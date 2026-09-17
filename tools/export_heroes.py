@@ -1,0 +1,244 @@
+"""Bake the static hero models into limb-segmented, game-ready GLBs.
+
+The source .blend files (ragnarok-defender/assets/blender/) are static posed models
+built from ~300 separate primitives grouped by *category* (Body / Armor / Hair / Cloth /
+Sword). They have no rig. This script re-groups every mesh by *limb*, bakes modifiers,
+joins each limb into a single mesh whose origin sits at its joint, parents the limbs into
+a tiny hierarchy and exports one GLB per hero. The game then animates the limbs
+procedurally (see src/render/heroes.js) - no skinning required.
+
+Run headless, one hero per invocation:
+
+    /Applications/Blender.app/Contents/MacOS/Blender -b <hero>.blend -P tools/export_heroes.py -- knight assets/heroes
+
+Output: <out>/<hero>.glb and a merged <out>/meta.json with pivots (glTF Y-up) and heights.
+
+Hierarchy (every node's origin is its joint, all in the model's rest pose):
+
+    root
+    ├─ torso            pivot: hips        (lean / bob)
+    │   ├─ head         pivot: neck
+    │   ├─ armL         pivot: shoulder L  (Blender -X side; knight's sword arm, hunter's bow arm)
+    │   │   └─ weapon   pivot: grip
+    │   ├─ armR         pivot: shoulder R
+    │   └─ cape         pivot: shoulders   (knight only)
+    ├─ legL             pivot: hip L
+    ├─ legR             pivot: hip R
+    └─ falcon           pivot: body centre (hunter only; wingL / wingR are its children)
+"""
+import json
+import os
+import sys
+
+import bpy
+from mathutils import Matrix, Vector
+
+# --------------------------------------------------------------------------------------
+# Per-hero recipe: which .blend scene, target height, joint pivots (Blender Z-up units)
+# and the classifier that maps a mesh to a limb.
+# --------------------------------------------------------------------------------------
+
+def _side(x):
+    return "L" if x < 0 else "R"
+
+
+def _has(name, *keys):
+    return any(k in name for k in keys)
+
+
+def classify_knight(group, name, cx):
+    if group.startswith("Sword"):
+        return "weapon"
+    if group.startswith("Hair"):
+        return "head"
+    if name.startswith(("Face", "Ear")):
+        return "head"
+    if _has(name, "Cuisse", "Poleyn", "Knee", "chausses", "Greave", "Ankle", "Sabatons"):
+        return "leg" + _side(cx)
+    if _has(name, "Upper arm", "Couter", "Vambrace", "Arm |", "Grip", "Gauntlet", "leather fist"):
+        return "arm" + _side(cx)
+    if name.startswith(("Cape | sculpted", "Cape | gold side", "Cape | sweeping")):
+        return "cape"
+    return "torso"  # cuirass, gorget, pauldrons, mail, gambeson, belts, surcoat, clasps, neck
+
+
+def classify_hunter(group, name, cx):
+    if group.startswith("Falcon"):
+        if name.startswith("Falcon | near"):
+            return "wingR"
+        if name.startswith("Falcon | far"):
+            return "wingL"
+        return "falcon"
+    if group.startswith("Bow"):
+        return "weapon" if name.startswith(("Bow", "Arrow")) else "torso"  # quiver rides the back
+    if group.startswith("Hair"):
+        return "head"
+    if name.startswith(("Head", "Ear", "Nose")):
+        return "head"
+    if _has(name, "Trousers", "Boot", "Sole"):
+        return "leg" + _side(cx)
+    if _has(name, "Upper arm", "Forearm", "bracer", "Bracer", "Gloved palm", "Glove finger", "Sleeve binding"):
+        return "arm" + _side(cx)
+    return "torso"  # tunic, puff sleeves, scarf, harness, corslet, belt, satchels, tabard, neck
+
+
+HEROES = {
+    "knight": {
+        "scene": "RO Knight | Studio",
+        "height": 1.9,                      # game units, feet at 0
+        "model_height": 3.75,               # Blender units, top of hair
+        "classify": classify_knight,
+        "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
+                   "cape": "torso", "weapon": "armL", "legL": "root", "legR": "root"},
+        "pivot": {
+            "root": (0, 0, 0),
+            "torso": (0, 0, 1.68),
+            "head": (0, 0, 2.90),
+            "armL": (-0.47, 0.0, 2.45), "armR": (0.47, 0.0, 2.45),
+            "cape": (0, 0.15, 2.70),
+            "weapon": (-0.80, -0.29, 2.00),
+            "legL": (-0.22, 0, 1.62), "legR": (0.24, 0, 1.62),
+        },
+    },
+    "hunter": {
+        "scene": "Hunter & Falcon | Studio",
+        "height": 1.75,
+        "model_height": 2.30,
+        "classify": classify_hunter,
+        "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
+                   "weapon": "armL", "legL": "root", "legR": "root",
+                   "falcon": "root", "wingL": "falcon", "wingR": "falcon"},
+        "pivot": {
+            "root": (0, 0, 0),
+            "torso": (0, 0, 1.05),
+            "head": (0, 0, 1.72),
+            "armL": (-0.36, 0.0, 1.50), "armR": (0.37, 0.0, 1.50),
+            "weapon": (-0.68, -0.22, 1.33),
+            "legL": (-0.16, 0, 1.05), "legR": (0.17, 0, 1.05),
+            "falcon": (0.85, -0.02, 1.85),
+            "wingL": (0.74, 0.0, 1.95), "wingR": (0.96, 0.0, 1.95),
+        },
+    },
+}
+
+
+# --------------------------------------------------------------------------------------
+
+def model_meshes(scene):
+    """Mesh objects under the '| model root' empty, skipping anything hidden from render."""
+    out = []
+    for o in scene.objects:
+        if o.type != "MESH" or o.hide_render:
+            continue
+        p, top = o.parent, None
+        while p is not None:
+            top = p
+            p = p.parent
+        if top is not None and "model root" in top.name:
+            out.append(o)
+    return out
+
+
+def world_center(o):
+    pts = [o.matrix_world @ Vector(c) for c in o.bound_box]
+    return sum(pts, Vector()) / 8
+
+
+def bake_group(scene, name, objects, scale, pivot):
+    """Evaluate (modifiers applied), bake world transforms, join into one object at `pivot`."""
+    dg = bpy.context.evaluated_depsgraph_get()
+    parts = []
+    for o in objects:
+        ev = o.evaluated_get(dg)
+        me = bpy.data.meshes.new_from_object(ev, preserve_all_data_layers=True, depsgraph=dg)
+        me.transform(Matrix.Scale(scale, 4) @ o.matrix_world)
+        part = bpy.data.objects.new(f"__{name}_{o.name}", me)
+        scene.collection.objects.link(part)
+        parts.append(part)
+    active = parts[0]
+    if len(parts) > 1:
+        with bpy.context.temp_override(active_object=active, selected_editable_objects=parts,
+                                       selected_objects=parts, object=active):
+            bpy.ops.object.join()
+    me = active.data
+    me.transform(Matrix.Translation(-Vector(pivot) * scale))
+    active.name = name
+    me.name = name
+    active.location = Vector(pivot) * scale
+    return active
+
+
+def export(hero_key, out_dir):
+    recipe = HEROES[hero_key]
+    scene = bpy.data.scenes[recipe["scene"]]
+    bpy.context.window.scene = scene
+    scale = recipe["height"] / recipe["model_height"]
+    classify = recipe["classify"]
+
+    groups = {}
+    for o in model_meshes(scene):
+        group = o.parent.name.split(" |")[0]
+        limb = classify(group, o.name, world_center(o).x)
+        groups.setdefault(limb, []).append(o)
+
+    for limb in recipe["parent"]:
+        if limb not in groups:
+            raise SystemExit(f"{hero_key}: recipe expects limb '{limb}' but no mesh was classified into it")
+    unknown = set(groups) - set(recipe["parent"])
+    if unknown:
+        raise SystemExit(f"{hero_key}: classifier produced limbs without a parent: {sorted(unknown)}")
+
+    root = bpy.data.objects.new("root", None)
+    scene.collection.objects.link(root)
+    nodes = {"root": root}
+    for limb, objs in groups.items():
+        nodes[limb] = bake_group(scene, limb, objs, scale, recipe["pivot"][limb])
+
+    # Parent so every node's local translation is joint-to-joint in the rest pose.
+    for limb, parent in recipe["parent"].items():
+        child, par = nodes[limb], nodes[parent]
+        child.parent = par
+        child.matrix_parent_inverse = Matrix.Identity(4)
+        child.location = (Vector(recipe["pivot"][limb]) - Vector(recipe["pivot"][parent])) * scale
+
+    for o in scene.objects:
+        o.select_set(o in nodes.values())
+    bpy.context.view_layer.objects.active = root
+
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, f"{hero_key}.glb")
+    bpy.ops.export_scene.gltf(
+        filepath=path, export_format="GLB", use_selection=True, use_active_scene=True, export_apply=True,
+        export_yup=True, export_animations=False, export_lights=False, export_cameras=False,
+        export_materials="EXPORT", export_normals=True, export_texcoords=False, export_extras=False,
+    )
+
+    def yup(v):  # Blender Z-up -> glTF Y-up
+        return [round(v[0] * scale, 4), round(v[2] * scale, 4), round(-v[1] * scale, 4)]
+
+    meta = {
+        "height": recipe["height"],
+        "front": "+z",
+        "pivot": {k: yup(v) for k, v in recipe["pivot"].items()},
+        "parts": {limb: {"meshes": len(objs), "verts": len(nodes[limb].data.vertices)} for limb, objs in groups.items()},
+    }
+    meta_path = os.path.join(out_dir, "meta.json")
+    all_meta = {}
+    if os.path.exists(meta_path):
+        with open(meta_path) as f:
+            all_meta = json.load(f)
+    all_meta[hero_key] = meta
+    with open(meta_path, "w") as f:
+        json.dump(all_meta, f, indent=2)
+
+    total = sum(p["verts"] for p in meta["parts"].values())
+    print(f"[export_heroes] {hero_key}: {len(groups)} limbs, {total} verts -> {path} ({os.path.getsize(path) // 1024} KB)")
+    for limb, p in sorted(meta["parts"].items()):
+        print(f"    {limb:8} {p['meshes']:4} meshes {p['verts']:6} verts")
+
+
+if __name__ == "__main__":
+    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    if len(argv) != 2 or argv[0] not in HEROES:
+        raise SystemExit(f"usage: blender -b <hero>.blend -P export_heroes.py -- <{'|'.join(HEROES)}> <out_dir>")
+    export(argv[0], argv[1])

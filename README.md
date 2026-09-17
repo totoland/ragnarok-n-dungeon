@@ -1,0 +1,142 @@
+# Dungeon RO
+
+3D belt-scrolling dungeon brawler in the Dungeon & Fighter mould, with the two Ragnarok heroes
+modelled in `../ragnarok-defender/assets/blender/` (RO Knight, Hunter & Falcon). Three.js
+(vendored, no build step), vanilla ES modules, fills whatever screen it gets. Sibling of
+`../ragnarok-defender` and `../badminton` and follows the same conventions.
+
+![Knight and Hunter on the title screen](docs/screenshots/heroes.jpg)
+
+| Sewer Entrance — knight's sword chain | Bone Crypt — hunter vs. skeletons |
+|---|---|
+| ![](docs/screenshots/sewer.jpg) | ![](docs/screenshots/crypt.jpg) |
+
+![Magnum Break on the Orc Lord](docs/screenshots/boss.jpg)
+
+```bash
+npm run dev      # http://localhost:8082  (no-store static server)
+npm test         # node --test: pure sim tests + a Three-in-Node render smoke test (no WebGL)
+npm run sim      # headless bot plays the whole dungeon with both heroes (balance harness)
+npm run export   # re-bake assets/heroes/*.glb from the source .blend files (needs Blender)
+```
+
+Arrows / WASD move on the floor (x = along the room, up/down = depth lane), **J** attack,
+**K** jump, **L** dash, **U I O** skills, **M** mute, **P** pause, **Enter** start. Gamepads
+work (X attack, A jump, B dash, Y / RB / LB skills, Start pause) and touch devices get a
+virtual stick + buttons; portrait screens zoom the camera out so you can still see ahead.
+
+## The one idea
+
+Enemies telegraph everything and hit-stun is the whole economy. A basic combo locks a monster
+in place; a launched monster can be juggled; anything winding up can be interrupted — except the
+Orc Lord, who has super armour (`mass >= 3` in `combat.applyHit`) and must be dodged on read.
+Ranged fire is beaten by stepping to another depth lane, not by blocking. Rooms restore 30 % HP
+and all MP on entry, so every room is its own puzzle: read the pack, pick the skill. Monsters
+drop red (HP) and blue (MP) potions — the red-potion chance jumps when you are under 40 % HP,
+the belt-scroller pity rule (`DROPS` in `config.js`).
+
+- **Knight**: 3-hit sword chain (`slash1 → slash2 → slash3`), Bash (single heavy hit, huge
+  knockback), Magnum Break (radial launch), Bowling Bash (charge through the pack).
+- **Hunter**: 3-shot arrow chain (the third pierces), Double Strafe, Arrow Shower (area launch
+  ahead), Blitz Beat (the falcon dives the nearest monster three times).
+
+Every attack is data in [src/sim/data/heroes.js](src/sim/data/heroes.js): a locked `dur`,
+timed `hits` (boxes relative to the hero: x forward, y height, z depth tolerance), `spawns`
+for projectiles, an optional `move` window and `cancelAt` — from there a buffered press chains
+`next`, and a skill cancels a basic. Monsters are the same shape in
+[src/sim/data/monsters.js](src/sim/data/monsters.js) with an `ai` (hopper / walker / archer /
+boss) and long wind-ups on purpose. The dungeon is five rooms of waves in
+[src/sim/data/dungeon.js](src/sim/data/dungeon.js), one lesson each.
+
+## Layout
+
+```
+src/
+  config.js            every tunable (sim step, floor lanes, player feel, camera)
+  input.js             keyboard / gamepad / touch → {held, pressed} snapshots, one per sim tick
+  sim/                 PURE: no DOM, no Three.js, no Math.random
+    game.js            createGame / update: rooms, waves, spawns, projectiles, potions, combo, events
+    player.js          hero state machine: idle/walk/air/dash/attack/hurt/dead, buffers, cancels
+    enemies.js         monster AI: enter → chase → windup → attack → recover, hurt/down, dead
+    combat.js          boxHits (belt-scroller depth fudge), rollDamage, applyHit (knockback/launch)
+    rng.js             mulberry32 — a run is (hero, seed, inputs)
+    data/              heroes, monsters, dungeon — the design lives here
+  render/              Three.js; never mutates the sim
+    scene.js           renderer, lights, PMREM env, camera follow + shake, procedural rooms/themes
+    heroes.js          GLB loading, limb rig, keyframe clips, falcon flight, i-frame blink
+    monsters.js        primitive-built chibis (Poring, Lunatic, Skel Soldier/Archer, Orc Lord)
+    anim.js            tiny pose system shared by heroes and humanoid monsters
+    fx.js              particles, damage numbers, slash arcs, rings, arrows, arrow rain, potions
+    hud.js             DOM: bars, room/wave, score/combo, boss bar, skill slots, banners, overlays
+    textures.js        procedural canvas textures (flagstones, bricks, sprites)
+  audio.js             WebAudio synth voices, driven by game.events
+  main.js              boot, title-screen hero turntable, fixed-step loop with hit-stop, window.__dro
+assets/heroes/         knight.glb, hunter.glb, meta.json (baked, see Art)
+vendor/three/          three r180 core + GLTFLoader, RoomEnvironment, BufferGeometryUtils (MIT)
+tools/export_heroes.py Blender headless: static .blend → limb-segmented GLB
+tools/playtest.mjs     headless balance harness
+tests/                 25 tests: combat / player / game (pure) + a Three-in-Node render smoke test
+```
+
+The sim never imports the renderer and never touches `Math.random`, so a run is fully
+determined by hero + seed + the input stream, which is what makes the harness trustworthy.
+The one channel out is `game.events` — plain records (`attack`, `hit`, `kill`, `windup`,
+`roomClear`, …) that fx, audio and the main loop (hit-stop) drain each frame; the sim never
+reads them and the array is capped.
+
+## Art
+
+The source models are static posed sculpts — ~300 primitives each, grouped by *category*
+(Body / Armor / Hair / Cloth / Sword), no rig. Rather than retopologise and skin them,
+[tools/export_heroes.py](tools/export_heroes.py) re-groups every mesh by **limb** (name
+keywords + side of the body), bakes the bevel/solidify modifiers, joins each limb into one
+mesh whose origin is its joint, parents them into a nine-node hierarchy and exports a GLB:
+
+```
+root ─ torso ─ head / armL ─ weapon / armR / cape        (knight)
+     ├ legL ├ legR
+     └ falcon ─ wingL / wingR                             (hunter)
+```
+
+The game then animates the limbs procedurally: [src/render/anim.js](src/render/anim.js) is a
+flat-channel keyframe system (`aLx` = left arm swings forward, `tx` = torso leans forward,
+`cx` = cape blown back, …) and [src/render/heroes.js](src/render/heroes.js) holds one clip per
+attack plus walk / idle / hurt / dash / dead. The hunter's bow arm is turned 90° at rest so the
+bow faces the camera and points forward; the weapon node counter-rotates to stay vertical.
+The falcon rides the draw hand and is re-parented to the world for Blitz Beat.
+
+Re-bake after editing the .blend files (the exporter reads the sibling project's copies):
+
+```bash
+npm run export
+```
+
+Monsters are primitives built in code, like the sibling project's chibis. Rooms are procedural
+too: canvas-drawn flagstone and brick textures, pillars, flickering torches and per-theme props
+(sewer / crypt / throne).
+
+**Names are placeholders.** Poring, Lunatic, Skel Soldier, Orc Lord and the RO skill names are
+Gravity's; swap them for original names before publishing — the models, stats and behaviour are
+all original so that is a string edit in `src/sim/data/`.
+
+## Balance
+
+`npm run sim` runs a deliberately dumb bot (walk to the nearest monster's lane, mash, fire
+skills when ready, sidestep wind-ups, lane-dodge arrows, back off from the boss) through the
+whole dungeon, five seeds per hero, and fails if fewer than half the runs clear it or any run
+clears it flawlessly. Current tuning: the knight clears ~4/5, the hunter ~1–2/5 (the bot has
+no boss strategy; a kiting hunter that lane-dodges the charge beats the Orc Lord with half her
+HP). The Orc Lord has super armour, so the "stun-lock everything" plan that clears rooms 1–4
+does not work on him — that is the point of the fight.
+
+## Debug
+
+In the browser console: `__dro.game` is the live state, `__dro.tick(n)` steps the sim `n`
+frames with the current keyboard state, `__dro.play(n)` steps sim and visuals together,
+`__dro.input.held.right = true` fakes a key, `__dro.hero('hunter')` restarts with a hero,
+`__dro.heroView.def.rest` is the live rest pose.
+
+Screenshots are taken by the game itself: `await __dro.shot('name')` renders one 1600×900
+frame off the live canvas and `PUT`s it to the dev server, which writes
+`docs/screenshots/name.png` (dev-only route in `serve.mjs`). Stage the moment with `__dro.play`
+first — the ones above are `heroes`, `sewer`, `crypt`, `boss`.

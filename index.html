@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Dungeon RO</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main id="frame">
+    <canvas id="view"></canvas>
+
+    <div id="hud" hidden>
+      <div id="status">
+        <div id="hero-badge"><span id="hero-name">Knight</span></div>
+        <div class="bars">
+          <div class="bar hp"><div id="hp-fill" class="fill"></div><span id="hp-text" class="text"></span></div>
+          <div class="bar mp"><div id="mp-fill" class="fill"></div><span id="mp-text" class="text"></span></div>
+        </div>
+      </div>
+      <div id="room">
+        <div id="room-name"></div>
+        <div id="room-wave"></div>
+      </div>
+      <div id="score">
+        <div id="score-value">0</div>
+        <div id="combo"><span id="combo-count">0</span><span class="label">HITS</span></div>
+      </div>
+      <div id="boss" hidden>
+        <div id="boss-name"></div>
+        <div class="bar boss"><div id="boss-fill" class="fill"></div></div>
+      </div>
+      <div id="go" hidden>GO <span>▶</span></div>
+      <div id="banner" hidden></div>
+      <div id="skills"></div>
+      <div id="hint">Move ← ↑ → ↓ · Attack J · Jump K · Dash L · Skills U I O · Mute M · Pause P</div>
+    </div>
+
+    <div id="title" class="overlay">
+      <h1>Dungeon <span>RO</span></h1>
+      <p class="sub">Culvert of Prontera — five rooms, one Orc Lord.</p>
+      <div id="heroes">
+        <button class="hero" data-hero="knight" type="button">
+          <strong>Knight</strong>
+          <em>Melee. Three-hit sword combo, Bash, Magnum Break, Bowling Bash.</em>
+        </button>
+        <button class="hero" data-hero="hunter" type="button">
+          <strong>Hunter</strong>
+          <em>Ranged. Arrow chain, Double Strafe, Arrow Shower, Blitz Beat.</em>
+        </button>
+      </div>
+      <p class="controls">Arrows / WASD move · J attack · K jump · L dash · U I O skills · Enter start</p>
+      <p id="loading">Loading heroes…</p>
+    </div>
+
+    <div id="end" class="overlay" hidden>
+      <h1 id="end-title">Dungeon cleared</h1>
+      <p id="end-stats"></p>
+      <button id="retry" type="button">Play again</button>
+    </div>
+
+    <div id="pause" class="overlay" hidden><h1>Paused</h1><p class="sub">Press P to resume</p></div>
+
+    <div id="touch" hidden>
+      <div id="stick"><div id="stick-knob"></div></div>
+      <div id="tbtns">
+        <button class="tbtn s" data-k="skill1" type="button">U</button>
+        <button class="tbtn s" data-k="skill2" type="button">I</button>
+        <button class="tbtn s" data-k="skill3" type="button">O</button>
+        <button class="tbtn" data-k="dash" type="button">DASH</button>
+        <button class="tbtn" data-k="jump" type="button">JUMP</button>
+        <button class="tbtn big" data-k="attack" type="button">ATK</button>
+      </div>
+    </div>
+  </main>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
