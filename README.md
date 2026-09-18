@@ -22,8 +22,26 @@ npm run export   # re-bake assets/heroes/*.glb from the source .blend files (nee
 
 Arrows / WASD move on the floor (x = along the room, up/down = depth lane), **J** attack,
 **K** jump, **L** dash, **U I O** skills, **M** mute, **P** pause, **Enter** start. Gamepads
-work (X attack, A jump, B dash, Y / RB / LB skills, Start pause) and touch devices get a
-virtual stick + buttons; portrait screens zoom the camera out so you can still see ahead.
+work (X attack, A jump, B dash, Y / RB / LB skills, Start pause).
+
+Both phone orientations are supported. Portrait zooms the camera out so you can still see
+ahead; landscape is the better fit for a belt-scroller and gets a compact HUD and smaller
+thumb buttons below 500 px of height, keyed on height rather than on orientation so a short
+desktop window behaves the same. `viewport-fit=cover` means the page runs under the notch and
+the home indicator, so every screen-edge offset is measured from `env(safe-area-inset-*)`.
+Rotating mid-run re-lays out the controls, except while a thumb is down, because mobile
+browsers also fire `resize` when the URL bar collapses.
+
+Those are only the defaults. **Settings & controls**, reachable from the title screen and the
+pause overlay, rebinds every action to up to three keys plus one gamepad button, and persists to
+`localStorage`. Binding a key that is already in use takes it from whatever held it, so one
+button never drives two actions; an action left with nothing bound is called out in the footer.
+Gamepad movement stays on the left stick and d-pad and is deliberately not rebindable.
+
+On-screen controls appear automatically on touchscreens and can be forced on or off from the
+same menu, which also sets the stick side, size, dead zone, opacity, haptics, and whether the
+stick is floating (the ring springs to wherever the thumb lands) or parked. The stick reads from
+a half-screen zone rather than the ring itself, because a thumb rarely lands on a 150 px circle.
 
 ## The one idea
 
@@ -53,6 +71,7 @@ boss) and long wind-ups on purpose. The dungeon is five rooms of waves in
 ```
 src/
   config.js            every tunable (sim step, floor lanes, player feel, camera)
+  settings.js          PURE: key/pad bindings + touch layout, localStorage I/O, conflict rules
   input.js             keyboard / gamepad / touch → {held, pressed} snapshots, one per sim tick
   sim/                 PURE: no DOM, no Three.js, no Math.random
     game.js            createGame / update: rooms, waves, spawns, projectiles, potions, combo, events
@@ -68,6 +87,7 @@ src/
     anim.js            tiny pose system shared by heroes and humanoid monsters
     fx.js              particles, damage numbers, slash arcs, rings, arrows, arrow rain, potions
     hud.js             DOM: bars, room/wave, score/combo, boss bar, skill slots, banners, overlays
+    settings-ui.js     DOM: the rebinding table and the on-screen-control tuning panel
     textures.js        procedural canvas textures (flagstones, bricks, sprites)
   audio.js             WebAudio synth voices, driven by game.events
   main.js              boot, title-screen hero turntable, fixed-step loop with hit-stop, window.__dro

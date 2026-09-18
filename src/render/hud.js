@@ -9,6 +9,7 @@ export function createHud() {
     roomName: $('room-name'), roomWave: $('room-wave'), score: $('score-value'), combo: $('combo'), comboCount: $('combo-count'),
     boss: $('boss'), bossName: $('boss-name'), bossFill: $('boss-fill'), go: $('go'), skills: $('skills'), banner: $('banner'),
     title: $('title'), end: $('end'), endTitle: $('end-title'), endStats: $('end-stats'), retry: $('retry'), pause: $('pause'), loading: $('loading'),
+    hint: $('hint'), settings: $('settings'),
   };
   let slots = [];
   let lastCombo = 0;

@@ -3,6 +3,8 @@
 import { SIM } from './config.js';
 import { createGame, update as simUpdate } from './sim/game.js';
 import { createInput, attachTouch } from './input.js';
+import { loadSettings, lookup, hintLine } from './settings.js';
+import { createSettingsUI } from './render/settings-ui.js';
 import { createScene, buildRoom, updateScene } from './render/scene.js';
 import { loadHeroAssets, createHeroView } from './render/heroes.js';
 import { createMonsterViews } from './render/monsters.js';
@@ -14,8 +16,31 @@ import * as THREE from 'three';
 const canvas = document.getElementById('view');
 const world = createScene(canvas);
 const hud = createHud();
-const input = createInput(window);
-attachTouch(input);
+const settings = loadSettings();
+const input = createInput(window, { settings });
+const touch = attachTouch(input, { settings });
+let keyLookup = lookup(settings.keys);
+
+// Hints are generated from the live bindings, so a rebind shows up everywhere at once.
+function applyBindings() {
+  keyLookup = lookup(settings.keys);
+  const line = hintLine(settings);
+  hud.el.hint.textContent = line;
+  const titleControls = document.getElementById('title-controls');
+  if (titleControls) titleControls.textContent = `${line} · Enter start`;
+  const pauseSub = document.getElementById('pause-sub');
+  if (pauseSub) {
+    const k = (settings.keys.pause || [])[0];
+    pauseSub.textContent = k ? `Press ${hintKey(k)} to resume` : 'Use the button below to resume';
+  }
+}
+const hintKey = (code) => (code.startsWith('Key') ? code.slice(3) : code === 'Escape' ? 'Esc' : code);
+
+const settingsUI = createSettingsUI({ input, touch, settings, onChange: applyBindings });
+applyBindings();
+document.getElementById('title-settings').addEventListener('click', () => settingsUI.open());
+document.getElementById('pause-settings').addEventListener('click', () => settingsUI.open());
+document.getElementById('pause-resume').addEventListener('click', () => { paused = false; hud.showPause(false); });
 const fx = createFx(world);
 const monsters = createMonsterViews(world);
 
@@ -36,13 +61,14 @@ for (const b of heroButtons) {
   b.disabled = true;
   b.addEventListener('click', () => { selectedHero = b.dataset.hero; sfx.init(); start(); });
 }
-input.on('confirm', () => { sfx.init(); if (!hud.el.title.hidden && assets) start(); else if (!hud.el.end.hidden) start(); });
+input.on('confirm', () => { if (settingsUI.isOpen) return; sfx.init(); if (!hud.el.title.hidden && assets) start(); else if (!hud.el.end.hidden) start(); });
 window.addEventListener('keydown', (e) => {
-  if (hud.el.title.hidden || !assets) return;
-  if (['ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD'].includes(e.code)) { selectedHero = selectedHero === 'knight' ? 'hunter' : 'knight'; markSelected(); }
+  if (hud.el.title.hidden || !assets || settingsUI.isOpen) return;
+  const a = keyLookup[e.code];
+  if (a === 'left' || a === 'right') { selectedHero = selectedHero === 'knight' ? 'hunter' : 'knight'; markSelected(); }
 });
 input.on('mute', () => { sfx.init(); sfx.toggleMute(); });
-input.on('pause', () => { if (!game || ended) return; paused = !paused; hud.showPause(paused); });
+input.on('pause', () => { if (!game || ended || settingsUI.isOpen) return; paused = !paused; hud.showPause(paused); });
 hud.el.retry.addEventListener('click', () => start());
 window.addEventListener('pointerdown', () => sfx.init(), { once: true });
 
