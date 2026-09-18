@@ -24,12 +24,19 @@ export function createHud() {
       const d = document.createElement('div');
       d.className = 'skill';
       d.title = info.tip;
-      d.innerHTML = `<span class="key">${info.key}</span><span class="cost">${atk.mp} MP</span><span class="name">${info.name}</span><div class="cd"></div>`;
+      d.innerHTML = `<span class="key">${info.key}</span><span class="cost">${atk.mp} MP</span><span class="name">${info.name}</span>`
+        + '<div class="cd"></div><span class="cdnum"></span>';
       el.skills.appendChild(d);
-      return { id, el: d, cd: d.querySelector('.cd'), flashT: 0 };
+      // The touch button for the same skill. On a phone #skills is hidden, so without this
+      // there is no cooldown feedback anywhere at all.
+      const tb = document.querySelector(`#touch .tbtn.s[data-k="skill${i + 1}"]`);
+      if (tb) tb.innerHTML = `<span class="tlabel">${info.name.split(' ')[0]}</span><span class="tcd"></span>`;
+      return {
+        id, el: d, cd: d.querySelector('.cd'), num: d.querySelector('.cdnum'),
+        tb, tcd: tb ? tb.querySelector('.tcd') : null,
+        flashT: 0, readyT: 0, wasCd: 0,
+      };
     });
-    // touch skill buttons show the skill's name
-    document.querySelectorAll('#touch .tbtn.s').forEach((b, i) => { const id = player.def.skills[i]; if (id) b.textContent = SKILL_INFO[id].name.split(' ')[0]; });
   }
 
   let bannerT = 0;
@@ -89,9 +96,32 @@ export function createHud() {
 
     for (const s of slots) {
       const atk = p.def.attacks[s.id];
-      const cd = p.cooldowns[s.id] > 0 ? p.cooldowns[s.id] / atk.cd : 0;
-      s.cd.style.height = `${cd * 100}%`;
-      s.el.classList.toggle('poor', p.mp < atk.mp);
+      const left = Math.max(0, p.cooldowns[s.id] || 0);
+      const cd = left > 0 ? left / atk.cd : 0;
+      // Driven straight off the sim every frame rather than a CSS transition: a transition
+      // would lag the real cooldown and lie about when the skill is actually ready.
+      s.el.style.setProperty('--cd', cd.toFixed(4));
+      const label = left > 0.05 ? (left >= 1 ? left.toFixed(0) : left.toFixed(1)) : '';
+      s.num.textContent = label;
+      const poor = p.mp < atk.mp;
+      s.el.classList.toggle('poor', poor);
+
+      if (s.tb) {
+        s.tb.style.setProperty('--cd', cd.toFixed(4));
+        s.tb.classList.toggle('poor', poor);
+        s.tb.classList.toggle('cooling', cd > 0);
+        if (s.tcd) s.tcd.textContent = label;
+      }
+
+      // One pulse the moment it comes back, so you can look away from the bar and still
+      // notice. Edge-triggered on the frame the cooldown actually reaches zero.
+      if (s.wasCd > 0 && cd === 0) s.readyT = 0.45;
+      s.wasCd = cd;
+      s.readyT = Math.max(0, s.readyT - dt);
+      const ready = s.readyT > 0;
+      s.el.classList.toggle('ready', ready);
+      s.tb?.classList.toggle('ready', ready);
+
       if (p.state === 'attack' && p.attack === s.id) s.flashT = 0.25;
       s.flashT = Math.max(0, s.flashT - dt);
       s.el.classList.toggle('flash', s.flashT > 0);
