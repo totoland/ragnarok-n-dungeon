@@ -12,7 +12,10 @@ COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY index.html style.css /usr/share/nginx/html/
 COPY src/ /usr/share/nginx/html/src/
 COPY vendor/ /usr/share/nginx/html/vendor/
-COPY assets/heroes/ /usr/share/nginx/html/assets/heroes/
-COPY assets/monsters/ /usr/share/nginx/html/assets/monsters/
+# Copy assets/ wholesale and let .dockerignore decide what stays out. Enumerating asset
+# folders here has now silently 404'd twice in production: once for assets/monsters when the
+# boss GLB was added, once for assets/maps when the painted backdrop was. Both worked fine on
+# the dev server, which serves straight from the working tree.
+COPY assets/ /usr/share/nginx/html/assets/
 
 EXPOSE 80

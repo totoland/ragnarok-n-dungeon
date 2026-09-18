@@ -7,7 +7,8 @@ docs
 serve.mjs
 README.md
 .playwright-mcp
-# Source art, not shipped: ~9 MB of .blend files and their build scripts.
+# Source art, not shipped: .blend files, build scripts and portrait renders. This is the
+# only thing keeping assets/ out of the image, so keep it accurate.
 assets/blender
 **/__pycache__
 **/.DS_Store
