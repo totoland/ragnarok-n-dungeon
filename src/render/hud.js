@@ -1,5 +1,6 @@
 // DOM overlay: bars, room label, score/combo, boss bar, skill slots, GO arrow, overlays.
 import { SKILL_INFO } from '../sim/data/heroes.js';
+import { MONSTERS } from '../sim/data/monsters.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -44,7 +45,16 @@ export function createHud() {
   function onEvent(ev, game) {
     switch (ev.type) {
       case 'wave': if (ev.index > 0) banner(`Wave ${ev.index + 1}`); break;
-      case 'roomEnter': if (ev.boss) setTimeout(() => banner('Orc Lord', 'boss'), 900); else if (ev.index > 0) banner(ev.name); break;
+      case 'roomEnter': {
+        // Read the boss's name out of the room's own wave, so swapping the boss in
+        // sim/data/dungeon.js is enough and this string never goes stale.
+        if (ev.boss) {
+          const type = game.dungeon.rooms[ev.index]?.waves?.[0]?.[0]?.type;
+          const name = MONSTERS[type]?.name || ev.name;
+          setTimeout(() => banner(name, 'boss'), 900);
+        } else if (ev.index > 0) banner(ev.name);
+        break;
+      }
       case 'roomClear': banner(ev.last ? 'Victory' : 'Clear!'); break;
       case 'bossAdds': banner('Reinforcements', 'boss'); break;
       case 'comboEnd': break;

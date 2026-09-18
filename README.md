@@ -11,7 +11,7 @@ modelled in `../ragnarok-defender/assets/blender/` (RO Knight, Hunter & Falcon).
 |---|---|
 | ![](docs/screenshots/sewer.jpg) | ![](docs/screenshots/crypt.jpg) |
 
-![Magnum Break on the Orc Lord](docs/screenshots/boss.jpg)
+![Magnum Break on Baphomet](docs/screenshots/boss.jpg)
 
 ```bash
 npm run dev      # http://localhost:8082  (no-store static server)
@@ -47,7 +47,7 @@ a half-screen zone rather than the ring itself, because a thumb rarely lands on 
 
 Enemies telegraph everything and hit-stun is the whole economy. A basic combo locks a monster
 in place; a launched monster can be juggled; anything winding up can be interrupted — except the
-Orc Lord, who has super armour (`mass >= 3` in `combat.applyHit`) and must be dodged on read.
+boss, who has super armour (`mass >= 3` in `combat.applyHit`) and must be dodged on read.
 Ranged fire is beaten by stepping to another depth lane, not by blocking. Rooms restore 30 % HP
 and all MP on entry, so every room is its own puzzle: read the pack, pick the skill. Monsters
 drop red (HP) and blue (MP) potions — the red-potion chance jumps when you are under 40 % HP,

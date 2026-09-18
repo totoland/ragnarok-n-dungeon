@@ -7,7 +7,7 @@ import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
 import { createScene, buildRoom, updateScene } from './render/scene.js';
 import { loadHeroAssets, createHeroView } from './render/heroes.js';
-import { createMonsterViews } from './render/monsters.js';
+import { createMonsterViews, loadMonsterAssets } from './render/monsters.js';
 import { createFx } from './render/fx.js';
 import { createHud } from './render/hud.js';
 import { sfx } from './audio.js';
@@ -122,7 +122,9 @@ function disposePreview() {
   preview = null;
 }
 
-loadHeroAssets().then((a) => {
+// The boss is a GLB like the heroes, so it loads on the same gate: the title screen stays
+// on "Loading" until every model the run can need is in memory.
+Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   assets = a;
   hud.setLoading('Pick a hero, or press Enter for the Knight.');
   for (const b of heroButtons) { b.disabled = false; b.addEventListener('mouseenter', () => { selectedHero = b.dataset.hero; markSelected(); }); }

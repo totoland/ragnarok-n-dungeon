@@ -2,6 +2,7 @@
 // the sim state. Humanoids (skeletons, the Orc Lord) use the same limb rig / applyPose as the
 // heroes; blobs (Poring, Lunatic) squash and stretch.
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
 const HALF = Math.PI / 2;
@@ -182,7 +183,52 @@ function buildOrcLord() {
   return v;
 }
 
-const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord };
+// ------------------------------------------------------------------ Baphomet (GLB)
+// Unlike every other monster here, the boss is the sculpted Blender model, baked into
+// limb-segmented GLB by tools/export_heroes.py exactly like the heroes. Each limb is a
+// rigid mesh whose origin is its joint, so the same applyPose rig drives it and the boss
+// clips below need no changes.
+let bossModel = null;
+
+/** Injection seam for the loaded boss model. The render test uses it to supply a stand-in
+ *  rig, since GLTFLoader cannot fetch a file in Node. */
+export function setBossModel(scene) { bossModel = scene; }
+
+export async function loadMonsterAssets(base = 'assets/monsters/') {
+  const gltf = await new GLTFLoader().loadAsync(base + 'baphomet.glb');
+  setBossModel(gltf.scene);
+  return bossModel;
+}
+
+function buildBaphomet() {
+  if (!bossModel) throw new Error('baphomet.glb not loaded — call loadMonsterAssets() first');
+  // Clone per spawn, materials included: the view mutates emissive for the hit flash and
+  // disposes materials on death, so sharing them across a retry would corrupt the model.
+  const root = bossModel.clone(true);
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    o.material = o.material.clone();
+    o.material.envMapIntensity = 0.9;
+    o.castShadow = true;
+    o.receiveShadow = false;
+  });
+  const rig = { root };
+  for (const name of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'weapon']) {
+    const n = root.getObjectByName(name);
+    if (n) rig[name] = n;
+  }
+  for (const k of ['root', 'torso', 'head']) if (rig[k]) rig[k].rotation.order = 'YXZ';
+  const base = { root: rig.root.position.clone(), torso: rig.torso.position.clone() };
+  return { root, rig, base, kind: 'humanoid' };
+}
+
+// Per-type rest offsets, added to every pose. The primitive monsters are modelled standing
+// upright so they need none; Baphomet is sculpted already crouched and hunched, and the boss
+// clips lean forward on top of that, which pitched him nearly horizontal on the slam.
+const EMPTY_REST = {};
+const REST = { baphomet: { tx: -0.24, hx: 0.16 } };
+
+const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: buildBaphomet };
 
 // ------------------------------------------------------------------ clips
 
@@ -235,6 +281,7 @@ export function createMonsterViews(world) {
 
   function updateHumanoid(v, e, dt) {
     const { rig, base } = v.built;
+    const rest = REST[e.type] || EMPTY_REST;
     const ai = e.def.ai === 'hopper' ? 'walker' : e.def.ai;
     const clips = CLIPS[ai] || CLIPS.walker;
     let target = v.scratch, rate = 16;
@@ -260,7 +307,7 @@ export function createMonsterViews(world) {
       target = idlePose(v.t, v.scratch);
     }
     blendTo(v.cur, target, rate, dt);
-    applyPose(rig, base, {}, v.cur, v.yaw);
+    applyPose(rig, base, rest, v.cur, v.yaw);
   }
 
   function updateBlob(v, e, dt) {

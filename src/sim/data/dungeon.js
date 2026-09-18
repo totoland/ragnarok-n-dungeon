@@ -39,9 +39,9 @@ export const DUNGEON = {
       ],
     },
     {
-      name: "Orc Lord's Throne", width: 20, theme: 'throne', boss: true,
+      name: "Baphomet's Throne", width: 20, theme: 'throne', boss: true,
       waves: [
-        [{ type: 'orcLord', count: 1 }],
+        [{ type: 'baphomet', count: 1 }],
       ],
     },
   ],

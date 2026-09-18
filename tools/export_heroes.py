@@ -1,4 +1,8 @@
-"""Bake the static hero models into limb-segmented, game-ready GLBs.
+"""Bake the static character models into limb-segmented, game-ready GLBs.
+
+Heroes and the Baphomet boss share this one pipeline: they are all static posed models
+with no rig, so the exporter re-groups meshes by limb and the game animates the limbs
+procedurally.
 
 The source .blend files (ragnarok-defender/assets/blender/) are static posed models
 built from ~300 separate primitives grouped by *category* (Body / Armor / Hair / Cloth /
@@ -9,7 +13,7 @@ procedurally (see src/render/heroes.js) - no skinning required.
 
 Run headless, one hero per invocation:
 
-    /Applications/Blender.app/Contents/MacOS/Blender -b <hero>.blend -P tools/export_heroes.py -- knight assets/heroes
+    /Applications/Blender.app/Contents/MacOS/Blender -b <model>.blend -P tools/export_heroes.py -- knight assets/heroes
 
 Output: <out>/<hero>.glb and a merged <out>/meta.json with pivots (glTF Y-up) and heights.
 
@@ -82,7 +86,27 @@ def classify_hunter(group, name, cx):
     return "torso"  # tunic, puff sleeves, scarf, harness, corslet, belt, satchels, tabard, neck
 
 
-HEROES = {
+def classify_baphomet(group, name, cx):
+    """Boss model. Collection names come from the edit-group empties in baphomet.blend.
+
+    The mane is welded to the shoulders, so it rides the torso rather than the head -
+    parenting it to the head makes the ruff swing with every nod.
+    """
+    if group.startswith("Scythe"):
+        return "weapon"
+    if group.startswith("Head"):
+        return "head"
+    if group.startswith("Fur"):
+        return "torso"
+    if _has(name, "Thigh", "Shank", "Cannon", "Hoof", "Stifle", "Hock", "Fetlock", "Dewclaw",
+            "thigh shag", "hock shag"):
+        return "leg" + _side(cx)
+    if _has(name, "Upper arm", "Forearm", "Elbow", "Bicep", "Palm", "Finger", "Thumb", "forearm cuff"):
+        return "arm" + _side(cx)
+    return "torso"   # trunk, pelvis, pectoral, deltoid, lat, rib, abdomen, clavicle, fissures
+
+
+MODELS = {
     "knight": {
         "scene": "RO Knight | Studio",
         "height": 1.9,                      # game units, feet at 0
@@ -117,6 +141,24 @@ HEROES = {
             "legL": (-0.16, 0, 1.05), "legR": (0.17, 0, 1.05),
             "falcon": (0.85, -0.02, 1.85),
             "wingL": (0.74, 0.0, 1.95), "wingR": (0.96, 0.0, 1.95),
+        },
+    },
+    # Boss. Pivots are the JOINT dict from assets/blender/baphomet/build_baphomet.py, which
+    # is where the model's joints were authored - do not re-measure them from the mesh.
+    "baphomet": {
+        "scene": "Baphomet | Studio",
+        "height": 3.0,                      # game units; hurtbox h is 3.2 in sim/data/monsters.js
+        "model_height": 4.85,               # Blender units, horn tips (the scythe reaches higher)
+        "classify": classify_baphomet,
+        "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
+                   "weapon": "armL", "legL": "root", "legR": "root"},
+        "pivot": {
+            "root": (0, 0, 0),
+            "torso": (0, 0.02, 2.42),       # hips
+            "head": (0, -0.10, 3.90),       # neck
+            "armL": (-0.74, -0.06, 3.62), "armR": (0.74, -0.06, 3.62),
+            "weapon": (-1.38, 0.08, 4.69),  # the raised hand's grip on the haft
+            "legL": (-0.46, 0.02, 2.42), "legR": (0.46, 0.02, 2.42),
         },
     },
 }
@@ -168,8 +210,8 @@ def bake_group(scene, name, objects, scale, pivot):
     return active
 
 
-def export(hero_key, out_dir):
-    recipe = HEROES[hero_key]
+def export(model_key, out_dir):
+    recipe = MODELS[model_key]
     scene = bpy.data.scenes[recipe["scene"]]
     bpy.context.window.scene = scene
     scale = recipe["height"] / recipe["model_height"]
@@ -183,10 +225,10 @@ def export(hero_key, out_dir):
 
     for limb in recipe["parent"]:
         if limb not in groups:
-            raise SystemExit(f"{hero_key}: recipe expects limb '{limb}' but no mesh was classified into it")
+            raise SystemExit(f"{model_key}: recipe expects limb '{limb}' but no mesh was classified into it")
     unknown = set(groups) - set(recipe["parent"])
     if unknown:
-        raise SystemExit(f"{hero_key}: classifier produced limbs without a parent: {sorted(unknown)}")
+        raise SystemExit(f"{model_key}: classifier produced limbs without a parent: {sorted(unknown)}")
 
     root = bpy.data.objects.new("root", None)
     scene.collection.objects.link(root)
@@ -206,7 +248,7 @@ def export(hero_key, out_dir):
     bpy.context.view_layer.objects.active = root
 
     os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, f"{hero_key}.glb")
+    path = os.path.join(out_dir, f"{model_key}.glb")
     bpy.ops.export_scene.gltf(
         filepath=path, export_format="GLB", use_selection=True, use_active_scene=True, export_apply=True,
         export_yup=True, export_animations=False, export_lights=False, export_cameras=False,
@@ -227,18 +269,18 @@ def export(hero_key, out_dir):
     if os.path.exists(meta_path):
         with open(meta_path) as f:
             all_meta = json.load(f)
-    all_meta[hero_key] = meta
+    all_meta[model_key] = meta
     with open(meta_path, "w") as f:
         json.dump(all_meta, f, indent=2)
 
     total = sum(p["verts"] for p in meta["parts"].values())
-    print(f"[export_heroes] {hero_key}: {len(groups)} limbs, {total} verts -> {path} ({os.path.getsize(path) // 1024} KB)")
+    print(f"[export_heroes] {model_key}: {len(groups)} limbs, {total} verts -> {path} ({os.path.getsize(path) // 1024} KB)")
     for limb, p in sorted(meta["parts"].items()):
         print(f"    {limb:8} {p['meshes']:4} meshes {p['verts']:6} verts")
 
 
 if __name__ == "__main__":
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-    if len(argv) != 2 or argv[0] not in HEROES:
-        raise SystemExit(f"usage: blender -b <hero>.blend -P export_heroes.py -- <{'|'.join(HEROES)}> <out_dir>")
+    if len(argv) != 2 or argv[0] not in MODELS:
+        raise SystemExit(f"usage: blender -b <model>.blend -P export_heroes.py -- <{'|'.join(MODELS)}> <out_dir>")
     export(argv[0], argv[1])

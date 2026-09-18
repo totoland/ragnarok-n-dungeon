@@ -33,6 +33,8 @@ export const MONSTERS = {
     attack: { range: 7.5, keep: 4.5, windup: 0.7, dur: 0.3, cd: 2.4, shot: { speed: 11, life: 1.4, y: 1.2 }, knock: [2, 0] },
     score: 45,
   },
+  // Kept as-is. No longer spawned by the default dungeon, but the stats, the AI and the
+  // primitive-built view in render/monsters.js are all still here and still work.
   orcLord: {
     name: 'Orc Lord', ai: 'boss', boss: true,
     hp: 820, atk: 14, speed: 2.4, mass: 4.0,
@@ -42,5 +44,18 @@ export const MONSTERS = {
     charge: { windup: 0.7, dur: 0.55, speed: 13, cd: 10, box: { x0: -0.4, x1: 1.8, y0: -0.3, y1: 3 }, knock: [9, 3] },
     adds: { at: 0.5, type: 'skeleton', count: 2 },
     score: 500,
+  },
+  // Baphomet reuses the Orc Lord's 'boss' AI wholesale - the same three-move kit reads very
+  // differently on a model this tall with a scythe, so the numbers move, not the behaviour.
+  // Bigger reach and a taller hurtbox to match the sculpt; slightly slower, hits harder.
+  baphomet: {
+    name: 'Baphomet', ai: 'boss', boss: true,
+    hp: 880, atk: 14, speed: 2.3, mass: 4.5,
+    hurtbox: { r: 1.0, h: 3.2 },
+    attack: { range: 2.4, windup: 0.62, dur: 0.4, cd: 2.3, box: { x0: 0.0, x1: 2.8, y0: -0.3, y1: 3.4 }, knock: [6, 2] },
+    slam: { windup: 1.05, dur: 0.5, cd: 8.5, box: { x0: -3.1, x1: 3.1, y0: -0.5, y1: 3.4, both: true }, knock: [5, 8], depth: 1.45 },
+    charge: { windup: 0.72, dur: 0.55, speed: 13, cd: 10, box: { x0: -0.4, x1: 1.9, y0: -0.3, y1: 3.4 }, knock: [9, 3] },
+    adds: { at: 0.5, type: 'skeleton', count: 2 },
+    score: 650,
   },
 };

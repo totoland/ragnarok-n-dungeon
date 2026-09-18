@@ -6,10 +6,35 @@ import * as THREE from 'three';
 import { createGame, update } from '../src/sim/game.js';
 import { createEnemy } from '../src/sim/enemies.js';
 import { MONSTERS } from '../src/sim/data/monsters.js';
-import { createMonsterViews } from '../src/render/monsters.js';
+import { createMonsterViews, setBossModel } from '../src/render/monsters.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from '../src/render/anim.js';
 
 const world = () => ({ scene: new THREE.Scene() });
+
+// The boss view is backed by assets/monsters/baphomet.glb, and GLTFLoader cannot fetch a
+// file in Node. Stand in a rig with the same node names and joint hierarchy so the builder,
+// the pose rig and the dispose path all get exercised for real.
+function stubBossModel() {
+  const mk = (name, parent, y = 0) => {
+    const g = new THREE.Group();
+    g.name = name;
+    g.position.y = y;
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshStandardMaterial()));
+    parent.add(g);
+    return g;
+  };
+  const root = new THREE.Group();
+  root.name = 'root';
+  const torso = mk('torso', root, 1.5);
+  mk('head', torso, 0.9);
+  const armL = mk('armL', torso, 0.7);
+  mk('weapon', armL, -0.4);
+  mk('armR', torso, 0.7);
+  mk('legL', root, 1.5);
+  mk('legR', root, 1.5);
+  return root;
+}
+setBossModel(stubBossModel());
 
 test('every monster type builds, walks, winds up, attacks, gets hurt, launched and dies without throwing', () => {
   const w = world();
