@@ -3,3 +3,7 @@ node_modules/
 __pycache__/
 *.blend1
 docs/screenshots/*.png
+# Blender portrait renders: large, and not needed to rebuild anything.
+assets/blender/**/*_preview.png
+assets/blender/**/*_detail.png
+assets/blender/**/preview*.png

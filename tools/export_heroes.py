@@ -119,8 +119,12 @@ MODELS = {
             "torso": (0, 0, 1.68),
             "head": (0, 0, 2.90),
             "armL": (-0.47, 0.0, 2.45), "armR": (0.47, 0.0, 2.45),
-            "cape": (0, 0.15, 2.70),
-            "weapon": (-0.80, -0.29, 2.00),
+            # Y on these two moved when assets/blender/ro_knight/thicken_knight.py deepened
+            # the model: the cape scaled 1.12 about the centreline and the sword was
+            # translated with the hand. A stale pivot here swings the sword about the wrong
+            # point, which only shows up mid-attack.
+            "cape": (0, 0.168, 2.70),
+            "weapon": (-0.80, -0.408, 2.00),
             "legL": (-0.22, 0, 1.62), "legR": (0.24, 0, 1.62),
         },
     },
