@@ -200,7 +200,7 @@ export async function loadMonsterAssets(base = 'assets/monsters/') {
   return bossModel;
 }
 
-function buildBaphomet() {
+function buildBaphomet(scale = 1, darken = 0) {
   if (!bossModel) throw new Error('baphomet.glb not loaded — call loadMonsterAssets() first');
   // Clone per spawn, materials included: the view mutates emissive for the hit flash and
   // disposes materials on death, so sharing them across a retry would corrupt the model.
@@ -211,6 +211,9 @@ function buildBaphomet() {
     o.material.envMapIntensity = 0.9;
     o.castShadow = true;
     o.receiveShadow = false;
+    // Minions are the same sculpt, so they need a tonal shift or the player cannot tell at a
+    // glance which silhouette is the one with 880 HP.
+    if (darken) o.material.color.multiplyScalar(1 - darken);
   });
   const rig = { root };
   for (const name of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'weapon']) {
@@ -218,6 +221,7 @@ function buildBaphomet() {
     if (n) rig[name] = n;
   }
   for (const k of ['root', 'torso', 'head']) if (rig[k]) rig[k].rotation.order = 'YXZ';
+  if (scale !== 1) root.scale.setScalar(scale);
   const base = { root: rig.root.position.clone(), torso: rig.torso.position.clone() };
   return { root, rig, base, kind: 'humanoid' };
 }
@@ -226,9 +230,45 @@ function buildBaphomet() {
 // upright so they need none; Baphomet is sculpted already crouched and hunched, and the boss
 // clips lean forward on top of that, which pitched him nearly horizontal on the slam.
 const EMPTY_REST = {};
-const REST = { baphomet: { tx: -0.24, hx: 0.16 } };
+const REST = { baphomet: { tx: -0.24, hx: 0.16 }, baphometling: { tx: -0.24, hx: 0.16 } };
 
-const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: buildBaphomet };
+// The shared `boss` clips swing aRx, because the Orc Lord carries his axe in the right hand.
+// Baphomet's scythe is parented to armL, so those clips swung an empty arm and the attack
+// read as no animation at all. These drive the arm that actually holds the weapon.
+const CLIPS_BY_TYPE = {
+  baphomet: {
+    windup: [[0, {}], [1, { aLx: -2.5, aLz: -0.35, tx: -0.3, tyaw: -0.45, hx: -0.2, aRx: 0.45 }]],
+    attack: [
+      [0, { aLx: -2.5, aLz: -0.35, tx: -0.3, tyaw: -0.45 }],
+      [0.38, { aLx: 1.9, aLz: 0.15, tx: 0.55, tyaw: 0.35, hx: 0.3, lLx: 0.5, lRx: -0.4, aRx: -0.5 }],
+      [1, { aLx: 1.5, tx: 0.4, tyaw: 0.25 }],
+    ],
+    slamWindup: [[0, {}], [1, { aLx: -2.9, aRx: -2.6, aLz: -0.25, aRz: 0.25, tx: -0.45, hx: -0.45, ty: 0.18 }]],
+    slam: [
+      [0, { aLx: -2.9, aRx: -2.6, tx: -0.45, hx: -0.45, ty: 0.18 }],
+      [0.34, { aLx: 1.6, aRx: 1.4, tx: 0.7, hx: 0.4, ty: -0.4, lLz: 0.3, lRz: -0.3, lLx: 0.45, lRx: 0.45 }],
+      [1, { aLx: 1.3, aRx: 1.2, tx: 0.6, hx: 0.35, ty: -0.32 }],
+    ],
+    chargeWindup: [[0, {}], [1, { tx: 0.4, ty: -0.15, aLx: -0.8, aRx: -0.7, hx: 0.25, lLx: 0.5, lRx: -0.6 }]],
+    charge: [[0, { tx: 0.65, aLx: -0.6, aRx: -0.6, hx: 0.25 }], [1, { tx: 0.7, aLx: -0.7, aRx: -0.65, hx: 0.3 }]],
+    // The free hand throws the spell while the scythe arm plants, so the tell is obviously
+    // not the melee wind-up.
+    castWindup: [
+      [0, {}],
+      [0.6, { aRx: -2.6, aRz: -0.5, aLx: -0.5, tx: -0.2, hx: -0.35, ty: 0.1 }],
+      [1, { aRx: -2.9, aRz: -0.6, aLx: -0.6, tx: -0.25, hx: -0.4, ty: 0.14 }],
+    ],
+    cast: [
+      [0, { aRx: -2.9, aRz: -0.6, aLx: -0.6, tx: -0.25, hx: -0.4, ty: 0.14 }],
+      [0.3, { aRx: 1.5, aRz: 0.2, aLx: -0.3, tx: 0.5, hx: 0.25, ty: -0.1 }],
+      [1, { aRx: 1.1, aLx: -0.2, tx: 0.35, hx: 0.15 }],
+    ],
+  },
+};
+
+const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: () => buildBaphomet(),
+  // 1.75 of the boss's 3.0 game units, which is skeleton height.
+  baphometling: () => buildBaphomet(0.58, 0.3) };
 
 // ------------------------------------------------------------------ clips
 
@@ -283,7 +323,7 @@ export function createMonsterViews(world) {
     const { rig, base } = v.built;
     const rest = REST[e.type] || EMPTY_REST;
     const ai = e.def.ai === 'hopper' ? 'walker' : e.def.ai;
-    const clips = CLIPS[ai] || CLIPS.walker;
+    const clips = CLIPS_BY_TYPE[e.type] || CLIPS[ai] || CLIPS.walker;
     let target = v.scratch, rate = 16;
     if (e.dead) {
       target = evalClip(CLIPS.down, 0, v.scratch); rate = 10;

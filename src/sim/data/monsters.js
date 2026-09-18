@@ -55,7 +55,24 @@ export const MONSTERS = {
     attack: { range: 2.4, windup: 0.62, dur: 0.4, cd: 2.3, box: { x0: 0.0, x1: 2.8, y0: -0.3, y1: 3.4 }, knock: [6, 2] },
     slam: { windup: 1.05, dur: 0.5, cd: 8.5, box: { x0: -3.1, x1: 3.1, y0: -0.5, y1: 3.4, both: true }, knock: [5, 8], depth: 1.45 },
     charge: { windup: 0.72, dur: 0.55, speed: 13, cd: 10, box: { x0: -0.4, x1: 1.9, y0: -0.3, y1: 3.4 }, knock: [9, 3] },
-    adds: { at: 0.5, type: 'skeleton', count: 2 },
+    // Hellfire: three orbs on three different depth lanes. Melee moves are dodged by
+    // backing off along x, so the spell is aimed at the other axis - you have to change
+    // lane, which is the one habit the earlier rooms teach.
+    cast: {
+      windup: 0.85, dur: 0.5, cd: 7.5,
+      shot: { count: 3, speed: 7.2, life: 2.4, y: 1.45, lane: 1.5, dmg: 0.8 },
+      knock: [4, 1],
+    },
+    adds: { at: 0.5, type: 'baphometling', count: 3 },
     score: 650,
+  },
+  // The boss splits off three of these at half health. Same sculpt at monster scale, so it
+  // reads instantly as "his brood" without needing a second model.
+  baphometling: {
+    name: 'Baphometling', ai: 'walker',
+    hp: 95, atk: 10, speed: 3.1, mass: 0.85,
+    hurtbox: { r: 0.44, h: 1.75 },
+    attack: { range: 1.5, windup: 0.38, dur: 0.28, cd: 1.35, box: { x0: -0.1, x1: 1.7, y0: -0.3, y1: 2.0 }, knock: [4, 1.2] },
+    score: 60,
   },
 };

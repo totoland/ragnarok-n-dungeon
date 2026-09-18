@@ -83,7 +83,23 @@ export function createFx(world) {
   const arrowMat = new THREE.MeshStandardMaterial({ color: 0x8a5a2a, roughness: 0.7 });
   const boneArrowMat = new THREE.MeshStandardMaterial({ color: 0x3a3238, roughness: 0.6 });
   const headMat = new THREE.MeshStandardMaterial({ color: 0xc9c9d4, metalness: 0.7, roughness: 0.3 });
+  // The boss's Hellfire orbs are not arrows: a glowing core with a darker shell, so they
+  // stay readable against the bright forest map as well as the dark crypt.
+  const orbCoreMat = new THREE.MeshBasicMaterial({ color: 0xffb04a, toneMapped: false });
+  const orbShellMat = new THREE.MeshBasicMaterial({ color: 0xff3a10, transparent: true, opacity: 0.45, toneMapped: false });
+  const orbCoreGeo = new THREE.SphereGeometry(0.17, 12, 10);
+  const orbShellGeo = new THREE.SphereGeometry(0.32, 12, 10);
+  function makeOrb() {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(orbCoreGeo, orbCoreMat));
+    g.add(new THREE.Mesh(orbShellGeo, orbShellMat));
+    const light = new THREE.PointLight(0xff5a1e, 6, 4.5, 2);
+    g.add(light);
+    return g;
+  }
+
   function makeArrow(kind) {
+    if (kind === 'hellOrb') return makeOrb();
     const g = new THREE.Group();
     const shaft = new THREE.Mesh(arrowGeo, kind === 'boneArrow' ? boneArrowMat : arrowMat);
     shaft.rotation.z = -Math.PI / 2;
@@ -255,6 +271,11 @@ export function createFx(world) {
       let m = projectiles.get(pr.id);
       if (!m) { m = makeArrow(pr.kind); scene.add(m); projectiles.set(pr.id, m); }
       m.position.set(pr.x, pr.y, pr.z);
+      if (pr.kind === 'hellOrb') {
+        const t = performance.now() * 0.006;
+        m.scale.setScalar(1 + 0.12 * Math.sin(t + pr.id));
+        m.rotation.y = t * 0.5;
+      }
       m.rotation.set(0, pr.facing > 0 ? 0 : Math.PI, Math.atan2(pr.vy, Math.abs(pr.vx)) * pr.facing);
     }
     for (const [id, m] of projectiles) if (!seen.has(id)) { scene.remove(m); projectiles.delete(id); }

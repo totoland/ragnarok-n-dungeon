@@ -77,6 +77,19 @@ function stepAttack(g, e, dt) {
     if (e.stateT >= pat.windup) {
       e.state = 'attack'; e.stateT = 0;
       g.events.push({ type: 'enemyAttack', id: e.id, move: e.move, x: e.x, z: e.z, y: e.y, facing: e.facing, monster: e.type });
+      if (e.move === 'cast' && pat.shot) {
+        const s = pat.shot;
+        for (let i = 0; i < s.count; i++) {
+          const lane = (i - (s.count - 1) / 2) * s.lane;
+          const z = Math.max(FLOOR.zMin, Math.min(FLOOR.zMax, e.z + lane));
+          g.spawnProjectile({
+            owner: 'enemy', kind: 'hellOrb', x: e.x + e.facing * 0.9, z, y: s.y,
+            vx: s.speed * e.facing, vy: 0, dmg: Math.round(e.def.atk * (s.dmg ?? 1)),
+            knock: pat.knock, stun: 0.25, life: s.life, facing: e.facing,
+          });
+        }
+        e.hitDone = true;
+      }
       if (e.move === 'attack' && e.def.ai === 'archer') {
         const s = pat.shot;
         g.spawnProjectile({ owner: 'enemy', kind: 'boneArrow', x: e.x + e.facing * 0.5, z: e.z, y: s.y, vx: s.speed * e.facing, vy: 0, dmg: e.def.atk, knock: pat.knock, stun: 0.3, life: s.life, facing: e.facing });
@@ -133,12 +146,16 @@ function think(g, e, dt) {
       const dx = Math.abs(p.x - e.x);
       e.chargeCd = (e.chargeCd ?? 3) - dt;
       e.slamCd = (e.slamCd ?? 5) - dt;
+      e.castCd = (e.castCd ?? 4) - dt;
       if (!e.addsDone && e.hp <= e.hpMax * def.adds.at) {
         e.addsDone = true;
         for (let i = 0; i < def.adds.count; i++) g.queueSpawn(def.adds.type, i % 2 ? 'left' : 'right', 0.2 * i);
         g.events.push({ type: 'bossAdds', id: e.id, x: e.x, z: e.z });
       }
       if (e.chargeCd <= 0 && dx > 4.5 && Math.abs(p.z - e.z) < 0.9) { e.chargeCd = def.charge.cd; beginAttack(g, e, 'charge'); break; }
+      // Cast sits between charge and slam on purpose: at slam range it would never fire,
+      // and at charge range the orbs are trivially outrun.
+      if (def.cast && e.castCd <= 0 && dx > 2.2) { e.castCd = def.cast.cd; beginAttack(g, e, 'cast'); break; }
       if (e.slamCd <= 0 && dx < 3.4) { e.slamCd = def.slam.cd; beginAttack(g, e, 'slam'); break; }
       approach(g, e, dt, def.attack.range - 0.3);
       if (e.cd <= 0 && inRange(g, e, def.attack.range)) beginAttack(g, e, 'attack');
