@@ -51,6 +51,19 @@ export const DEFAULT_PAD = {
   confirm: [9], pause: [8], mute: [],
 };
 
+// Controls the player can reposition. Order is the order the edit overlay walks them.
+export const TOUCH_CONTROLS = [
+  { key: 'stick', label: 'Stick', sel: '#stick' },
+  { key: 'attack', label: 'Attack', sel: '.tbtn[data-k="attack"]' },
+  { key: 'jump', label: 'Jump', sel: '.tbtn[data-k="jump"]' },
+  { key: 'dash', label: 'Dash', sel: '.tbtn[data-k="dash"]' },
+  { key: 'skill1', label: 'Skill 1', sel: '.tbtn[data-k="skill1"]' },
+  { key: 'skill2', label: 'Skill 2', sel: '.tbtn[data-k="skill2"]' },
+  { key: 'skill3', label: 'Skill 3', sel: '.tbtn[data-k="skill3"]' },
+  { key: 'pause', label: 'Pause', sel: '#tbtn-pause' },
+];
+export const TOUCH_KEYS = TOUCH_CONTROLS.map((c) => c.key);
+
 export const DEFAULT_TOUCH = {
   mode: 'auto',      // auto (coarse pointers only) | on (always) | off
   side: 'left',      // side of the screen the stick lives on
@@ -59,9 +72,15 @@ export const DEFAULT_TOUCH = {
   deadzone: 0.22,    // fraction of the stick radius that reads as centred
   opacity: 0.85,
   haptics: true,
+  // Per-control positions as a fraction of the viewport, {x, y} of the control's centre.
+  // Empty means "use the CSS defaults"; the edit overlay seeds every control at once so the
+  // layout is never half grid and half absolute. Fractions rather than pixels so a layout
+  // survives rotation and different screen sizes.
+  layout: {},
 };
 
 const TOUCH_RANGE = { size: [110, 220], deadzone: [0.05, 0.5], opacity: [0.25, 1] };
+const LAYOUT_RANGE = [0.04, 0.96];
 const MODES = ['auto', 'on', 'off'];
 const SIDES = ['left', 'right'];
 
@@ -69,7 +88,7 @@ export function defaultSettings() {
   return {
     keys: Object.fromEntries(ACTION_IDS.map((id) => [id, [...(DEFAULT_KEYS[id] || [])]])),
     pad: Object.fromEntries(ACTION_IDS.map((id) => [id, [...(DEFAULT_PAD[id] || [])]])),
-    touch: { ...DEFAULT_TOUCH },
+    touch: { ...DEFAULT_TOUCH, layout: {} },
   };
 }
 
@@ -97,6 +116,15 @@ export function normalize(raw) {
     for (const flag of ['floating', 'haptics']) if (typeof t[flag] === 'boolean') out.touch[flag] = t[flag];
     for (const num of ['size', 'deadzone', 'opacity']) {
       if (Number.isFinite(t[num])) out.touch[num] = clamp(t[num], TOUCH_RANGE[num]);
+    }
+    if (t.layout && typeof t.layout === 'object') {
+      for (const key of TOUCH_KEYS) {
+        const p = t.layout[key];
+        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+        // Clamped so a control saved off-screen, or saved on a much wider device, can still
+        // be reached and dragged back.
+        out.touch.layout[key] = { x: clamp(p.x, LAYOUT_RANGE), y: clamp(p.y, LAYOUT_RANGE) };
+      }
     }
   }
   return out;

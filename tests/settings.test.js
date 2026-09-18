@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   ACTION_IDS, SLOTS, defaultSettings, normalize, loadSettings, saveSettings, clearSettings,
   lookup, bind, unbind, unbound, keyLabel, padLabel, hintLine, STORE_KEY,
+  TOUCH_KEYS, TOUCH_CONTROLS,
 } from '../src/settings.js';
 
 // Minimal localStorage stand-in; the real one is only reachable in a browser.
@@ -93,4 +94,48 @@ test('labels are human readable and the hint follows the bindings', () => {
   assert.match(hintLine(s), /Attack J/);
   bind(s.keys, 'attack', 0, 'KeyQ');
   assert.match(hintLine(s), /Attack Q/);
+});
+
+test('touch layout ships empty and every control is addressable', () => {
+  const s = defaultSettings();
+  assert.deepEqual(s.touch.layout, {}, 'empty means "use the CSS defaults"');
+  assert.equal(TOUCH_KEYS.length, 8);
+  assert.deepEqual(TOUCH_KEYS, TOUCH_CONTROLS.map((c) => c.key));
+  for (const c of TOUCH_CONTROLS) {
+    assert.ok(c.sel && c.label, `${c.key} needs a selector and a label`);
+  }
+});
+
+test('a saved layout is clamped back on screen and junk is dropped', () => {
+  const s = normalize({
+    touch: {
+      layout: {
+        attack: { x: 4.2, y: -9 },          // saved on a much larger screen, or corrupted
+        jump: { x: 0.5, y: 0.8 },           // fine
+        dash: { x: 'left', y: 0.5 },        // wrong type
+        skill1: { x: 0.3 },                 // missing y
+        nonsense: { x: 0.5, y: 0.5 },       // not a control
+      },
+    },
+  });
+  const L = s.touch.layout;
+  assert.deepEqual(L.attack, { x: 0.96, y: 0.04 }, 'clamped into reach, not discarded');
+  assert.deepEqual(L.jump, { x: 0.5, y: 0.8 });
+  assert.equal('dash' in L, false);
+  assert.equal('skill1' in L, false);
+  assert.equal('nonsense' in L, false);
+});
+
+test('a hand-placed layout survives a save and load round trip', () => {
+  let v = null;
+  const store = { getItem: () => v, setItem: (_, n) => { v = n; }, removeItem: () => { v = null; } };
+  const s = defaultSettings();
+  s.touch.layout = { attack: { x: 0.498, y: 0.769 }, jump: { x: 0.2, y: 0.9 } };
+  saveSettings(s, store);
+  const back = loadSettings(store);
+  assert.deepEqual(back.touch.layout, s.touch.layout);
+  // and clearing it returns to the default grid rather than leaving a half layout
+  back.touch.layout = {};
+  saveSettings(back, store);
+  assert.deepEqual(loadSettings(store).touch.layout, {});
 });

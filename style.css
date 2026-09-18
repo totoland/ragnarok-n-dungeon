@@ -112,6 +112,37 @@ body.touch-right #tbtns { right: auto; left: calc(22px + var(--safe-l)); }
 #tbtn-pause { position: absolute; right: calc(14px + var(--safe-r)); top: calc(12px + var(--safe-t)); width: 42px; height: 42px; font-size: 11px; letter-spacing: 0.1em; pointer-events: auto; opacity: var(--touch-alpha); }
 body.touch #score { right: calc(68px + var(--safe-r)); }
 body.touch #hint, body.touch #skills { display: none; }
+
+/* Hand-placed controls. Once any control has been dragged the grid stops being the source
+   of truth, so #tbtns becomes a pass-through layer and each button positions itself. */
+#tbtns.free { position: absolute; inset: 0; right: auto; bottom: auto; display: block; width: 100%; height: 100%; pointer-events: none; }
+#tbtns.free .tbtn { position: absolute; pointer-events: auto; }
+body.touch-right #tbtns.free { left: 0; }
+
+/* Drag-to-place mode.
+   The overlays hide #touch by sibling selector, and editing is reached from the pause menu,
+   so without this override every control is display:none and measures 0x0 - nothing can be
+   dragged and seeding the layout reads garbage. */
+body.touch-edit #touch { display: block !important; z-index: 30; }
+body.touch-edit .overlay:not(#settings) { opacity: 0.18; }
+body.touch-edit #stick-zone { display: none; }          /* it would swallow every drag */
+body.touch-edit #hud { opacity: 0.25; }
+.tedit-item { outline: 2px dashed var(--gold); outline-offset: 3px; cursor: grab; touch-action: none; }
+.tedit-item.tedit-drag { outline-style: solid; cursor: grabbing; filter: brightness(1.3); }
+.tedit-locked { outline: 2px dashed rgba(243,236,216,0.28); outline-offset: 3px; }
+#stick.tedit-item { pointer-events: auto; opacity: 1; }
+.tedit-bar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  top: calc(10px + var(--safe-t)); z-index: 40;
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 14px; border-radius: 10px;
+  background: rgba(10,8,14,0.94); border: 1px solid var(--edge);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+}
+.tedit-hint { font-size: 12px; opacity: 0.75; }
+.tedit-done { padding: 8px 20px; border-radius: 8px; border: 2px solid var(--gold); background: var(--panel); color: var(--gold); font-weight: 700; cursor: pointer; }
+.seg-loose { display: flex; gap: 8px; justify-self: start; flex-wrap: wrap; }
+@media (max-width: 720px) { .tedit-hint { display: none; } }
 #title:not([hidden]) ~ #touch, #end:not([hidden]) ~ #touch, #pause:not([hidden]) ~ #touch, #settings:not([hidden]) ~ #touch { display: none; }
 
 /* ---------------------------------------------------------------- settings overlay */

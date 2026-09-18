@@ -5,6 +5,7 @@ import {
   ACTIONS, GROUPS, SLOTS, bind, unbind, defaultSettings, saveSettings, clearSettings,
   keyLabel, padLabel, unbound,
 } from '../settings.js';
+import { startEdit } from './touch-layout.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -178,6 +179,34 @@ export function createSettingsUI({ input, touch, settings, onChange }) {
     wrap.append(control('Opacity',
       slider(Math.round(t.opacity * 100), 25, 100, 5, (v) => `${v}%`, (v) => { t.opacity = v / 100; })));
     wrap.append(control('Vibrate on tap', toggle(t.haptics, (v) => { t.haptics = v; })));
+
+    const placed = Object.keys(t.layout || {}).length;
+    const arrange = el('button', 'ghost', placed ? 'Rearrange buttons' : 'Arrange buttons');
+    arrange.type = 'button';
+    arrange.addEventListener('click', async () => {
+      // The panel has to get out of the way: the controls being dragged sit underneath it.
+      root.hidden = true;
+      await startEdit({ settings, onChange: () => { saveSettings(settings); touch?.refresh(settings); } });
+      root.hidden = false;
+      commit();
+      render();
+      setNote('Positions saved.');
+    });
+    const clearPos = el('button', 'ghost', 'Default positions');
+    clearPos.type = 'button';
+    clearPos.addEventListener('click', () => {
+      t.layout = {};
+      commit();
+      render();
+      setNote('Button positions reset to the default layout.');
+    });
+    const row = el('div', 'srow');
+    row.append(el('span', 'slabel', 'Button positions'));
+    const btns = el('div', 'seg-loose');
+    btns.append(arrange, clearPos);
+    row.append(btns);
+    row.append(el('span', 'shint', placed ? `${placed} controls placed by hand` : 'Drag each control where your thumbs sit'));
+    wrap.append(row);
     const tip = el('p', 'tip', t.mode === 'off'
       ? 'On-screen controls are off, so this tab only affects them once you turn them back on.'
       : 'Changes apply straight away. Close this menu to try them.');

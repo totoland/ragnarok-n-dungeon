@@ -40,7 +40,10 @@ Gamepad movement stays on the left stick and d-pad and is deliberately not rebin
 
 On-screen controls appear automatically on touchscreens and can be forced on or off from the
 same menu, which also sets the stick side, size, dead zone, opacity, haptics, and whether the
-stick is floating (the ring springs to wherever the thumb lands) or parked. The stick reads from
+stick is floating (the ring springs to wherever the thumb lands) or parked. **Arrange buttons**
+drops into a drag-to-place mode for every control including the stick; positions are stored as
+a fraction of the viewport so a layout arranged in landscape stays proportionally right after
+a rotation. The stick reads from
 a half-screen zone rather than the ring itself, because a thumb rarely lands on a 150 px circle.
 
 ## The one idea
@@ -88,6 +91,7 @@ src/
     fx.js              particles, damage numbers, slash arcs, rings, arrows, arrow rain, potions
     hud.js             DOM: bars, room/wave, score/combo, boss bar, skill slots, banners, overlays
     settings-ui.js     DOM: the rebinding table and the on-screen-control tuning panel
+    touch-layout.js    drag-to-place for the on-screen controls; applies the saved layout
     textures.js        procedural canvas textures (flagstones, bricks, sprites)
   audio.js             WebAudio synth voices, driven by game.events
   main.js              boot, title-screen hero turntable, fixed-step loop with hit-stop, window.__dro

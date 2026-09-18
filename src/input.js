@@ -5,6 +5,7 @@
 // Bindings come from src/settings.js rather than a const table, so the settings menu can
 // rebind anything at runtime via `setBindings`.
 import { loadSettings, lookup, DEFAULT_TOUCH } from './settings.js';
+import { applyLayout } from './render/touch-layout.js';
 
 // Events that carry `key` but no `code` (some automation harnesses, a few IMEs) still need to
 // resolve, so every bound code gets a `key`-shaped alias too.
@@ -188,6 +189,7 @@ export function attachTouch(input, opts = {}) {
     // Floating mode hides the ring until touched; parked mode drops it back on its CSS anchor.
     if (cfg.floating) stick.style.opacity = '0';
     else { stick.style.opacity = ''; stick.style.left = ''; stick.style.top = ''; }
+    applyLayout({ touch: cfg }, root);
   }
 
   function apply(dx, dy) {
