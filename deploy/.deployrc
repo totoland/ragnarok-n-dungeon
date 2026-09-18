@@ -9,4 +9,4 @@ ARGOCD_APP=ragnarok-n-dungeon
 PLATFORM=linux/arm64                                # Pi 5 is arm64
 GIT_BRANCH=main                                     # branch Argo CD tracks
 HOST=ragnarok-n-dungeon.192-168-0-125.nip.io        # LAN host; public host needs a tunnel route
-REMOTE_CTX=~/build/ragnarok-n-dungeon                # build context path on the Pi
+REMOTE_CTX=/home/pi/build/ragnarok-n-dungeon         # build context on the Pi (no ~: it would expand locally)
