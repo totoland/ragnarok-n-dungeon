@@ -8,7 +8,7 @@ export const DUNGEON = {
   name: 'Culvert of Prontera',
   rooms: [
     {
-      name: 'Sewer Entrance', width: 16, theme: 'sewer',
+      name: 'Prontera Field', width: 16, theme: 'field',
       waves: [
         [{ type: 'poring', count: 3 }],
         [{ type: 'poring', count: 4 }, { type: 'lunatic', count: 1 }],

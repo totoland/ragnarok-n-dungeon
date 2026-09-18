@@ -46,6 +46,69 @@ export function stoneFloor(base = '#5a5a62', grout = '#25242b', seed = 3) {
   });
 }
 
+// Grass and dirt ground for the outdoor map. Everything is drawn with wrap-around so the
+// tile is seamless: an element near an edge is also drawn shifted by a full tile, which is
+// what keeps the repeat from showing a grid.
+export function grassFloor(base = '#5f7a3c', dirt = '#6d5c39', seed = 11) {
+  return make(512, 512, (ctx, w, h) => {
+    let s = seed;
+    const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    const wrap = (x, y, r, fn) => {
+      for (const dx of [-w, 0, w]) for (const dy of [-h, 0, h]) {
+        if (x + dx > -r && x + dx < w + r && y + dy > -r && y + dy < h + r) fn(x + dx, y + dy);
+      }
+    };
+    ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
+
+    // broad tonal patches so the ground is not a flat green field
+    for (let i = 0; i < 16; i++) {
+      const x = rnd() * w, y = rnd() * h, r = 40 + rnd() * 90;
+      const light = rnd() > 0.45;
+      wrap(x, y, r, (px, py) => {
+        const grd = ctx.createRadialGradient(px, py, 0, px, py, r);
+        grd.addColorStop(0, light ? 'rgba(150,175,90,0.20)' : 'rgba(62,78,42,0.18)');
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+    // worn dirt showing through
+    for (let i = 0; i < 9; i++) {
+      const x = rnd() * w, y = rnd() * h, r = 22 + rnd() * 46;
+      wrap(x, y, r, (px, py) => {
+        const grd = ctx.createRadialGradient(px, py, 0, px, py, r);
+        grd.addColorStop(0, dirt + '7a');
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+    // grass blades: short strokes, leaning randomly
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 1400; i++) {
+      const x = rnd() * w, y = rnd() * h;
+      const len = 3 + rnd() * 7, lean = (rnd() - 0.5) * 5;
+      const g = 110 + (rnd() * 70) | 0;
+      ctx.strokeStyle = `rgba(${(g * 0.62) | 0},${g},${(g * 0.42) | 0},${0.35 + rnd() * 0.4})`;
+      ctx.lineWidth = 0.8 + rnd() * 1.0;
+      wrap(x, y, len + 4, (px, py) => {
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + lean, py - len); ctx.stroke();
+      });
+    }
+    // pebbles and fallen leaves
+    for (let i = 0; i < 46; i++) {
+      const x = rnd() * w, y = rnd() * h, r = 1.6 + rnd() * 3.4;
+      const leaf = rnd() > 0.62;
+      ctx.fillStyle = leaf ? `rgba(${140 + rnd() * 50 | 0},${100 + rnd() * 40 | 0},50,0.62)`
+                           : `rgba(${130 + rnd() * 50 | 0},${128 + rnd() * 44 | 0},${120 + rnd() * 40 | 0},0.72)`;
+      wrap(x, y, r + 2, (px, py) => {
+        ctx.beginPath(); ctx.ellipse(px, py, r, r * (0.6 + rnd() * 0.4), rnd() * 3, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+    noise(ctx, w, h, 0.10, seed);
+  });
+}
+
 // Brick wall with staggered courses.
 export function brickWall(base = '#4c4653', mortar = '#211d26', seed = 5) {
   return make(512, 512, (ctx, w, h) => {

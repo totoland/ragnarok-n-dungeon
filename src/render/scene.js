@@ -3,9 +3,17 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CAMERA, FLOOR } from '../config.js';
-import { stoneFloor, brickWall } from './textures.js';
+import { stoneFloor, brickWall, grassFloor } from './textures.js';
 
 const THEMES = {
+  // Outdoor map. `bg` swaps the tiling brick wall for a painted backdrop plane, and
+  // `outdoor` drops the dungeon pillars and torches - a torch bracket standing in open
+  // grass was the thing that read as wrong. Fog and hemisphere go daylight.
+  field: {
+    floor: '#5f7a3c', grout: '#3c4a26', wall: '#6d7a58', mortar: '#3a4430',
+    fog: 0xcfdcc6, hemi: [0xdfeaff, 0x6d7a44], torch: 0xffd9a0, props: 'grove',
+    bg: 'assets/maps/prontera-forest.png', bgH: 12, ground: 'grass', outdoor: true,
+  },
   sewer: { floor: '#4f5a55', grout: '#1f2622', wall: '#3f4a48', mortar: '#1b211f', fog: 0x0a1210, hemi: [0x7d9a93, 0x1c2a24], torch: 0xffa040, props: 'barrels' },
   crypt: { floor: '#5a5560', grout: '#221f28', wall: '#4a4452', mortar: '#1e1a24', fog: 0x0d0a12, hemi: [0x8a80a8, 0x241c30], torch: 0x9fd0ff, props: 'bones' },
   throne: { floor: '#5c4a46', grout: '#251b19', wall: '#5a3f3a', mortar: '#221513', fog: 0x140a0a, hemi: [0xb08a70, 0x2e1a14], torch: 0xff7a30, props: 'throne' },
@@ -89,27 +97,46 @@ export function buildRoom(world, roomDef, index) {
   world.hemi.color.set(theme.hemi[0]);
   world.hemi.groundColor.set(theme.hemi[1]);
 
-  const floorMat = new THREE.MeshStandardMaterial({ map: stoneFloor(theme.floor, theme.grout, index + 3), roughness: 0.92, metalness: 0.02 });
+  const groundTex = theme.ground === 'grass'
+    ? grassFloor(theme.floor, theme.grout, index + 3)
+    : stoneFloor(theme.floor, theme.grout, index + 3);
+  const floorMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.92, metalness: 0.02 });
   floorMat.map.repeat.set((W + pad * 2) / 2.2, depth / 2.2);
   const floor = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, 0.3, depth), floorMat);
   floor.position.set(W / 2, -0.15, (FLOOR.zMin + FLOOR.zMax) / 2 - 0.4);
   floor.receiveShadow = true;
   g.add(floor);
 
-  const wallMat = new THREE.MeshStandardMaterial({ map: brickWall(theme.wall, theme.mortar, index + 7), roughness: 0.95 });
-  wallMat.map.repeat.set((W + pad * 2) / 4, 14 / 4);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, 14, 0.6), wallMat);
-  back.position.set(W / 2, 7, zBack - 0.3);
-  back.receiveShadow = true; back.castShadow = true;
+  // A painted backdrop is unlit on purpose: it already has its own light baked in, and
+  // letting torches or the key light touch it makes the distance read as a nearby wall.
+  // Its height is chosen so the art maps 1:1 with no stretch - see assets/maps/README.md.
+  const bgH = theme.bg ? (theme.bgH || 12) : 14;
+  let wallMat;
+  if (theme.bg) {
+    const tex = new THREE.TextureLoader().load(theme.bg);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    wallMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+  } else {
+    wallMat = new THREE.MeshStandardMaterial({ map: brickWall(theme.wall, theme.mortar, index + 7), roughness: 0.95 });
+    wallMat.map.repeat.set((W + pad * 2) / 4, 14 / 4);
+  }
+  const back = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, bgH, 0.6), wallMat);
+  back.position.set(W / 2, bgH / 2, zBack - 0.3);
+  back.receiveShadow = !theme.bg; back.castShadow = !theme.bg;
   g.add(back);
   // dado / ledge along the wall base
-  const ledge = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: 0x2b2730, roughness: 0.9 }));
+  const ledge = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: theme.outdoor ? 0x3f4a2c : 0x2b2730, roughness: 0.9 }));
   ledge.position.set(W / 2, 0.17, zBack + 0.05);
   ledge.castShadow = true; ledge.receiveShadow = true;
   g.add(ledge);
 
-  // side walls with the exit arch on the right
-  const sideMat = wallMat.clone();
+  // side walls with the exit arch on the right.
+  // Outdoors these must NOT clone wallMat: that material is the painted backdrop, and
+  // cloning it smears the whole forest image down a 14-unit slab at each end of the room.
+  const sideMat = theme.bg
+    ? new THREE.MeshStandardMaterial({ color: theme.sideWall || 0x33522a, roughness: 0.96 })
+    : wallMat.clone();
   const left = new THREE.Mesh(new THREE.BoxGeometry(0.6, 14, depth + 1), sideMat);
   left.position.set(-0.6, 7, (FLOOR.zMin + FLOOR.zMax) / 2 - 0.5);
   left.castShadow = true; left.receiveShadow = true;
@@ -122,6 +149,53 @@ export function buildRoom(world, roomDef, index) {
   arch.position.set(W + 0.6, 1.7, 0);
   arch.name = 'exit';
   g.add(arch);
+  if (theme.outdoor) {
+    // Frame the dark opening as a mossy stone culvert mouth. The next room is the sewer, so
+    // this doubles as the story beat instead of a black rectangle in open daylight.
+    // Built as a real arch profile - an extruded shape with a semicircular head and a hole
+    // through it - because stacked boxes plus sphere "moss" read as grey slab and green balls.
+    const mossStone = new THREE.MeshStandardMaterial({ color: 0x8d9180, roughness: 0.96 });
+    const halfW = 1.9, pierW = 1.42, springY = 2.1, jamb = 2.0;
+
+    const profile = new THREE.Shape();
+    profile.moveTo(-halfW, 0);
+    profile.lineTo(-halfW, springY);
+    profile.absarc(0, springY, halfW, Math.PI, 0, true);
+    profile.lineTo(halfW, 0);
+    profile.lineTo(-halfW, 0);
+
+    const hole = new THREE.Path();
+    hole.moveTo(-pierW, 0);
+    hole.lineTo(-pierW, jamb);
+    hole.absarc(0, jamb, pierW, Math.PI, 0, true);
+    hole.lineTo(pierW, 0);
+    hole.lineTo(-pierW, 0);
+    profile.holes.push(hole);
+
+    const archGeo = new THREE.ExtrudeGeometry(profile, { depth: 0.8, bevelEnabled: true, bevelSize: 0.06, bevelThickness: 0.06, bevelSegments: 1, curveSegments: 20 });
+    const mouth = new THREE.Mesh(archGeo, mossStone);
+    mouth.rotation.y = Math.PI / 2;        // shape spans the room's depth, extrudes along x
+    mouth.position.set(W - 0.1, 0, 0);
+    mouth.castShadow = true; mouth.receiveShadow = true;
+    g.add(mouth);
+
+    // A dark plane just behind the opening so the hole reads as depth, not as the skybox.
+    const throat = new THREE.Mesh(new THREE.PlaneGeometry(pierW * 2.2, jamb + pierW), new THREE.MeshBasicMaterial({ color: 0x0a1410 }));
+    throat.rotation.y = -Math.PI / 2;
+    throat.position.set(W + 0.5, (jamb + pierW) / 2, 0);
+    g.add(throat);
+
+    // Moss reads as a creeping edge, not as beads: a thin band hugging the arch crown.
+    const mossMat = new THREE.MeshStandardMaterial({ color: 0x4f6f33, roughness: 0.99 });
+    for (let i = 0; i <= 12; i++) {
+      const a = Math.PI * (i / 12);
+      const z = Math.cos(a) * halfW, y = springY + Math.sin(a) * halfW;
+      const blob = new THREE.Mesh(new THREE.SphereGeometry(0.17 + (i % 3) * 0.04, 7, 6), mossMat);
+      blob.position.set(W - 0.42, y, z);
+      blob.scale.set(0.5, 0.75, 1.15);
+      g.add(blob);
+    }
+  }
   const archGlow = new THREE.PointLight(0xe8b64a, 0, 6, 2);
   archGlow.position.set(W - 0.5, 1.8, 0);
   archGlow.name = 'exitGlow';
@@ -130,7 +204,7 @@ export function buildRoom(world, roomDef, index) {
   // pillars + torches along the back wall
   const pillarMat = new THREE.MeshStandardMaterial({ color: 0x3a3540, roughness: 0.85 });
   const torchMat = new THREE.MeshStandardMaterial({ color: theme.torch, emissive: theme.torch, emissiveIntensity: 2.2, roughness: 0.6 });
-  for (let x = 2; x < W; x += 5) {
+  for (let x = 2; x < W && !theme.outdoor; x += 5) {
     const p = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 14, 10), pillarMat);
     p.position.set(x, 7, zBack + 0.35);
     p.castShadow = true; p.receiveShadow = true;
@@ -154,7 +228,25 @@ export function buildRoom(world, roomDef, index) {
   // themed props
   const propMat = new THREE.MeshStandardMaterial({ color: 0x5b3f2a, roughness: 0.8 });
   const boneMat = new THREE.MeshStandardMaterial({ color: 0xd9d2c2, roughness: 0.6 });
-  if (theme.props === 'barrels') {
+  if (theme.props === 'grove') {
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x77776b, roughness: 0.92 });
+    const bushMat = new THREE.MeshStandardMaterial({ color: 0x3f6330, roughness: 0.95 });
+    for (let i = 0; i < 7; i++) {
+      const r = 0.22 + (i % 3) * 0.14;
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), rockMat);
+      rock.position.set(1.4 + i * (W / 7.2), r * 0.55, zBack + 0.9 + (i % 3) * 0.45);
+      rock.rotation.set(i, i * 1.7, i * 0.6);
+      rock.castShadow = true; rock.receiveShadow = true;
+      g.add(rock);
+    }
+    for (let i = 0; i < 5; i++) {
+      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.5 + (i % 2) * 0.22, 9, 7), bushMat);
+      bush.position.set(2.6 + i * (W / 5.1), 0.34, zBack + 0.75);
+      bush.scale.set(1, 0.72, 0.85);
+      bush.castShadow = true; bush.receiveShadow = true;
+      g.add(bush);
+    }
+  } else if (theme.props === 'barrels') {
     for (let i = 0; i < 4; i++) {
       const b = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.0, 12), propMat);
       b.position.set(3 + i * (W / 4.2) + (i % 2) * 0.6, 0.5, zBack + 1.1 + (i % 2) * 0.5);
