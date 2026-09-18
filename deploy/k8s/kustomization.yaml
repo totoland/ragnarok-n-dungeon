@@ -12,4 +12,4 @@ resources:
 # Pinned by deploy.sh to an immutable commit-sha tag, so a rollback is a one-line revert.
 images:
   - name: ghcr.io/totoland/ragnarok-n-dungeon
-    newTag: sha-06ea0e9695ec
+    newTag: sha-0988fdfef45a
