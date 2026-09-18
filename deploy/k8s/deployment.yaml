@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ragnarok-n-dungeon
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ragnarok-n-dungeon }
+  template:
+    metadata:
+      labels: { app: ragnarok-n-dungeon }
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/totoland/ragnarok-n-dungeon
+          # The image is side-loaded into the Pi's containerd by deploy.sh and is not
+          # published to GHCR, so Always would make the pod fail to pull.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 80 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 10m, memory: 24Mi }
+            limits: { memory: 96Mi }

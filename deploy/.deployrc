@@ -1,0 +1,12 @@
+# Deploy config for ragnarok-n-dungeon — committed to git.
+# Override per-machine in .deployrc.local (gitignored).
+
+PI=pi@192.168.0.125                                 # SSH target running k3s
+IMAGE_REPO=ghcr.io/totoland/ragnarok-n-dungeon      # repo WITHOUT tag — deploy.sh appends :sha-<gitsha>
+NAMESPACE=ragnarok-n-dungeon
+DEPLOYMENT=ragnarok-n-dungeon
+ARGOCD_APP=ragnarok-n-dungeon
+PLATFORM=linux/arm64                                # Pi 5 is arm64
+GIT_BRANCH=main                                     # branch Argo CD tracks
+HOST=ragnarok-n-dungeon.192-168-0-125.nip.io        # LAN host; public host needs a tunnel route
+REMOTE_CTX=~/build/ragnarok-n-dungeon                # build context path on the Pi

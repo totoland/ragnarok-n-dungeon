@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+tests
+tools
+docs
+serve.mjs
+README.md
+.playwright-mcp
+# Source art, not shipped: ~9 MB of .blend files and their build scripts.
+assets/blender
+**/__pycache__
+**/.DS_Store
