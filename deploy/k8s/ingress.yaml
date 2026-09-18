@@ -5,17 +5,25 @@ metadata:
   # k3s ships Traefik as the default ingress controller.
   #
   # No TLS block and no cert-manager annotation, on purpose: this cluster has no
-  # cert-manager. Public apps here terminate HTTPS at Cloudflare's edge and reach the Pi
-  # over a named tunnel, so Traefik only ever sees plain HTTP.
+  # cert-manager. HTTPS terminates at Cloudflare's edge and reaches the Pi over the
+  # `docker-host` named tunnel, so Traefik only ever sees plain HTTP.
   #
-  # This app is deliberately LAN-only. There is no ragnarok.totoland.cloud rule in the
-  # docker-host tunnel and no DNS record, so a host entry for it here would claim routing
-  # that does not exist. Add the public hostname in the Cloudflare Zero Trust dashboard
-  # first, pointing at the nip.io host below, then add the host back here.
+  # Both hosts are listed, the same way the `profile` app does it. The tunnel rule points at
+  # the nip.io name, but which Host header actually arrives at Traefik depends on the
+  # tunnel's origin settings, so accepting both is what makes this robust.
 spec:
   ingressClassName: traefik
   rules:
     - host: ragnarok-n-dungeon.192-168-0-125.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ragnarok-n-dungeon
+                port: { name: http }
+    - host: ragnarok.totoland.cloud
       http:
         paths:
           - path: /
