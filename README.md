@@ -139,14 +139,22 @@ smoothstep `evalClip` uses.
 
 ```sh
 tools/mixamo_to_clip.sh anim.fbx --name cast --range 11:44 --gain legs=0.6,tz=0.5
+tools/mixamo_to_clip.sh walk.fbx --name walk --loop 1     # one cyclic clip, no wind-up split
 tools/preview_clip.sh baphomet cast --json out.json --out strip.png --views sideflat
 ```
+
+`--loop` emits a single cycle instead of a wind-up/strike pair and re-centres the vertical
+bob on the cycle mean. Mixamo ends a loop on a duplicate of frame 1, so the first and last
+keys match and `walkPose`'s phase can drive it straight through `evalClip`, one cycle per
+2π — which is how a type opts out of the shared sine walk.
 
 What does *not* survive: elbows, knees and spine bend, and anything that assumes human legs
 — Mixamo's are plantigrade, Baphomet's are digitigrade goat legs that bend the other way.
 Treat the output as a strong first draft to art-direct with `--gain`, not as a finished clip.
-Baphomet's `castWindup` / `cast` in [monsters.js](src/render/monsters.js) came through this
-path; everything else there is hand-authored.
+Baphomet's `walk`, `windup` / `attack` and `castWindup` / `cast` in
+[monsters.js](src/render/monsters.js) came through this path; everything else there is
+hand-authored. Watch the gains: Mixamo's melee swing twists the torso 54 degrees, which
+turns a boss out of a fight plane whose hit boxes run along X.
 
 The game then animates the limbs procedurally: [src/render/anim.js](src/render/anim.js) is a
 flat-channel keyframe system (`aLx` = left arm swings forward, `tx` = torso leans forward,

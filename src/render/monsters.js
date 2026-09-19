@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
 const HALF = Math.PI / 2;
+const TAU = Math.PI * 2;
 
 const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, ...opts });
 function mesh(geo, material, x = 0, y = 0, z = 0, parent) {
@@ -237,11 +238,36 @@ const REST = { baphomet: { tx: -0.24, hx: 0.16 }, baphometling: { tx: -0.24, hx:
 // read as no animation at all. These drive the arm that actually holds the weapon.
 export const CLIPS_BY_TYPE = {
   baphomet: {
-    windup: [[0, {}], [1, { aLx: -2.5, aLz: -0.35, tx: -0.3, tyaw: -0.45, hx: -0.2, aRx: 0.45 }]],
+    // Mixamo "Standing Melee Attack Downward", frames 7:33, gain legs=0.6,hy=0.25,tz=0.4,tyaw=0.55.
+    // The scythe goes up over the shoulder while the torso winds the other way, then the
+    // whole body unwinds through the chop, which is the part a hand-authored swing never
+    // has the patience to key. Mixamo's own twist reaches 54 degrees; it is held to 0.55 of
+    // that because the hit box stays along X, and a boss who turns that far out of the fight
+    // plane stops agreeing with where he is actually swinging.
+    windup: [
+      [0, { tx: 0.05, tyaw: -0.08, hx: 0.02, hy: 0.26, aLx: 0.72, aLz: -0.87, aRx: 0.11, aRz: 0.74, lLx: -0.06, lLz: -0.30, lRx: 0.01, lRz: 0.17 }],
+      [0.286, { tx: -0.05, tyaw: -0.23, tz: 0.05, hx: -0.05, hy: 0.24, aLx: 2.81, aLz: -1.00, aRx: -0.22, aRz: 0.96, lLx: -0.12, lLz: -0.32, lRz: 0.13 }],
+      [0.429, { tx: -0.10, tyaw: -0.23, tz: 0.05, hx: -0.05, hy: 0.24, aLx: 3.20, aLz: -0.82, aRx: -0.22, aRz: 1.02, lLx: -0.20, lLz: -0.30, lRz: 0.11 }],
+      [0.786, { tx: -0.18, tyaw: -0.09, ty: 0.08, hx: -0.19, hy: 0.16, aLx: 3.51, aLz: -0.65, aRx: -0.06, aRz: 0.96, lLx: -0.36, lLz: -0.17, lRx: 0.11 }],
+      [1, { tx: 0.08, tyaw: 0.08, tz: -0.04, ty: 0.08, hx: -0.12, hy: 0.08, aLx: 3.74, aLz: -0.68, aRx: 0.27, aRz: 0.78, lLx: -0.39, lLz: -0.08, lRx: 0.15, lRz: -0.03 }],
+    ],
     attack: [
-      [0, { aLx: -2.5, aLz: -0.35, tx: -0.3, tyaw: -0.45 }],
-      [0.38, { aLx: 1.9, aLz: 0.15, tx: 0.55, tyaw: 0.35, hx: 0.3, lLx: 0.5, lRx: -0.4, aRx: -0.5 }],
-      [1, { aLx: 1.5, tx: 0.4, tyaw: 0.25 }],
+      [0, { tx: 0.08, tyaw: 0.08, tz: -0.04, ty: 0.08, hx: -0.12, hy: 0.08, aLx: 3.74, aLz: -0.68, aRx: 0.27, aRz: 0.78, lLx: -0.39, lLz: -0.08, lRx: 0.15, lRz: -0.03 }],
+      [0.25, { tx: 0.37, tyaw: 0.17, hx: 0.08, aLx: 2.82, aLz: -0.94, aRx: 0.14, aRz: 0.47, lLx: -0.40, lRx: 0.19, lRz: -0.07 }],
+      [0.417, { tx: 0.55, tyaw: 0.26, hx: 0.11, aLx: 1.59, aLz: -0.67, aRx: -0.06, aRz: 0.47, lLx: -0.39, lLz: -0.06, lRx: 0.19 }],
+      [0.583, { tx: 0.70, tyaw: 0.38, tz: 0.06, hx: 0.11, hy: 0.06, aLx: 1.22, aLz: -0.11, aRx: -0.12, aRz: 0.39, lLx: -0.41, lRx: 0.19 }],
+      [1, { tx: 0.83, tyaw: 0.52, tz: 0.23, ty: -0.03, hx: -0.07, hy: 0.02, aLx: 1.49, aLz: 0.24, aRx: -0.25, aRz: 0.28, lLx: -0.43, lLz: 0.13, lRx: 0.19, lRz: -0.06 }],
+    ],
+    // Mixamo "Walking", the full 32-frame cycle, gain ty=0.5,hy=0.4. Frame 32 is a copy of
+    // frame 1, so the first and last keys match and the loop closes without a seam.
+    walk: [
+      [0, { tx: 0.23, tyaw: -0.11, tz: 0.02, hx: -0.06, hy: 0.05, aLx: 0.39, aLz: -0.21, aRx: 0.11, aRz: 0.18, lLx: -0.10, lLz: 0.02, lRx: -0.16, lRz: -0.01 }],
+      [0.161, { tx: 0.20, tyaw: 0.10, hx: -0.09, aLx: 0.72, aLz: -0.22, aRx: -0.25, aRz: 0.18, lLx: -0.40, lRx: 0.46, lRz: 0.05 }],
+      [0.355, { tx: 0.13, tyaw: 0.11, tz: -0.04, hx: -0.06, aLx: 0.37, aLz: -0.28, aRx: -0.09, aRz: 0.25, lLx: -0.67, lLz: -0.05, lRx: 0.18 }],
+      [0.452, { tx: 0.14, tyaw: -0.07, hx: -0.06, hy: 0.04, aLx: 0.20, aLz: -0.27, aRx: 0.21, aRz: 0.21, lLx: -0.41, lRz: -0.05 }],
+      [0.71, { tx: 0.19, tyaw: -0.40, hx: -0.07, hy: 0.12, aLx: -0.17, aLz: -0.26, aRx: 0.83, lLx: 0.38, lLz: -0.06, lRx: -0.51, lRz: 0.04 }],
+      [0.871, { tx: 0.18, tyaw: -0.32, hx: -0.08, hy: 0.11, aLx: 0.07, aLz: -0.29, aRx: 0.49, aRz: 0.14, lLx: 0.13, lRx: -0.65, lRz: 0.05 }],
+      [1, { tx: 0.23, tyaw: -0.11, tz: 0.02, hx: -0.06, hy: 0.05, aLx: 0.39, aLz: -0.21, aRx: 0.11, aRz: 0.18, lLx: -0.10, lLz: 0.02, lRx: -0.16, lRz: -0.01 }],
     ],
     slamWindup: [[0, {}], [1, { aLx: -2.9, aRx: -2.6, aLz: -0.25, aRz: 0.25, tx: -0.45, hx: -0.45, ty: 0.18 }]],
     slam: [
@@ -276,6 +302,11 @@ export const CLIPS_BY_TYPE = {
     ],
   },
 };
+
+// Same sculpt at 0.58 scale with the scythe in the same hand, so the minions need the same
+// clips: falling through to CLIPS.walker swung their empty arm, exactly as the shared boss
+// clips once did to Baphomet himself.
+CLIPS_BY_TYPE.baphometling = CLIPS_BY_TYPE.baphomet;
 
 const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: () => buildBaphomet(),
   // 1.75 of the boss's 3.0 game units, which is skeleton height.
@@ -353,7 +384,12 @@ export function createMonsterViews(world) {
       if (e.move === 'charge') { v.walkPhase += 22 * dt; const w = walkPose(v.walkPhase, 1.1); target.lLx = w.lLx; target.lRx = w.lRx; }
     } else if (e.moving || e.state === 'enter') {
       v.walkPhase += dt * e.def.speed * 2.6;
-      target = walkPose(v.walkPhase, e.boss ? 0.8 : 1, v.scratch);
+      // walkPose is a pair of sines, which is all the primitive monsters need. A type that
+      // ships a `walk` clip drives it off the same phase instead, one cycle per 2*PI, so
+      // speed still sets the cadence.
+      target = clips.walk
+        ? evalClip(clips.walk, (v.walkPhase / TAU) % 1, v.scratch)
+        : walkPose(v.walkPhase, e.boss ? 0.8 : 1, v.scratch);
     } else {
       target = idlePose(v.t, v.scratch);
     }

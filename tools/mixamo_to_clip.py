@@ -250,7 +250,7 @@ def main():
     argv = sys.argv[sys.argv.index("--") + 1:]
     fbx = argv[0]
     opt = {"name": "clip", "split": "auto", "keys": "5", "tol": "0.05", "drop": "0.04",
-           "height": "3.0", "json": "", "range": "", "gain": ""}
+           "height": "3.0", "json": "", "range": "", "gain": "", "loop": ""}
     for i in range(1, len(argv) - 1, 2):
         opt[argv[i].lstrip("-")] = argv[i + 1]
 
@@ -281,10 +281,17 @@ def main():
 
     apply_gain(rows, opt["gain"])
 
-    # Split at the top of the wind-up: the frame whose arm elevation is furthest from BOTH
-    # ends of the clip, which is the turn-around whichever way the strike travels. Measuring
-    # against the end alone picks the start, since that is far from the end too.
-    if opt["split"] == "auto":
+    # A cycle has no wind-up to split at, and it has to meet itself: Mixamo ends the loop on
+    # a duplicate of frame 1, so keys spanning first..last already close seamlessly. The
+    # vertical bob is re-centred on the cycle mean instead of frame 1, or the torso would sit
+    # permanently low against legs that hang off the root rather than off it.
+    loop = opt["loop"] not in ("", "0", "false")
+    if loop:
+        mean = sum(r["ty"] for r in rows) / len(rows)
+        for row in rows:
+            row["ty"] -= mean
+        cut = 0
+    elif opt["split"] == "auto":
         arms = [r["aLx"] + r["aRx"] for r in rows]
         cut = max(range(len(rows)),
                   key=lambda i: min(abs(arms[i] - arms[0]), abs(arms[i] - arms[-1])))
@@ -301,11 +308,18 @@ def main():
     print(f"RET| using frames {frames[0]}-{frames[-1]} "
           f"({len(rows)} of {n_src}, {len(rows)/fps:.2f}s)"
           + (f", gain {opt['gain']}" if opt["gain"] else ""))
-    print(f"RET| split at frame {frames[cut]} ({cut/(len(rows)-1)*100:.0f}%)\n")
+    if loop:
+        seam = max(abs(rows[0][c] - rows[-1][c]) for c in CHANNELS)
+        print(f"RET| loop of {len(rows)} frames; seam frame {frames[0]} vs {frames[-1]} "
+              f"is {math.degrees(seam):.1f}deg\n")
+    else:
+        print(f"RET| split at frame {frames[cut]} ({cut/(len(rows)-1)*100:.0f}%)\n")
 
     mk, tol, drop = int(opt["keys"]), float(opt["tol"]), float(opt["drop"])
     clips = {}
-    for label, seg in ((opt["name"] + "Windup", rows[:cut + 1]), (opt["name"], rows[cut:])):
+    segs = ([(opt["name"], rows)] if loop else
+            [(opt["name"] + "Windup", rows[:cut + 1]), (opt["name"], rows[cut:])])
+    for label, seg in segs:
         keys, e = reduce_keys(seg, mk, tol)
         lo, hi = keys[0], keys[-1]
         span = max(1, hi - lo)
