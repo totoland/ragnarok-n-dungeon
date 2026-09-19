@@ -192,7 +192,7 @@ export function createFx(world) {
           }
           if (ev.monster === 'poring' || ev.monster === 'lunatic') burst(ev.x, ev.y, ev.z, 8, { color: ev.monster === 'poring' ? 0xff86b4 : 0xffffff, speed: 3, up: 3, life: 0.5, size: 0.3, gravity: 12 });
           addShake(world, crit ? 0.35 : 0.14);
-          if (ev.attack === 'blitzBeat') burst(ev.x, ev.y + 0.6, ev.z, 14, { color: 0xffe0a0, speed: 5, up: 2, life: 0.4, size: 0.3 });
+          if (ev.attack === 'blitzBeat' || ev.attack === 'autoBlitz') burst(ev.x, ev.y + 0.6, ev.z, 14, { color: 0xffe0a0, speed: 5, up: 2, life: 0.4, size: 0.3 });
         } else {
           number(ev.x, ev.y + 0.6, ev.z, String(ev.dmg), '#ff5a4a', true);
           burst(ev.x, ev.y, ev.z, 16, { color: 0xff5040, speed: 4, up: 3, life: 0.4, size: 0.3 });
@@ -204,6 +204,15 @@ export function createFx(world) {
         const c = ev.monster === 'poring' ? 0xff86b4 : ev.monster === 'lunatic' ? 0xffffff : ev.boss ? 0xff4020 : 0xd9d1c0;
         burst(ev.x, ev.y + 0.5, ev.z, ev.boss ? 200 : 30, { color: c, speed: ev.boss ? 8 : 4, up: ev.boss ? 8 : 4, life: ev.boss ? 1.4 : 0.7, size: 0.35, gravity: 10 });
         if (ev.boss) { addShake(world, 1.2); ring(ev.x, ev.z, { color: 0xff6030, radius: 6, life: 1.0 }); }
+        break;
+      }
+      case 'autoBlitz':   // feathers as the bird launches; the strike itself is a normal hit
+        burst(ev.x, ev.y + 1.4, ev.z, 6, { color: 0xf0e6d0, speed: 2, up: 2.5, life: 0.45, size: 0.22, gravity: 3 });
+        break;
+      case 'drain': {     // Soul Drain: a green heal number and a red/blue pair of motes
+        number(ev.x, ev.y, ev.z, `+${ev.hp}`, '#7dff9a');
+        burst(ev.x, ev.y - 0.6, ev.z, 8, { color: 0xff6a6a, speed: 1.2, up: 2.2, life: 0.6, size: 0.24, gravity: -1 });
+        burst(ev.x, ev.y - 0.6, ev.z, 6, { color: 0x7fb0ff, speed: 1.2, up: 2.4, life: 0.6, size: 0.22, gravity: -1 });
         break;
       }
       case 'dodge':

@@ -227,6 +227,8 @@ export function createHeroView(world, heroKey, assets) {
     view.yaw += (yawTarget - view.yaw) * Math.min(1, 16 * dt);
     group.position.set(p.x, p.y, p.z);
 
+    if (rig.falcon) for (const ev of game.events) if (ev.type === 'autoBlitz') startAutoBlitz(game, ev.target);
+
     // --- choose the target pose
     let target = view.scratch;
     let rate = 18;
@@ -301,6 +303,21 @@ export function createHeroView(world, heroKey, assets) {
   // settles back on the arm. Pure flourish - the sim's buff is already applied - so it runs
   // on its own clock rather than the cast's, which is far too short for a lap.
   const CIRCLE = { total: 1.5, r: 1.7, laps: 2, height: 1.6 };
+
+  // Auto Blitz: the passive sent the bird after one enemy. One swoop and back, on its own
+  // clock; the sim lands the hit at its own delay so the number arrives as the bird does.
+  const AUTO = { total: 0.75 };
+  function startAutoBlitz(game, targetId) {
+    if (falcon.flying) return;                       // already out - the hit still lands
+    const tgt = game.enemies.find((e) => e.id === targetId && !e.dead);
+    if (!tgt) return;
+    falcon.flying = true;
+    falcon.mode = 'auto';
+    falcon.t = 0;
+    falcon.target = tgt;
+    world.scene.attach(rig.falcon);
+    falcon.from.copy(rig.falcon.position);
+  }
   function startCircle() {
     if (falcon.flying) return;
     falcon.flying = true;
@@ -319,6 +336,24 @@ export function createHeroView(world, heroKey, assets) {
     if (!falcon.flying) return;
     const p = game.player;
     falcon.t += dt;
+    if (falcon.mode === 'auto') {
+      const u = Math.min(1, falcon.t / AUTO.total);
+      const tgt = falcon.target;
+      const tx = tgt.x, tz = tgt.z, ty = tgt.y + tgt.hurtbox.h * 0.6;
+      let px, py, pz;
+      if (u < 0.4) { const k = u / 0.4; px = falcon.from.x + (tx - falcon.from.x) * k; py = falcon.from.y + 2.2 * Math.sin(k * Math.PI / 2); pz = falcon.from.z + (tz - falcon.from.z) * k; }
+      else if (u < 0.6) { const k = (u - 0.4) / 0.2; px = tx; py = ty + 2.2 * (1 - Math.sin(k * Math.PI)); pz = tz; }
+      else { const k = (u - 0.6) / 0.4; const home = rig.armR.getWorldPosition(new THREE.Vector3()); px = tx + (home.x - tx) * k; py = ty + 1.2 + (home.y - ty - 1.2) * k; pz = tz + (home.z - tz) * k; }
+      f.position.lerp(new THREE.Vector3(px, py, pz), Math.min(1, 16 * dt));
+      f.rotation.set(0, view.yaw, 0);
+      if (u >= 1) {
+        falcon.flying = false;
+        rig.armR.attach(f);
+        f.position.copy(falconPerch.pos);
+        f.quaternion.copy(falconPerch.quat);
+      }
+      return;
+    }
     if (falcon.mode === 'circle') {
       const u = Math.min(1, falcon.t / CIRCLE.total);
       // ease in from the hand, two laps, ease back; the ring follows the hunter as he moves

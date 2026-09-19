@@ -1,5 +1,5 @@
 // DOM overlay: bars, room label, score/combo, boss bar, skill slots, GO arrow, overlays.
-import { SKILL_INFO } from '../sim/data/heroes.js';
+import { SKILL_INFO, PASSIVE_INFO } from '../sim/data/heroes.js';
 import { MONSTERS } from '../sim/data/monsters.js';
 
 const $ = (id) => document.getElementById(id);
@@ -17,6 +17,10 @@ export function createHud() {
 
   function bindHero(player) {
     el.heroName.textContent = player.def.name;
+    // The passive has no slot of its own; the badge carries it as a tooltip and the title
+    // screen blurb names it, and its procs announce themselves in play.
+    const pv = player.def.passive && PASSIVE_INFO[player.def.passive.id];
+    el.heroName.title = pv ? `${pv.name} — ${pv.tip}` : '';
     el.skills.innerHTML = '';
     slots = player.def.skills.map((id, i) => {
       const info = SKILL_INFO[id];

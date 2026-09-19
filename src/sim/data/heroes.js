@@ -13,6 +13,10 @@ export const HEROES = {
     hurtbox: { r: 0.55, h: 1.9 },
     basic: 'slash1',
     skills: ['quicken', 'magnumBreak', 'bowlingBash'],
+    // Passive: rolled on every hit that lands (see rollPassive in game.js). Restores a share
+    // of MAX HP/SP, not of what is left - a drain that shrank as you bled would help least
+    // exactly when it mattered most.
+    passive: { id: 'soulDrain', chance: 0.03, hp: 0.10, sp: 0.10 },
     attacks: {
       slash1: {
         dur: 0.40, cancelAt: 0.24, next: 'slash2', anim: 'slash1',
@@ -64,6 +68,10 @@ export const HEROES = {
     hurtbox: { r: 0.5, h: 1.75 },
     basic: 'shoot1',
     skills: ['windWalk', 'arrowShower', 'blitzBeat'],
+    // Passive: a landed hit has a chance to send the falcon after that enemy. The strike is
+    // one Blitz-style hit after a short delay so the bird is seen to arrive before the
+    // number does. Falcon hits never proc the falcon.
+    passive: { id: 'autoBlitz', chance: 0.03, delay: 0.3, hit: { dmg: 1.5, knock: [1, 0], stun: 0.3 } },
     attacks: {
       shoot1: {
         dur: 0.34, cancelAt: 0.2, next: 'shoot2', anim: 'shoot',
@@ -107,6 +115,11 @@ export const HEROES = {
       },
     },
   },
+};
+
+export const PASSIVE_INFO = {
+  soulDrain: { name: 'Soul Drain', tip: '3% on hit: restore 10% HP and SP' },
+  autoBlitz: { name: 'Auto Blitz', tip: '3% on hit: the falcon strikes that enemy' },
 };
 
 export const SKILL_INFO = {

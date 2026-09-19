@@ -16,6 +16,7 @@ export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON } = {}
     roomIndex: -1, room: null, bounds: { xMin: 0, xMax: 16 },
     waveIndex: -1, spawnQueue: [], enemies: [], projectiles: [], pickups: [],
     events: [], nextId: 1,
+    pending: [],          // delayed strikes (the falcon's Auto Blitz), resolved in update()
     phase: 'fight',       // fight | cleared | won | dead
     roomT: 0, combo: { count: 0, timer: 0, best: 0 }, score: 0, kills: 0,
     stats: { damageDealt: 0, damageTaken: 0, hits: 0 },
@@ -122,11 +123,50 @@ function onEnemyHit(g, e, dmg, crit, killed, attackId) {
   g.combo.timer = PLAYER.comboWindow;
   g.combo.best = Math.max(g.combo.best, g.combo.count);
   pushEvent(g, { type: 'hit', target: 'enemy', id: e.id, monster: e.type, dmg, crit, x: e.x, z: e.z, y: e.y + e.hurtbox.h * 0.7, attack: attackId, launched: e.launched, combo: g.combo.count });
+  rollPassive(g, e, attackId, killed);
   if (killed) {
     g.kills++;
     g.score += e.def.score * (1 + Math.min(2, g.combo.count / 20));
     pushEvent(g, { type: 'kill', id: e.id, monster: e.type, x: e.x, z: e.z, y: e.y, boss: e.boss, score: e.def.score });
     if (!e.boss) rollDrop(g, e);
+  }
+}
+
+// The hero's passive, rolled once per landed hit off the run's rng so a proc is as
+// reproducible as a crit. Both are data on the hero (data/heroes.js).
+function rollPassive(g, e, attackId, killed) {
+  const p = g.player, pv = p.def.passive;
+  if (!pv) return;
+  if (pv.id === 'autoBlitz') {
+    if (killed || attackId === 'blitzBeat' || attackId === 'autoBlitz') return;
+    if (!g.rng.chance(pv.chance)) return;
+    g.pending.push({ kind: 'autoBlitz', target: e.id, t: pv.delay });
+    pushEvent(g, { type: 'autoBlitz', target: e.id, x: e.x, z: e.z, y: e.y });
+  } else if (pv.id === 'soulDrain') {
+    if (!g.rng.chance(pv.chance)) return;
+    const hp = Math.round(p.hpMax * pv.hp), sp = Math.round(p.mpMax * pv.sp);
+    p.hp = Math.min(p.hpMax, p.hp + hp);
+    p.mp = Math.min(p.mpMax, p.mp + sp);
+    pushEvent(g, { type: 'drain', hp, sp, x: p.x, z: p.z, y: p.y + 1.6 });
+  }
+}
+
+function resolvePending(g, dt) {
+  if (!g.pending.length) return;
+  const p = g.player;
+  for (const job of g.pending) job.t -= dt;
+  const due = g.pending.filter((j) => j.t <= 0);
+  if (!due.length) return;
+  g.pending = g.pending.filter((j) => j.t > 0);
+  for (const job of due) {
+    if (job.kind !== 'autoBlitz') continue;
+    const e = g.enemies.find((x) => x.id === job.target);
+    if (!e || e.dead) continue;               // the bird finds nothing there; no hit, no proc
+    const hit = p.def.passive.hit;
+    const { dmg, crit } = rollDamage(p.atk, hit.dmg, g.rng);
+    const dir = Math.sign(e.x - p.x) || p.facing;
+    const killed = applyHit(e, dmg, hit.knock, hit.stun, dir, e.mass);
+    onEnemyHit(g, e, dmg, crit, killed, 'autoBlitz');
   }
 }
 
@@ -182,6 +222,7 @@ export function update(g, input, dt = SIM.dt) {
   }
 
   updatePlayer(g, g.player, input, dt);
+  resolvePending(g, dt);
   for (const e of g.enemies) updateEnemy(g, e, dt);
   updateProjectiles(g, dt);
   updatePickups(g, dt);

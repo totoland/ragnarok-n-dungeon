@@ -226,3 +226,65 @@ test('holding attack keeps the combo going at the rate the attacks allow', () =>
   steps(g, 40);
   assert.equal(g.player.state, 'idle');
 });
+
+test("Knight's Soul Drain procs on a share of hits and restores a tenth of max HP and SP", () => {
+  const g = createGame({ hero: 'knight', dungeon: quiet, seed: 3 });
+  const p = g.player, e = dummy(g, 2.4);
+  e.hp = 1e9; e.hpMax = 1e9;
+  p.hp = 50; p.mp = 10;
+  let hits = 0, drains = 0, firstHeal = null;
+  for (let i = 0; i < 4000; i++) {
+    const hpBefore = p.hp;
+    update(g, hold('attack'));
+    for (const ev of g.events) {
+      if (ev.type === 'hit' && ev.target === 'enemy') hits++;
+      if (ev.type === 'drain') { drains++; if (firstHeal === null) firstHeal = { hp: ev.hp, sp: ev.sp, gained: p.hp - hpBefore }; }
+    }
+    g.events.length = 0;
+    p.hp = Math.min(p.hp, 60); p.mp = Math.min(p.mp, 20);   // stay below max so the heal is visible
+    e.hp = 1e9; e.x = 2.4; e.z = 0; e.vx = 0; e.dead = false;   // knockback would walk it out of reach
+    e.state = 'chase'; e.hitstun = 0; e.launched = false; e.y = 0; e.vy = 0; e.grounded = true;   // and knockdown would make it unhittable
+    p.x = 1.5; p.z = 0; p.vx = 0; p.facing = 1;                  // and the combo's lunge would walk him past it
+  }
+  assert.ok(hits > 150, `enough hits landed (${hits})`);
+  const rate = drains / hits;
+  assert.ok(rate > 0.008 && rate < 0.065, `about 3% of hits drain (${drains}/${hits} = ${(rate * 100).toFixed(1)}%)`);
+  assert.deepEqual({ hp: firstHeal.hp, sp: firstHeal.sp }, { hp: 15, sp: 6 }, '10% of 150 HP and 60 SP');
+  assert.equal(firstHeal.gained, 15, 'the HP actually went up by that much');
+});
+
+test("Hunter's Auto Blitz sends the falcon after a share of arrow hits, and the falcon never procs itself", () => {
+  const g = createGame({ hero: 'hunter', dungeon: quiet, seed: 5 });
+  const p = g.player, e = dummy(g, 4.5);
+  e.hp = 1e9; e.hpMax = 1e9;
+  let arrowHits = 0, procs = 0, falconHits = 0;
+  for (let i = 0; i < 4000; i++) {
+    update(g, hold('attack'));
+    for (const ev of g.events) {
+      if (ev.type === 'hit' && ev.target === 'enemy') { if (ev.attack === 'autoBlitz') falconHits++; else arrowHits++; }
+      if (ev.type === 'autoBlitz') procs++;
+    }
+    g.events.length = 0;
+    e.hp = 1e9; e.x = 4.5; e.z = 0; e.vx = 0; e.dead = false;
+    e.state = 'chase'; e.hitstun = 0; e.launched = false; e.y = 0; e.vy = 0; e.grounded = true;
+    p.x = 1.5; p.z = 0; p.vx = 0; p.facing = 1;                  // shoot3 backsteps into the wall otherwise
+  }
+  // A proc in the last 0.3s of the loop has not landed yet; let the falcon finish its trip.
+  for (let i = 0; i < 20; i++) {
+    update(g, EMPTY_INPUT);
+    for (const ev of g.events) if (ev.type === 'hit' && ev.target === 'enemy' && ev.attack === 'autoBlitz') falconHits++;
+    g.events.length = 0;
+    e.hp = 1e9; e.dead = false; e.state = 'chase'; e.hitstun = 0;
+  }
+  assert.ok(arrowHits > 150, `enough arrows landed (${arrowHits})`);
+  const rate = procs / arrowHits;
+  assert.ok(rate > 0.008 && rate < 0.065, `about 3% of hits proc (${procs}/${arrowHits} = ${(rate * 100).toFixed(1)}%)`);
+  assert.equal(falconHits, procs, 'every proc landed its strike after the delay');
+
+  // Same seed, same story - the proc comes off the run's rng.
+  const g2 = createGame({ hero: 'hunter', dungeon: quiet, seed: 5 });
+  const e2 = dummy(g2, 4.5); e2.hp = 1e9; e2.hpMax = 1e9;
+  let procs2 = 0;
+  for (let i = 0; i < 4000; i++) { update(g2, hold('attack')); for (const ev of g2.events) if (ev.type === 'autoBlitz') procs2++; g2.events.length = 0; e2.hp = 1e9; e2.x = 4.5; e2.z = 0; e2.vx = 0; e2.dead = false; e2.state = 'chase'; e2.hitstun = 0; e2.launched = false; e2.y = 0; e2.vy = 0; e2.grounded = true; g2.player.x = 1.5; g2.player.z = 0; g2.player.vx = 0; g2.player.facing = 1; }
+  assert.equal(procs2, procs, 'deterministic');
+});

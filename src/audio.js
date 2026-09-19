@@ -94,6 +94,8 @@ class Sfx {
         else { this.noise({ dur: 0.25, vol: 0.1, freq: 600, q: 0.5 }); this.tone({ freq: 200, to: 60, type: 'triangle', dur: 0.25, vol: 0.06 }); }
         break;
       case 'jump': this.tone({ freq: 300, to: 600, type: 'triangle', dur: 0.1, vol: 0.04 }); break;
+      case 'autoBlitz': this.tone({ freq: 2200, to: 3400, type: 'square', dur: 0.14, vol: 0.05 }); this.tone({ freq: 3000, to: 1900, type: 'square', dur: 0.12, vol: 0.04, at: 0.14 }); break;
+      case 'drain': [660, 990].forEach((f, i) => this.tone({ freq: f, to: f * 1.25, type: 'sine', dur: 0.18, vol: 0.05, at: i * 0.06 })); break;
       case 'dodge': this.noise({ dur: 0.1, vol: 0.06, freq: 2600, q: 1.2 }); this.tone({ freq: 1800, to: 2600, type: 'sine', dur: 0.08, vol: 0.03 }); break;
       case 'dash': this.noise({ dur: 0.12, vol: 0.06, freq: 1500, q: 0.8 }); break;
       case 'land': if (ev.hard) this.noise({ dur: 0.15, vol: 0.08, freq: 250, q: 0.5 }); break;
