@@ -203,3 +203,26 @@ test('an enemy attack hurts the player once, grants i-frames and kills at 0 hp',
   assert.equal(g.phase, 'dead');
   assert.ok(g.events.some((ev) => ev.type === 'gameOver'));
 });
+
+test('holding attack keeps the combo going at the rate the attacks allow', () => {
+  const chain = (atkSpeed, secs) => {
+    const g = createGame({ hero: 'knight', dungeon: quiet });
+    if (atkSpeed !== 1) g.player.buffs.quicken = { t: 99, atkSpeed, dodge: 0 };
+    const seen = [];
+    for (let i = 0; i < Math.round(secs / SIM.dt); i++) {
+      update(g, hold('attack'));
+      for (const e of g.events) if (e.type === 'attack') seen.push(e.id);
+      g.events.length = 0;
+    }
+    return seen;
+  };
+  const held = chain(1, 3);
+  assert.deepEqual(held.slice(0, 4), ['slash1', 'slash2', 'slash3', 'slash1'], 'chains and loops with no presses at all');
+  const quick = chain(1.3, 3);
+  assert.ok(quick.length > held.length, `Quicken lands more swings in the same time (${quick.length} vs ${held.length})`);
+  // A single press still behaves as before: one slash, then idle.
+  const g = createGame({ hero: 'knight', dungeon: quiet });
+  update(g, press('attack'));
+  steps(g, 40);
+  assert.equal(g.player.state, 'idle');
+});

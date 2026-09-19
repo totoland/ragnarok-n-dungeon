@@ -16,7 +16,7 @@ export function createPlayer(heroKey) {
     hurtbox: def.hurtbox,
     state: 'idle', stateT: 0,
     attack: null, attackT: 0, hitLog: [], spawned: [],
-    cooldowns: {}, dashCd: 0, buf: {},
+    cooldowns: {}, dashCd: 0, buf: {}, holdAttack: false,
     hitstun: 0, iframes: 0, flash: 0, launched: false,
     moving: false,
     // Timed modifiers keyed by id, and the values folded from them every tick. Anything that
@@ -90,6 +90,11 @@ function tickTimers(p, input, dt) {
   if (p.hitstun > 0) p.hitstun -= dt;
   p.mp = Math.min(p.mpMax, p.mp + PLAYER.mpRegen * dt);
   const pr = input.pressed || {};
+  // Holding attack keeps swinging: the combo chains at each cancel point and loops from the
+  // top, at the rate the attack timeline allows. That is what makes attack speed something
+  // the player can feel - with press-to-swing the finger is the bottleneck, and a faster
+  // attack only closes the chain window sooner. Single presses still work as they always did.
+  p.holdAttack = !!(input.held && input.held.attack);
   // A press during an attack is held until that attack's cancel point plus the normal buffer,
   // so mashing early still chains — the belt-scroller feel.
   const untilCancel = p.state === 'attack' ? Math.max(0, p.def.attacks[p.attack].cancelAt - p.attackT) / p.atkSpeed : 0;
@@ -143,7 +148,7 @@ function runAttack(g, p, dt) {
   if (t >= atk.cancelAt) {
     const skill = bufferedSkill(p);
     if (skill && p.grounded) { startAttack(g, p, skill); return; }
-    if (atk.next && p.buf.attack > 0) { startAttack(g, p, atk.next); return; }
+    if (atk.next && (p.buf.attack > 0 || p.holdAttack)) { startAttack(g, p, atk.next); return; }
   }
   if (t >= atk.dur) { p.state = 'idle'; p.attack = null; }
 }
@@ -187,7 +192,7 @@ export function updatePlayer(g, p, input, dt) {
       move(g, p, input, dt);
       const skill = p.grounded ? bufferedSkill(p) : null;
       if (skill) startAttack(g, p, skill);
-      else if (p.buf.attack > 0) startAttack(g, p, p.grounded ? p.def.basic : (p.hero === 'knight' ? 'airSlash' : 'airShot'));
+      else if (p.buf.attack > 0 || p.holdAttack) startAttack(g, p, p.grounded ? p.def.basic : (p.hero === 'knight' ? 'airSlash' : 'airShot'));
       else if (p.buf.jump > 0 && p.grounded) { p.vy = PLAYER.jumpVel; p.grounded = false; p.buf.jump = 0; p.state = 'air'; g.events.push({ type: 'jump', x: p.x, z: p.z }); }
       else if (p.buf.dash > 0 && p.grounded && p.dashCd <= 0) { p.state = 'dash'; p.stateT = 0; p.dashCd = PLAYER.dash.cd; p.buf.dash = 0; g.events.push({ type: 'dash', x: p.x, z: p.z, facing: p.facing }); }
     }
