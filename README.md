@@ -98,8 +98,10 @@ src/
 assets/heroes/         knight.glb, hunter.glb, meta.json (baked, see Art)
 vendor/three/          three r180 core + GLTFLoader, RoomEnvironment, BufferGeometryUtils (MIT)
 tools/export_heroes.py Blender headless: static .blend → limb-segmented GLB
+tools/mixamo_to_clip.py Blender headless: Mixamo .fbx → keys in the rigid-limb clip format
+tools/preview_clip.py  Blender headless: render a clip onto an exported rig, for eyeballing
 tools/playtest.mjs     headless balance harness
-tests/                 25 tests: combat / player / game (pure) + a Three-in-Node render smoke test
+tests/                 44 tests: combat / player / game (pure) + a Three-in-Node render smoke test
 ```
 
 The sim never imports the renderer and never touches `Math.random`, so a run is fully
@@ -121,6 +123,30 @@ root ─ torso ─ head / armL ─ weapon / armR / cape        (knight)
      ├ legL ├ legR
      └ falcon ─ wingL / wingR                             (hunter)
 ```
+
+### Borrowing motion from Mixamo
+
+Mixamo rigs are ~65-bone skeletons for skinned meshes; ours are seven rigid limbs posed by
+Euler angles. A bone-for-bone transfer is therefore impossible — there is no forearm, shin
+or spine chain to receive it. [tools/mixamo_to_clip.py](tools/mixamo_to_clip.py) measures the
+*result* of the Mixamo pose instead and restates it in our channels: arms and legs are
+**aimed** (shoulder → hand, hip → foot), which folds the elbow and knee into the one segment
+we have and so keeps the reach of the pose; torso and head are real single joints on both
+rigs, so their rotation transfers as a **delta**. Body yaw is divided out, because in game
+the facing comes from the sim. The sampled curve is then cut down to a handful of keys by
+inserting whichever frame is currently worst-reconstructed, scored through the same
+smoothstep `evalClip` uses.
+
+```sh
+tools/mixamo_to_clip.sh anim.fbx --name cast --range 11:44 --gain legs=0.6,tz=0.5
+tools/preview_clip.sh baphomet cast --json out.json --out strip.png --views sideflat
+```
+
+What does *not* survive: elbows, knees and spine bend, and anything that assumes human legs
+— Mixamo's are plantigrade, Baphomet's are digitigrade goat legs that bend the other way.
+Treat the output as a strong first draft to art-direct with `--gain`, not as a finished clip.
+Baphomet's `castWindup` / `cast` in [monsters.js](src/render/monsters.js) came through this
+path; everything else there is hand-authored.
 
 The game then animates the limbs procedurally: [src/render/anim.js](src/render/anim.js) is a
 flat-channel keyframe system (`aLx` = left arm swings forward, `tx` = torso leans forward,

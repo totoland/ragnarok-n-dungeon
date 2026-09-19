@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { createGame, update } from '../src/sim/game.js';
 import { createEnemy } from '../src/sim/enemies.js';
 import { MONSTERS } from '../src/sim/data/monsters.js';
-import { createMonsterViews, setBossModel } from '../src/render/monsters.js';
+import { createMonsterViews, setBossModel, CLIPS_BY_TYPE } from '../src/render/monsters.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from '../src/render/anim.js';
 
 const world = () => ({ scene: new THREE.Scene() });
@@ -72,4 +72,24 @@ test('poses evaluate and apply cleanly on a rig', () => {
   assert.ok(w.lLx * w.lRx < 0, 'legs alternate');
   assert.ok(w.cx > 0, 'cape streams back while walking');
   assert.ok(Object.keys(idlePose(3)).length > 0);
+});
+
+test("baphomet's cast sweeps the arm that actually holds the scythe", () => {
+  // The shared `boss` clips drive aRx, because the Orc Lord's axe is in his right hand.
+  // Baphomet's scythe hangs off armL, so a clip that only swings aRx reads as a boss
+  // standing still while a spell comes out of nowhere - which is exactly what shipped once.
+  // Retargeted motion is no protection against that: assert the weapon arm travels.
+  const clips = CLIPS_BY_TYPE.baphomet;
+  const arc = (name, ch) => {
+    const vals = [];
+    for (let t = 0; t <= 1.0001; t += 0.05) vals.push(evalClip(clips[name], t, {})[ch] ?? 0);
+    return Math.max(...vals) - Math.min(...vals);
+  };
+  for (const name of ['castWindup', 'cast']) {
+    assert.ok(arc(name, 'aLx') > 1.0, `${name} swings the scythe arm (got ${arc(name, 'aLx')})`);
+  }
+  // The gather has to pass over the head rather than swing backwards through the body,
+  // which is the whole reason those keys are allowed past pi.
+  const peak = evalClip(clips.castWindup, 1, {}).aLx;
+  assert.ok(peak > Math.PI, `wind-up carries the scythe over the top (got ${peak})`);
 });

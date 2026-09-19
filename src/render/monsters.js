@@ -235,7 +235,7 @@ const REST = { baphomet: { tx: -0.24, hx: 0.16 }, baphometling: { tx: -0.24, hx:
 // The shared `boss` clips swing aRx, because the Orc Lord carries his axe in the right hand.
 // Baphomet's scythe is parented to armL, so those clips swung an empty arm and the attack
 // read as no animation at all. These drive the arm that actually holds the weapon.
-const CLIPS_BY_TYPE = {
+export const CLIPS_BY_TYPE = {
   baphomet: {
     windup: [[0, {}], [1, { aLx: -2.5, aLz: -0.35, tx: -0.3, tyaw: -0.45, hx: -0.2, aRx: 0.45 }]],
     attack: [
@@ -251,17 +251,28 @@ const CLIPS_BY_TYPE = {
     ],
     chargeWindup: [[0, {}], [1, { tx: 0.4, ty: -0.15, aLx: -0.8, aRx: -0.7, hx: 0.25, lLx: 0.5, lRx: -0.6 }]],
     charge: [[0, { tx: 0.65, aLx: -0.6, aRx: -0.6, hx: 0.25 }], [1, { tx: 0.7, aLx: -0.7, aRx: -0.65, hx: 0.3 }]],
-    // The free hand throws the spell while the scythe arm plants, so the tell is obviously
-    // not the melee wind-up.
+    // Retargeted from Mixamo's "Standing 2H Magic Attack 01" by tools/mixamo_to_clip.py:
+    //   tools/mixamo_to_clip.sh <fbx> --name cast --range 11:44 --gain legs=0.6,tz=0.5
+    // Both hands gather the scythe up and over the head, then drive it forward with the
+    // body lunging after it. The melee wind-up swings the same arm back and *down*, so the
+    // two tells still read apart at a glance.
+    //
+    // aLx/aRx run past pi on purpose: the keys are interpolated as plain numbers, so 3.90
+    // sweeps the arm up over the front, while the equivalent -2.38 would swing it backwards
+    // through the body. Do not "simplify" these into range.
     castWindup: [
-      [0, {}],
-      [0.6, { aRx: -2.6, aRz: -0.5, aLx: -0.5, tx: -0.2, hx: -0.35, ty: 0.1 }],
-      [1, { aRx: -2.9, aRz: -0.6, aLx: -0.6, tx: -0.25, hx: -0.4, ty: 0.14 }],
+      [0, { tx: 0.50, tyaw: -0.08, tz: -0.25, hx: -0.55, hy: -0.06, aLx: 0.91, aLz: -1.09, aRx: 1.40, aRz: 0.07, lLx: -0.28, lLz: -0.14, lRx: 0.08, lRz: 0.13 }],
+      [0.286, { tx: 0.43, tyaw: 0.13, tz: -0.21, hx: -0.41, hy: -0.18, aLx: 2.24, aLz: -0.88, aRx: 2.15, aRz: 0.54, lLx: -0.37, lRx: 0.11, lRz: 0.13 }],
+      [0.524, { tx: 0.20, tyaw: 0.25, tz: -0.12, ty: 0.10, hx: -0.14, hy: -0.21, aLx: 3.13, aLz: -0.59, aRx: 2.83, aRz: 0.55, lLx: -0.33, lRx: 0.14, lRz: 0.10 }],
+      [0.81, { tx: -0.16, tyaw: 0.17, ty: 0.16, hx: 0.23, aLx: 3.55, aLz: -0.42, aRx: 3.35, aRz: 0.49, lLx: -0.28, lLz: -0.07, lRx: 0.15, lRz: 0.08 }],
+      [1, { tx: 0.02, tyaw: 0.08, tz: -0.02, ty: 0.08, hx: 0.20, hy: 0.12, aLx: 3.90, aLz: -0.73, aRx: 3.55, aRz: 0.80, lLx: -0.24, lLz: -0.10, lRx: 0.21, lRz: 0.05 }],
     ],
     cast: [
-      [0, { aRx: -2.9, aRz: -0.6, aLx: -0.6, tx: -0.25, hx: -0.4, ty: 0.14 }],
-      [0.3, { aRx: 1.5, aRz: 0.2, aLx: -0.3, tx: 0.5, hx: 0.25, ty: -0.1 }],
-      [1, { aRx: 1.1, aLx: -0.2, tx: 0.35, hx: 0.15 }],
+      [0, { tx: 0.02, tyaw: 0.08, tz: -0.02, ty: 0.08, hx: 0.20, hy: 0.12, aLx: 3.90, aLz: -0.73, aRx: 3.55, aRz: 0.80, lLx: -0.24, lLz: -0.10, lRx: 0.21, lRz: 0.05 }],
+      [0.167, { tx: 0.27, tyaw: 0.07, hx: 0.08, hy: 0.11, aLx: 3.40, aLz: -1.27, aRx: 2.84, aRz: 0.93, lLx: -0.24, lLz: -0.11, lRx: 0.23 }],
+      [0.25, { tx: 0.48, tyaw: 0.08, hx: -0.11, hy: 0.09, aLx: 2.19, aLz: -1.01, aRx: 2.19, aRz: 0.78, lLx: -0.25, lLz: -0.10, lRx: 0.24 }],
+      [0.5, { tx: 0.93, tyaw: 0.12, tz: 0.09, ty: -0.04, hx: -0.55, aLx: 2.34, aLz: -0.24, aRx: 2.35, lLx: -0.32, lLz: -0.05, lRx: 0.21 }],
+      [1, { tx: 1.00, tyaw: 0.14, tz: 0.10, ty: -0.05, hx: -0.77, hy: 0.02, aLx: 2.51, aLz: -0.12, aRx: 2.45, aRz: -0.05, lLx: -0.39, lLz: -0.05, lRx: 0.14, lRz: 0.04 }],
     ],
   },
 };

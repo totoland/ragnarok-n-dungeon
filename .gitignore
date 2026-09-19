@@ -7,3 +7,4 @@ docs/screenshots/*.png
 assets/blender/**/*_preview.png
 assets/blender/**/*_detail.png
 assets/blender/**/preview*.png
+.playwright-mcp/
