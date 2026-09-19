@@ -95,6 +95,12 @@
       sees. Press any button on the pad — the API hides a controller until it gets one press.</p>
   </header>
 
+  <div class="verdict" id="focusWarn" data-state="nope" hidden>
+    <h2><span class="lamp"></span>This page doesn't have focus</h2>
+    <p>The Gamepad API reports nothing to an unfocused page, and requestAnimationFrame slows
+      to a crawl. Click anywhere on this page, then press a button on the pad.</p>
+  </div>
+
   <div class="verdict" id="verdict" data-state="waiting">
     <h2><span class="lamp"></span><span id="vTitle">Waiting for a button press…</span></h2>
     <p id="vBody">Nothing reported yet. If you've pressed a button and this hasn't changed, the pad isn't reaching this device — see the checklist below.</p>
@@ -110,6 +116,10 @@
       <dt>Buttons</dt><dd id="fBtns">—</dd>
       <dt>Axes</dt><dd id="fAxes">—</dd>
       <dt>Polls</dt><dd id="fPolls">0</dd>
+      <dt>Poll rate</dt><dd id="fRate">—</dd>
+      <dt>Open for</dt><dd id="fElapsed">0.0 s</dd>
+      <dt>Focused</dt><dd id="fFocus">—</dd>
+      <dt>Connect events</dt><dd id="fEvents">0</dd>
     </dl>
     <p class="note" id="mapNote" hidden></p>
   </section>
@@ -167,12 +177,18 @@
                 12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right', 16:'Home' };
   var $ = function (id) { return document.getElementById(id); };
   var polls = 0, seen = false, cells = [], axes = [], report = '';
+  // A null result only means something alongside these: an unfocused page reports no pad no
+  // matter what is connected, and a throttled rAF makes a big poll count look like a long
+  // wait when it was really a background tab.
+  var t0 = performance.now(), events = 0, everFocused = document.hasFocus(), rate = 0, lastMark = t0, lastPolls = 0;
+  addEventListener('focus', function () { everFocused = true; });
 
   function log(line) {
     var el = $('log');
     el.textContent = new Date().toLocaleTimeString() + '  ' + line + '\n' + el.textContent;
   }
   addEventListener('gamepadconnected', function (e) {
+    events++;
     log('connected — slot ' + e.gamepad.index + ' — ' + e.gamepad.id);
   });
   addEventListener('gamepaddisconnected', function (e) { log('disconnected — slot ' + e.gamepad.index); });
@@ -220,6 +236,19 @@
   (function frame() {
     requestAnimationFrame(frame);
     polls++; $('fPolls').textContent = polls;
+    var now = performance.now(), secs = (now - t0) / 1000;
+    if (now - lastMark >= 500) {
+      rate = Math.round((polls - lastPolls) / ((now - lastMark) / 1000));
+      lastMark = now; lastPolls = polls;
+    }
+    var focused = document.hasFocus();
+    if (focused) everFocused = true;
+    $('fRate').textContent = rate ? rate + '/s' + (rate < 20 ? '  (throttled — page is in the background)' : '') : '—';
+    $('fElapsed').textContent = secs.toFixed(1) + ' s';
+    $('fFocus').textContent = focused ? 'yes' : (everFocused ? 'not right now' : 'never — click the page');
+    $('fFocus').className = focused ? 'good' : 'bad';
+    $('fEvents').textContent = events;
+    $('focusWarn').hidden = focused || seen;
     var pad = firstPad();
 
     if (!pad) {
@@ -227,7 +256,12 @@
         'It was visible and now is not — it probably slept or lost its Bluetooth link. Press a button to wake it.');
       $('fStatus').textContent = 'no gamepad visible'; $('fStatus').className = '';
       $('secButtons').hidden = true; $('secAxes').hidden = true;
-      report = 'no gamepad visible after ' + polls + ' polls\nuserAgent: ' + navigator.userAgent;
+      report = ['no gamepad visible',
+        '  open for: ' + secs.toFixed(1) + ' s   polls: ' + polls + '   rate: ' + rate + '/s',
+        '  focused now: ' + (focused ? 'yes' : 'no') + '   ever focused: ' + (everFocused ? 'yes' : 'no'),
+        '  gamepadconnected events: ' + events,
+        '  getGamepads() slots: ' + (navigator.getGamepads() || []).length,
+        '  userAgent: ' + navigator.userAgent].join('\n');
       return;
     }
 
