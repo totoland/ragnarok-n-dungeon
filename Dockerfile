@@ -9,7 +9,7 @@
 FROM nginx:1.27-alpine
 
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
-COPY index.html style.css /usr/share/nginx/html/
+COPY index.html style.css gamepad.html /usr/share/nginx/html/
 COPY src/ /usr/share/nginx/html/src/
 COPY vendor/ /usr/share/nginx/html/vendor/
 # Copy assets/ wholesale and let .dockerignore decide what stays out. Enumerating asset

@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gamepad probe — Dungeon RO</title>
+<!--
+  Served from the game's own origin on purpose. A gamepad is gated by Permissions Policy, so
+  a probe running in an embedded viewer or a cross-origin iframe reports "no gamepad" no
+  matter what is plugged in. Testing from here means the page sees exactly what the game sees.
+-->
+<style>
+  :root {
+    --ground:#141a21; --panel:#1c242d; --panel2:#222c37; --rule:#2f3b47;
+    --ink:#e7edf2; --dim:#93a2b1; --faint:#64727f;
+    --signal:#ff9e3d; --signal-soft:#4a3318; --trace:#4ad3c3; --alert:#ff6f61; --ok:#7bd88f;
+    color-scheme: dark;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:760px; margin:0 auto; padding:22px 18px 64px; display:flex; flex-direction:column; gap:18px; }
+  h1 { font-size:21px; margin:0; letter-spacing:-.01em; text-wrap:balance; }
+  .sub { color:var(--dim); font-size:13.5px; margin:0; max-width:62ch; }
+  .eyebrow { font:500 10.5px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing:.14em;
+             text-transform:uppercase; color:var(--faint); }
+  .verdict { border:1px solid var(--rule); border-left-width:4px; border-radius:3px;
+             background:var(--panel); padding:16px 18px; display:flex; flex-direction:column; gap:6px; }
+  .verdict[data-state=waiting]{ border-left-color:var(--signal); }
+  .verdict[data-state=found]  { border-left-color:var(--ok); }
+  .verdict[data-state=nope]   { border-left-color:var(--alert); }
+  .verdict h2 { margin:0; font-size:17px; font-weight:600; }
+  .verdict p  { margin:0; color:var(--dim); font-size:13.5px; }
+  .lamp { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--faint);
+          margin-right:8px; vertical-align:1px; }
+  .verdict[data-state=waiting] .lamp{ background:var(--signal); animation:pulse 1.4s ease-in-out infinite; }
+  .verdict[data-state=found] .lamp  { background:var(--ok); }
+  .verdict[data-state=nope] .lamp   { background:var(--alert); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+  @media (prefers-reduced-motion:reduce){ .lamp{animation:none!important} }
+  section { background:var(--panel); border:1px solid var(--rule); border-radius:3px;
+            padding:14px 16px 16px; display:flex; flex-direction:column; gap:12px; }
+  dl { margin:0; display:grid; grid-template-columns:120px 1fr; gap:7px 14px; }
+  dt { color:var(--faint); font-size:12px; letter-spacing:.04em; text-transform:uppercase; }
+  dd { margin:0; font:12.5px ui-monospace, Menlo, Consolas, monospace; word-break:break-word;
+       font-variant-numeric:tabular-nums; }
+  dd.bad{ color:var(--alert) } dd.good{ color:var(--ok) }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:6px; }
+  .btn { border:1px solid var(--rule); border-radius:2px; background:var(--panel2);
+         padding:7px 8px 8px; display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .btn.on { background:var(--signal-soft); border-color:var(--signal); }
+  .btn .idx { font:10.5px ui-monospace, Menlo, monospace; color:var(--faint); font-variant-numeric:tabular-nums; }
+  .btn.on .idx { color:var(--signal); }
+  .btn .nm { font-size:12.5px; font-weight:600; overflow-wrap:anywhere; }
+  .btn .act{ font-size:11px; color:var(--dim); overflow-wrap:anywhere; }
+  .btn.unbound .nm { color:var(--dim); font-weight:500; }
+  .axes { display:flex; flex-direction:column; gap:8px; }
+  .axis { display:grid; grid-template-columns:78px 1fr 62px; gap:10px; align-items:center; }
+  .axis .lbl { font-size:12px; color:var(--dim); }
+  .axis .val { font:12px ui-monospace, Menlo, monospace; text-align:right; font-variant-numeric:tabular-nums; }
+  .bar { position:relative; height:8px; background:var(--panel2); border:1px solid var(--rule); border-radius:2px; }
+  .bar i { position:absolute; top:0; bottom:0; background:var(--trace); display:block; }
+  .bar b { position:absolute; top:-2px; bottom:-2px; left:50%; width:1px; background:var(--rule); }
+  ol.steps { margin:0; padding-left:20px; display:flex; flex-direction:column; gap:8px; }
+  ol.steps li { font-size:13.5px; color:var(--dim); }
+  ol.steps li strong { color:var(--ink); font-weight:600; }
+  .note { font-size:12.5px; color:var(--dim); margin:0; }
+  code { font:12px ui-monospace, Menlo, Consolas, monospace; }
+  .log { font:11.5px ui-monospace, Menlo, monospace; color:var(--dim); background:var(--panel2);
+         border:1px solid var(--rule); border-radius:2px; padding:9px 10px; margin:0;
+         max-height:132px; overflow-y:auto; white-space:pre-wrap; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  button { font:600 13px inherit; font-family:inherit; color:var(--ink); background:var(--panel2);
+           border:1px solid var(--rule); border-radius:3px; padding:8px 13px; cursor:pointer; }
+  button:hover { border-color:var(--signal); }
+  button:focus-visible { outline:2px solid var(--signal); outline-offset:2px; }
+  .said { font-size:12.5px; color:var(--ok); }
+  [hidden] { display:none !important; }
+  footer { color:var(--faint); font-size:12px; }
+  @media (max-width:460px){
+    dl { grid-template-columns:1fr; gap:2px 0 } dt { margin-top:6px }
+    .axis { grid-template-columns:62px 1fr 54px }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:4px">
+    <span class="eyebrow">Dungeon RO · input diagnostic</span>
+    <h1>Does this browser see your controller?</h1>
+    <p class="sub">Served from the game's own origin, so this page sees exactly what the game
+      sees. Press any button on the pad — the API hides a controller until it gets one press.</p>
+  </header>
+
+  <div class="verdict" id="verdict" data-state="waiting">
+    <h2><span class="lamp"></span><span id="vTitle">Waiting for a button press…</span></h2>
+    <p id="vBody">Nothing reported yet. If you've pressed a button and this hasn't changed, the pad isn't reaching this device — see the checklist below.</p>
+  </div>
+
+  <section>
+    <span class="eyebrow">What the browser reports</span>
+    <dl>
+      <dt>Status</dt><dd id="fStatus">no gamepad</dd>
+      <dt>ID</dt><dd id="fId">—</dd>
+      <dt>Mapping</dt><dd id="fMapping">—</dd>
+      <dt>Slot</dt><dd id="fIndex">—</dd>
+      <dt>Buttons</dt><dd id="fBtns">—</dd>
+      <dt>Axes</dt><dd id="fAxes">—</dd>
+      <dt>Polls</dt><dd id="fPolls">0</dd>
+    </dl>
+    <p class="note" id="mapNote" hidden></p>
+  </section>
+
+  <section id="secButtons" hidden>
+    <span class="eyebrow">Buttons — lit while held, labelled with the action Dungeon RO binds</span>
+    <div class="grid" id="btnGrid"></div>
+    <p class="note">Index <code>0</code> is whichever button sits at the <em>bottom</em> of the face
+      cluster. On an Xbox pad that's A; on a Switch Pro Controller it's <strong>B</strong>. So jump
+      lands on B and attack on Y unless you rebind them in the game's settings.</p>
+  </section>
+
+  <section id="secAxes" hidden>
+    <span class="eyebrow">Axes — 0 and 1 are the left stick, which drives movement</span>
+    <div class="axes" id="axisList"></div>
+  </section>
+
+  <section id="secHelp">
+    <span class="eyebrow">If nothing shows up</span>
+    <ol class="steps">
+      <li><strong>Open this in a real browser.</strong> An embedded viewer or a cross-origin iframe
+        blocks the Gamepad API by policy and always reports nothing, whatever is connected.</li>
+      <li><strong>Put the pad in pairing mode properly.</strong> On a Switch Pro Controller that's the
+        small round <em>sync</em> button on the top edge beside the USB-C port — hold ~3s until the four
+        lights run back and forth. Home or a face button only tries to reconnect to a Switch.</li>
+      <li><strong>Use Bluetooth, not the cable.</strong> Over USB the Pro Controller doesn't speak
+        standard HID — it waits on a Nintendo handshake desktop OSes don't send.</li>
+      <li><strong>Check the OS sees it first.</strong> It must appear in System Settings → Bluetooth
+        before any browser can see it. Absent there means the problem is below the browser.</li>
+      <li><strong>Click this page once, then press a button.</strong> The API stays silent until the
+        document has focus and has had a real press.</li>
+    </ol>
+  </section>
+
+  <section>
+    <span class="eyebrow">Event log</span>
+    <pre class="log" id="log">ready — waiting for connect/disconnect events</pre>
+    <div class="row">
+      <button id="copyBtn" type="button">Copy report</button>
+      <span class="said" id="copied" hidden>Copied.</span>
+    </div>
+  </section>
+
+  <footer>Reads <code>navigator.getGamepads()</code> every animation frame. Nothing leaves this page.</footer>
+</div>
+
+<script>
+(function () {
+  // Dungeon RO's DEFAULT_PAD (src/settings.js), so a press reads as what it would do in game.
+  var ACTION = { 0:'Jump', 1:'Dash', 2:'Attack', 3:'Skill 1', 4:'Skill 3', 5:'Skill 2',
+                 8:'Pause', 9:'Confirm / Start',
+                 12:'Move up', 13:'Move down', 14:'Move left', 15:'Move right' };
+  var NAMED = { 0:'A / ✕', 1:'B / ○', 2:'X / □', 3:'Y / △', 4:'LB / L1', 5:'RB / R1',
+                6:'LT / L2', 7:'RT / R2', 8:'Select', 9:'Start', 10:'L Stick', 11:'R Stick',
+                12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right', 16:'Home' };
+  var $ = function (id) { return document.getElementById(id); };
+  var polls = 0, seen = false, cells = [], axes = [], report = '';
+
+  function log(line) {
+    var el = $('log');
+    el.textContent = new Date().toLocaleTimeString() + '  ' + line + '\n' + el.textContent;
+  }
+  addEventListener('gamepadconnected', function (e) {
+    log('connected — slot ' + e.gamepad.index + ' — ' + e.gamepad.id);
+  });
+  addEventListener('gamepaddisconnected', function (e) { log('disconnected — slot ' + e.gamepad.index); });
+
+  function firstPad() {
+    if (!navigator.getGamepads) return null;
+    var pads = navigator.getGamepads();
+    if (!pads) return null;
+    for (var i = 0; i < pads.length; i++) if (pads[i] && pads[i].connected) return pads[i];
+    return null;
+  }
+  function verdict(state, title, body) {
+    $('verdict').dataset.state = state; $('vTitle').textContent = title; $('vBody').textContent = body;
+  }
+  function buildCells(n) {
+    var g = $('btnGrid'); g.textContent = ''; cells = [];
+    for (var i = 0; i < n; i++) {
+      var d = document.createElement('div');
+      d.className = 'btn' + (ACTION[i] ? '' : ' unbound');
+      d.innerHTML = '<span class="idx">' + i + '</span><span class="nm">' +
+                    (NAMED[i] || 'Btn ' + i) + '</span><span class="act">' +
+                    (ACTION[i] || 'not bound') + '</span>';
+      g.appendChild(d); cells.push(d);
+    }
+  }
+  function buildAxes(n) {
+    var l = $('axisList'); l.textContent = ''; axes = [];
+    var nm = ['L stick ⇠⇢', 'L stick ⇡⇣', 'R stick ⇠⇢', 'R stick ⇡⇣'];
+    for (var i = 0; i < n; i++) {
+      var r = document.createElement('div'); r.className = 'axis';
+      r.innerHTML = '<span class="lbl">' + (nm[i] || 'Axis ' + i) +
+                    '</span><span class="bar"><b></b><i></i></span><span class="val">0.00</span>';
+      l.appendChild(r);
+      axes.push({ fill: r.querySelector('i'), val: r.querySelector('.val') });
+    }
+  }
+
+  if (!navigator.getGamepads) {
+    verdict('nope', 'This browser has no Gamepad API',
+      'navigator.getGamepads does not exist here, so no controller can reach the game in this browser.');
+    $('fStatus').textContent = 'unsupported'; $('fStatus').className = 'bad';
+    return;
+  }
+
+  (function frame() {
+    requestAnimationFrame(frame);
+    polls++; $('fPolls').textContent = polls;
+    var pad = firstPad();
+
+    if (!pad) {
+      if (seen) verdict('nope', 'The controller dropped off',
+        'It was visible and now is not — it probably slept or lost its Bluetooth link. Press a button to wake it.');
+      $('fStatus').textContent = 'no gamepad visible'; $('fStatus').className = '';
+      $('secButtons').hidden = true; $('secAxes').hidden = true;
+      report = 'no gamepad visible after ' + polls + ' polls\nuserAgent: ' + navigator.userAgent;
+      return;
+    }
+
+    if (!seen) {
+      seen = true;
+      buildCells(pad.buttons.length); buildAxes(pad.axes.length);
+      $('secButtons').hidden = false; $('secAxes').hidden = false; $('secHelp').hidden = true;
+      log('visible in slot ' + pad.index + ' — ' + pad.id);
+    }
+
+    var std = pad.mapping === 'standard';
+    verdict('found', 'Controller detected', std
+      ? 'Standard mapping, so Dungeon RO reads it directly. Press buttons and check the right ones light up.'
+      : 'Detected, but the browser reports no standard mapping — the numbers will not match the game. Copy the report and send it over.');
+    $('fStatus').textContent = 'connected'; $('fStatus').className = 'good';
+    $('fId').textContent = pad.id;
+    $('fMapping').textContent = pad.mapping || '(empty — non-standard)';
+    $('fMapping').className = std ? 'good' : 'bad';
+    $('fIndex').textContent = pad.index;
+    $('fBtns').textContent = pad.buttons.length;
+    $('fAxes').textContent = pad.axes.length;
+    $('mapNote').hidden = std;
+    if (!std) $('mapNote').textContent = 'An empty mapping means the browser recognised a device but ' +
+      'has no layout for it, so index 0 is whatever the hardware reports first. The game would need a ' +
+      'per-device table to use it.';
+
+    if (cells.length !== pad.buttons.length) buildCells(pad.buttons.length);
+    for (var i = 0; i < pad.buttons.length; i++) {
+      var b = pad.buttons[i];
+      if (cells[i]) cells[i].classList.toggle('on', !!(b && (b.pressed || b.value > 0.35)));
+    }
+    if (axes.length !== pad.axes.length) buildAxes(pad.axes.length);
+    for (var j = 0; j < pad.axes.length; j++) {
+      var v = pad.axes[j] || 0, r = axes[j];
+      if (!r) continue;
+      var pct = Math.min(50, Math.abs(v) * 50);
+      r.fill.style.left = (v < 0 ? 50 - pct : 50) + '%';
+      r.fill.style.width = pct + '%';
+      r.val.textContent = (v < 0 ? '' : '+') + v.toFixed(2);
+    }
+
+    report = ['id: ' + pad.id, 'mapping: ' + (pad.mapping || '(empty)'), 'slot: ' + pad.index,
+      'buttons: ' + pad.buttons.length + '  axes: ' + pad.axes.length,
+      'pressed: [' + pad.buttons.map(function (b, k) { return b && b.pressed ? k : null; })
+        .filter(function (k) { return k !== null; }).join(', ') + ']',
+      'axes: [' + pad.axes.map(function (v) { return (v || 0).toFixed(2); }).join(', ') + ']',
+      'userAgent: ' + navigator.userAgent].join('\n');
+  })();
+
+  $('copyBtn').addEventListener('click', function () {
+    var done = function () {
+      var c = $('copied'); c.hidden = false; setTimeout(function () { c.hidden = true; }, 2600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(report).then(done, function () { log(report); done(); });
+    } else { log(report); done(); }
+  });
+})();
+</script>
+</body>
+</html>
