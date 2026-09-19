@@ -3,7 +3,22 @@ kind: Deployment
 metadata:
   name: ragnarok-n-dungeon
 spec:
-  replicas: 1
+  # Two, so a deploy has somewhere to send traffic while the other pod is replaced. Both land
+  # on pi5 because that is the only node - this buys zero-downtime deploys, not survival of
+  # the node dying. The image is side-loaded into that node's containerd, so a second node
+  # would need deploy.sh to import there too before replicas could usefully spread.
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Never drop below two ready pods; bring the replacement up first and retire the old one
+      # only once the new one passes its readiness probe. Peaks at three pods and ~72Mi of
+      # requests mid-roll, against a node sitting at 37% of 16Gi.
+      maxUnavailable: 0
+      maxSurge: 1
+  # Ready is not the same as reachable: hold a new pod for a few seconds so Traefik has
+  # actually picked it up before the old one is allowed to go.
+  minReadySeconds: 4
   selector:
     matchLabels: { app: ragnarok-n-dungeon }
   template:
@@ -26,6 +41,13 @@ spec:
             httpGet: { path: /healthz, port: http }
             initialDelaySeconds: 10
             periodSeconds: 20
+          # Endpoint removal and pod termination race each other. Without this pause nginx can
+          # stop while Traefik is still sending it requests, which shows up as exactly the
+          # 502 a rolling update is supposed to prevent. The nginx image stops on SIGQUIT,
+          # which is its graceful drain, so the pause is all that is missing.
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "5"] }
           resources:
             requests: { cpu: 10m, memory: 24Mi }
             limits: { memory: 96Mi }
