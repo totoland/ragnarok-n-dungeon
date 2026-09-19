@@ -101,7 +101,7 @@ tools/export_heroes.py Blender headless: static .blend → limb-segmented GLB
 tools/mixamo_to_clip.py Blender headless: Mixamo .fbx → keys in the rigid-limb clip format
 tools/preview_clip.py  Blender headless: render a clip onto an exported rig, for eyeballing
 tools/playtest.mjs     headless balance harness
-tests/                 44 tests: combat / player / game (pure) + a Three-in-Node render smoke test
+tests/                 45 tests: combat / player / game (pure) + a Three-in-Node render smoke test
 ```
 
 The sim never imports the renderer and never touches `Math.random`, so a run is fully
@@ -140,8 +140,17 @@ smoothstep `evalClip` uses.
 ```sh
 tools/mixamo_to_clip.sh anim.fbx --name cast --range 11:44 --gain legs=0.6,tz=0.5
 tools/mixamo_to_clip.sh walk.fbx --name walk --loop 1     # one cyclic clip, no wind-up split
+tools/mixamo_to_clip.sh spin.fbx --name slam --keepyaw 1  # keep the body turn, on the root
 tools/preview_clip.sh baphomet cast --json out.json --out strip.png --views sideflat
 ```
+
+Body yaw is normally divided out, since the facing comes from the sim — but a spin attack
+*is* its body yaw, so `--keepyaw` routes it to a `ryaw` channel on the root (not the torso:
+the legs hang off the root, and a torso-only spin whips the upper body around hooves that
+never move). `updateHumanoid` takes `ryaw` unblended, which is only safe because the clip
+closes on a whole revolution — `--gain ryaw=…` stretches the source onto an exact 2π so the
+last key is the same orientation as the first and the channel can just be dropped. A test
+guards that.
 
 `--loop` emits a single cycle instead of a wind-up/strike pair and re-centres the vertical
 bob on the cycle mean. Mixamo ends a loop on a duplicate of frame 1, so the first and last
@@ -151,7 +160,7 @@ keys match and `walkPose`'s phase can drive it straight through `evalClip`, one 
 What does *not* survive: elbows, knees and spine bend, and anything that assumes human legs
 — Mixamo's are plantigrade, Baphomet's are digitigrade goat legs that bend the other way.
 Treat the output as a strong first draft to art-direct with `--gain`, not as a finished clip.
-Baphomet's `walk`, `windup` / `attack` and `castWindup` / `cast` in
+Baphomet's `walk`, `windup` / `attack`, `slamWindup` / `slam` and `castWindup` / `cast` in
 [monsters.js](src/render/monsters.js) came through this path; everything else there is
 hand-authored. Watch the gains: Mixamo's melee swing twists the torso 54 degrees, which
 turns a boss out of a fight plane whose hit boxes run along X.

@@ -46,7 +46,7 @@ AIM = {
     "lL": (M + "RightUpLeg", M + "RightFoot"),
     "lR": (M + "LeftUpLeg", M + "LeftFoot"),
 }
-CHANNELS = ["tx", "tyaw", "tz", "ty", "hx", "hy",
+CHANNELS = ["ryaw", "tx", "tyaw", "tz", "ty", "hx", "hy",
             "aLx", "aLz", "aRx", "aRz", "lLx", "lLz", "lRx", "lRz"]
 
 
@@ -90,7 +90,7 @@ def rot(m):
     return m.to_3x3().normalized()
 
 
-def sample(arm, frames, scale):
+def sample(arm, frames, scale, keep_yaw=False):
     """Per-frame channel dict, measured in model axes with body yaw removed."""
     bones, data = arm.pose.bones, arm.data.bones
     w3 = rot(arm.matrix_world)
@@ -114,7 +114,7 @@ def sample(arm, frames, scale):
     At = A.transposed()
 
     hips_r, chest_r, head_r = rest(M + "Hips"), rest(M + "Spine2"), rest(M + "Head")
-    out, diag = [], {"hipPitch": 0.0, "hipRoll": 0.0}
+    out, diag = [], {"hipPitch": 0.0, "hipRoll": 0.0, "yawLo": 9e9, "yawHi": -9e9}
     hips_y0 = None
 
     for f in frames:
@@ -139,9 +139,18 @@ def sample(arm, frames, scale):
         diag["hipRoll"] = max(diag["hipRoll"], abs(hz_))
         unyaw = Matrix.Rotation(-hy_, 3, "Y")
 
+        diag["yawLo"] = min(diag["yawLo"], hy_)
+        diag["yawHi"] = max(diag["yawHi"], hy_)
+
         c = {}
         t_m = unyaw @ (At @ d_chest @ A)
         c["tx"], c["tyaw"], c["tz"] = yxz(t_m)
+        # A spin attack IS its body yaw, so it cannot always be thrown away. It belongs on the
+        # root, not the torso: the legs hang off the root, and a torso-only spin would whip
+        # the upper body around hooves that never move. Everything else stays measured with
+        # the yaw removed, and the composition still comes out right - the arms are relative
+        # to the torso, which is relative to the root that is now carrying the turn.
+        c["ryaw"] = hy_ if keep_yaw else 0.0
         h_m = (At @ d_chest @ A).inverted() @ (At @ d_head @ A)
         c["hx"], c["hy"], _ = yxz(h_m)
 
@@ -250,7 +259,7 @@ def main():
     argv = sys.argv[sys.argv.index("--") + 1:]
     fbx = argv[0]
     opt = {"name": "clip", "split": "auto", "keys": "5", "tol": "0.05", "drop": "0.04",
-           "height": "3.0", "json": "", "range": "", "gain": "", "loop": ""}
+           "height": "3.0", "json": "", "range": "", "gain": "", "loop": "", "keepyaw": ""}
     for i in range(1, len(argv) - 1, 2):
         opt[argv[i].lstrip("-")] = argv[i + 1]
 
@@ -266,7 +275,7 @@ def main():
     top = (arm.matrix_world @ arm.data.bones[M + "HeadTop_End"].head_local).z
     scale = float(opt["height"]) / top
 
-    rows, diag = sample(arm, frames, scale)
+    rows, diag = sample(arm, frames, scale, opt["keepyaw"] not in ("", "0", "false"))
     unwrap(rows)
 
     # Mixamo clips open and close on a neutral stance the game never plays: the engine
@@ -275,9 +284,10 @@ def main():
         a, b = (int(x) for x in opt["range"].split(":"))
         lo, hi = frames.index(a), frames.index(b)
         rows, frames = rows[lo:hi + 1], frames[lo:hi + 1]
-        base = rows[0]["ty"]
+        base, yaw0 = rows[0]["ty"], rows[0]["ryaw"]
         for row in rows:
             row["ty"] -= base
+            row["ryaw"] -= yaw0
 
     apply_gain(rows, opt["gain"])
 
@@ -305,6 +315,10 @@ def main():
     # torso lean and left in the leg aims rather than lost - worth seeing how much that is.
     print(f"RET| hips pitch/roll folded into torso: "
           f"{math.degrees(diag['hipPitch']):.1f}deg / {math.degrees(diag['hipRoll']):.1f}deg")
+    spin = math.degrees(diag["yawHi"] - diag["yawLo"])
+    print(f"RET| body turns {spin:.0f}deg over the clip"
+          + (" - folded into tyaw" if opt["keepyaw"] not in ("", "0", "false")
+             else " - removed (pass --keepyaw 1 to keep it)"))
     print(f"RET| using frames {frames[0]}-{frames[-1]} "
           f"({len(rows)} of {n_src}, {len(rows)/fps:.2f}s)"
           + (f", gain {opt['gain']}" if opt["gain"] else ""))

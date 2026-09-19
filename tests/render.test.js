@@ -93,3 +93,17 @@ test("baphomet's cast sweeps the arm that actually holds the scythe", () => {
   const peak = evalClip(clips.castWindup, 1, {}).aLx;
   assert.ok(peak > Math.PI, `wind-up carries the scythe over the top (got ${peak})`);
 });
+
+test('the spin slam closes on a whole turn, so dropping ryaw is invisible', () => {
+  // updateHumanoid takes ryaw raw rather than blended, because easing it out would unwind
+  // most of a revolution in a tenth of a second. That is only safe while the clip ends on a
+  // multiple of 2*PI - retime the slam and this is what catches it.
+  const end = evalClip(CLIPS_BY_TYPE.baphomet.slam, 1, {}).ryaw;
+  assert.ok(Math.abs(Math.abs(end) - 2 * Math.PI) < 0.02, `slam ends on a full turn (got ${end})`);
+  assert.equal(evalClip(CLIPS_BY_TYPE.baphomet.slamWindup, 0, {}).ryaw ?? 0, 0, 'and opens at zero');
+  // Nothing else may use the channel yet: the raw hand-off is only reasoned about for slam.
+  for (const [name, clip] of Object.entries(CLIPS_BY_TYPE.baphomet)) {
+    if (name === 'slam' || name === 'slamWindup') continue;
+    for (const [, pose] of clip) assert.equal(pose.ryaw ?? 0, 0, `${name} leaves ryaw alone`);
+  }
+});

@@ -2,7 +2,8 @@
 // A pose is a flat bag of named channels (radians / metres); a clip is a list of
 // [time, pose] keys interpolated with smoothstep; missing channels read as 0.
 //
-// Channels: ry (root lift), rx (root tip fwd/back), rz (root roll),
+// Channels: ry (root lift), rx (root tip fwd/back), rz (root roll), ryaw (root turn,
+//           added to the facing the sim supplies - a spin attack lives here),
 //           ty (torso lift), tx/tyaw/tz (torso lean / twist / roll), hx/hy (head),
 //           aLx/aLy/aLz, aRx/aRy/aRz (arms), lLx/lRx (legs swing), lLz/lRz (legs splay),
 //           cx (cape), wx/wy/wz (weapon in hand), sx (scale squash, 1 = none)
@@ -68,7 +69,7 @@ export function blendTo(cur, target, rate, dt) {
 // Write a pose onto rig nodes (heroes and humanoid monsters share this).
 export function applyPose(rig, base, rest, c, yaw) {
   const v = (k) => (c[k] ?? 0) + (rest[k] ?? 0);
-  rig.root.rotation.set(v('rx'), yaw, v('rz'));
+  rig.root.rotation.set(v('rx'), yaw + v('ryaw'), v('rz'));
   rig.root.position.y = base.root.y + v('ry');
   if (rig.torso) {
     rig.torso.rotation.set(v('tx'), v('tyaw'), v('tz'));

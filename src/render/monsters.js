@@ -269,11 +269,36 @@ export const CLIPS_BY_TYPE = {
       [0.871, { tx: 0.18, tyaw: -0.32, hx: -0.08, hy: 0.11, aLx: 0.07, aLz: -0.29, aRx: 0.49, aRz: 0.14, lLx: 0.13, lRx: -0.65, lRz: 0.05 }],
       [1, { tx: 0.23, tyaw: -0.11, tz: 0.02, hx: -0.06, hy: 0.05, aLx: 0.39, aLz: -0.21, aRx: 0.11, aRz: 0.18, lLx: -0.10, lLz: 0.02, lRx: -0.16, lRz: -0.01 }],
     ],
-    slamWindup: [[0, {}], [1, { aLx: -2.9, aRx: -2.6, aLz: -0.25, aRz: 0.25, tx: -0.45, hx: -0.45, ty: 0.18 }]],
+    // Mixamo "Standing Melee Attack 360 Low", frames 1:51, split 0.32,
+    // gain legs=0.6,hy=0.3,tz=0.5,ryaw=1.076.
+    //
+    // slam's box is `both: true`, which combat.js reads as radial - 3.1 units either side of
+    // him. Every hand-authored version of this was a forward overhead smash, so the picture
+    // and the hit box never agreed. A spin sweep is what that box actually describes.
+    //
+    // ryaw turns the root, so the hooves come round with him. The 1.076 on it stretches the
+    // source's 335 degrees onto a whole 360: the last key is exactly -2*PI, which is the
+    // same orientation as 0, so updateHumanoid can drop the channel the moment the clip ends
+    // without anything moving. Retime this and that has to be re-normalised.
+    slamWindup: [
+      [0, { ryaw: 0.00, tx: 0.30, tyaw: 0.28, tz: -0.04, hx: -0.05, hy: 0.17, aLx: 0.27, aLz: -0.57, aRx: 0.58, aRz: 0.52, lLx: -0.09, lLz: -0.26, lRx: 0.08, lRz: 0.20 }],
+      [0.188, { tx: 0.34, tyaw: 0.27, hx: -0.08, hy: 0.14, aLx: 0.25, aLz: -0.71, aRx: 0.70, aRz: 0.59, lLx: -0.08, lLz: -0.28, lRx: 0.11, lRz: 0.12 }],
+      [0.312, { ryaw: -0.05, tx: 0.41, tyaw: 0.20, tz: -0.05, hx: -0.15, hy: 0.06, aLx: 0.51, aLz: -0.78, aRx: 0.77, aRz: 0.50, lLz: -0.32, lRx: 0.12 }],
+      [0.438, { ryaw: -0.40, tx: 0.43, tyaw: 0.11, tz: -0.14, hx: -0.17, hy: -0.05, aLx: 0.92, aLz: -0.53, aRx: 0.82, aRz: 0.34, lLx: 0.13, lLz: -0.34, lRx: 0.09 }],
+      [0.5, { ryaw: -0.55, tx: 0.38, tz: -0.19, hx: -0.15, hy: -0.11, aLx: 1.11, aLz: -0.34, aRx: 0.87, aRz: 0.22, lLx: 0.19, lLz: -0.37, lRx: 0.09 }],
+      [0.688, { ryaw: -0.74, tx: 0.22, tyaw: -0.27, tz: -0.22, ty: 0.05, hx: -0.15, hy: -0.24, aLx: 1.68, aLz: 0.10, aRx: 1.20, aRz: -0.33, lLx: 0.12, lLz: -0.56, lRx: 0.11, lRz: -0.12 }],
+      [0.938, { ryaw: -1.40, tx: -0.12, tyaw: -0.19, tz: -0.15, ty: 0.17, hx: -0.28, hy: -0.17, aLx: 2.05, aLz: 0.62, aRx: 1.39, aRz: -0.78, lLx: 0.10, lLz: -0.62, lRx: 0.09, lRz: -0.15 }],
+      [1, { ryaw: -1.62, tx: -0.21, tyaw: -0.16, tz: -0.12, ty: 0.20, hx: -0.28, hy: -0.15, aLx: 2.09, aLz: 0.67, aRx: 1.47, aRz: -0.88, lLx: 0.12, lLz: -0.57, lRx: 0.09, lRz: -0.14 }],
+    ],
     slam: [
-      [0, { aLx: -2.9, aRx: -2.6, tx: -0.45, hx: -0.45, ty: 0.18 }],
-      [0.34, { aLx: 1.6, aRx: 1.4, tx: 0.7, hx: 0.4, ty: -0.4, lLz: 0.3, lRz: -0.3, lLx: 0.45, lRx: 0.45 }],
-      [1, { aLx: 1.3, aRx: 1.2, tx: 0.6, hx: 0.35, ty: -0.32 }],
+      [0, { ryaw: -1.62, tx: -0.21, tyaw: -0.16, tz: -0.12, ty: 0.20, hx: -0.28, hy: -0.15, aLx: 2.09, aLz: 0.67, aRx: 1.47, aRz: -0.88, lLx: 0.12, lLz: -0.57, lRx: 0.09, lRz: -0.14 }],
+      [0.176, { ryaw: -3.33, tx: -0.44, tyaw: 0.05, tz: 0.21, ty: 0.18, hx: -0.19, hy: -0.06, aLx: 1.98, aLz: 0.58, aRx: 1.16, aRz: -0.96, lLx: 0.06, lLz: -0.15, lRz: 0.04 }],
+      [0.265, { ryaw: -4.13, tx: 0.10, tyaw: -0.06, tz: 0.25, ty: 0.06, hx: 0.40, hy: -0.12, aLx: 1.73, aLz: 0.36, aRx: 0.87, aRz: -0.12, lLx: 0.12, lLz: -0.09, lRz: 0.19 }],
+      [0.412, { ryaw: -4.66, tx: 1.01, tyaw: 0.24, tz: 0.31, ty: -0.13, hy: -0.16, aLx: 0.74, aLz: -1.21, aRx: 0.15, aRz: 0.76, lLx: 0.22, lRx: -0.10, lRz: 0.26 }],
+      [0.471, { ryaw: -4.78, tx: 1.20, tyaw: 0.05, tz: 0.23, ty: -0.10, hx: -0.09, hy: -0.14, aLx: -0.24, aLz: -1.01, aRx: -0.31, aRz: 0.62, lLx: 0.19, lRx: -0.16, lRz: 0.24 }],
+      [0.559, { ryaw: -5.06, tx: 1.00, tyaw: -0.23, hx: -0.22, hy: -0.17, aLx: -0.71, aLz: -0.71, aRx: -0.51, aRz: 0.73, lLx: 0.15, lRx: -0.24, lRz: 0.16 }],
+      [0.853, { ryaw: -5.73, tx: 0.40, tyaw: -0.11, tz: -0.06, ty: 0.12, hx: -0.10, hy: -0.07, aLx: -0.87, aLz: -1.02, aRx: 0.90, aRz: 0.97, lLx: 0.13, lRx: -0.07 }],
+      [1, { ryaw: -6.28, tx: 0.21, tyaw: 0.09, tz: -0.06, ty: 0.16, hx: -0.03, hy: 0.03, aLx: 0.24, aLz: -1.12, aRx: 0.84, aRz: 0.87, lLx: 0.02, lLz: -0.08, lRx: -0.02, lRz: -0.02 }],
     ],
     chargeWindup: [[0, {}], [1, { tx: 0.4, ty: -0.15, aLx: -0.8, aRx: -0.7, hx: 0.25, lLx: 0.5, lRx: -0.6 }]],
     charge: [[0, { tx: 0.65, aLx: -0.6, aRx: -0.6, hx: 0.25 }], [1, { tx: 0.7, aLx: -0.7, aRx: -0.65, hx: 0.3 }]],
@@ -394,6 +419,11 @@ export function createMonsterViews(world) {
       target = idlePose(v.t, v.scratch);
     }
     blendTo(v.cur, target, rate, dt);
+    // A spin attack turns the whole body, so its yaw is taken raw rather than blended: an
+    // eased hand-off would unwind most of a revolution in a tenth of a second the instant
+    // the clip ended. The clip opens at zero and closes on very nearly a whole turn, so
+    // dropping the channel on the next frame is very nearly invisible.
+    v.cur.ryaw = target.ryaw ?? 0;
     applyPose(rig, base, rest, v.cur, v.yaw);
   }
 
