@@ -9,6 +9,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
+// Emissive tint per buff. Gold for the Knight's Quicken, a cold wind-green for Wind Walk.
+const AURA = { quicken: new THREE.Color(0.95, 0.72, 0.2), windWalk: new THREE.Color(0.25, 0.9, 0.7) };
+const AURA_TMP = new THREE.Color();
+
 const HALF = Math.PI / 2;
 
 // ------------------------------------------------------------------ clips
@@ -50,6 +54,12 @@ const KNIGHT = {
       [0, { aLx: -1.4, lLx: 0.8, lRx: 0.4, tx: -0.2 }],
       [0.3, { aLx: 2.1, lLx: 0.9, lRx: 0.3, tx: 0.4, aRx: -0.5, hx: 0.3 }],
       [1, { aLx: 1.6, lLx: 0.6, lRx: 0.2, tx: 0.2 }],
+    ],
+    quicken: [ // sword held high, hold the pose while the aura catches, settle
+      [0, { aLx: 0.2 }],
+      [0.25, { aLx: -2.9, aLz: 0.15, tx: -0.2, hx: -0.35, aRx: -0.4, ty: 0.05 }],
+      [0.7, { aLx: -2.8, aLz: 0.15, tx: -0.15, hx: -0.3, aRx: -0.35, ty: 0.05 }],
+      [1, {}],
     ],
     bash: [ // long wind-up, brutal overhead
       [0, { aLx: -0.5 }],
@@ -102,6 +112,12 @@ const HUNTER = {
       [0.25, { aRx: 0.3, aRy: 0.5, lLx: 0.8, lRx: 0.3, aLx: 0.7, tx: 0.25 }],
       [0.35, { aRx: 1.3, lLx: 0.8, lRx: 0.3, aLx: 0.75, tx: 0.3 }],
       [1, { aRx: 0.8, lLx: 0.5, lRx: 0.2, aLx: 0.4, tx: 0.15 }],
+    ],
+    windWalk: [ // coil low, then spring up and open the arms as the wind takes hold
+      [0, { tx: 0.1 }],
+      [0.3, { tx: 0.45, ty: -0.18, lLx: 0.5, lRx: -0.4, aRx: 0.3, aLx: 0.3, hx: 0.3 }],
+      [0.6, { tx: -0.2, ty: 0.12, aRx: -1.2, aRz: 0.7, aLx: -1.0, aLz: -0.7, hx: -0.25 }],
+      [1, {}],
     ],
     doubleStrafe: [
       [0, { aRx: 0.9, tx: 0.1 }],
@@ -249,9 +265,13 @@ export function createHeroView(world, heroKey, assets) {
     // hit flash (red tint) and the classic i-frame blink
     const flashing = p.flash > 0;
     model.visible = !(p.iframes > 0 && p.state !== 'dead' && Math.floor(view.t * 20) % 2 === 0);
+    // A buff aura is a slow emissive pulse in the buff's colour; the flash still wins.
+    const aura = p.buffs?.quicken ? AURA.quicken : p.buffs?.windWalk ? AURA.windWalk : null;
+    const pulse = aura ? 0.35 + 0.25 * Math.sin(view.t * 6) : 0;
     for (const m of materials) {
       if (!m.emissive) continue;
       if (flashing) m.emissive.setRGB(0.9, 0.2, 0.15);
+      else if (aura) m.emissive.copy(m.userData.emissive).add(AURA_TMP.copy(aura).multiplyScalar(pulse));
       else m.emissive.copy(m.userData.emissive);
     }
 

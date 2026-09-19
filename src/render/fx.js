@@ -41,13 +41,19 @@ export function createFx(world) {
 
   // ---- damage numbers
   const numbers = [];
-  function number(x, y, z, text, color, big = false) {
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(text, { color, size: big ? 80 : 60 }), transparent: true, depthTest: false }));
-    sp.scale.set(big ? 2.4 : 1.6, big ? 1.2 : 0.8, 1);
+  function number(x, y, z, text, color, big = false, crit = false) {
+    // A critical is drawn the way Ragnarok draws one: red digits rimmed in gold, bigger than
+    // any other number, punched in at 1.7x and settling as it rises.
+    const tex = crit
+      ? textTexture(text, { color: '#ff3b2a', size: 96, stroke: '#ffd85a' })
+      : textTexture(text, { color, size: big ? 80 : 60 });
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+    const w = crit ? 3.2 : big ? 2.4 : 1.6, h = crit ? 1.6 : big ? 1.2 : 0.8;
+    sp.scale.set(w, h, 1);
     sp.position.set(x + (Math.random() - 0.5) * 0.4, y, z + 0.3);
-    sp.renderOrder = 10;
+    sp.renderOrder = crit ? 11 : 10;
     scene.add(sp);
-    numbers.push({ sp, t: 0, vy: 2.6 + Math.random(), life: 0.8 });
+    numbers.push({ sp, t: 0, vy: crit ? 2.0 : 2.6 + Math.random(), life: crit ? 1.0 : 0.8, w, h, pop: crit ? 0.7 : 0 });
   }
 
   // ---- transient meshes (slash arcs, rings, shockwaves)
@@ -155,6 +161,14 @@ export function createFx(world) {
           setTimeout(() => slash(ev.x, ev.y, ev.z, ev.facing, { color: skillColor[id], scale: big ? 1.5 : 1.1, tilt: id === 'slash2' ? -1.3 : 0.35, spin: id === 'slash2' ? 3 : -1.4 }), (id === 'bash' ? 250 : 100));
         } else if (id === 'magnumBreak') {
           setTimeout(() => { ring(ev.x, ev.z, { color: 0xff7020, radius: 3.2, life: 0.5 }); ring(ev.x, ev.z, { color: 0xffd040, radius: 2.2, life: 0.35, y: 0.1 }); burst(ev.x, 0.6, ev.z, 90, { color: 0xff8020, speed: 7, up: 5, life: 0.7, size: 0.5, gravity: 4 }); burst(ev.x, 0.4, ev.z, 40, { color: 0xffe080, speed: 4, up: 7, life: 0.6, size: 0.35 }); flashLight.position.set(ev.x, 1.5, ev.z); flashLight.intensity = 30; addShake(world, 0.7); }, 280);
+        } else if (id === 'quicken') {
+          // The cast: a gold ring rushes out and sparks climb the blade. The aura that
+          // follows is drawn every frame below, off the player's buff state.
+          ring(ev.x, ev.z, { color: 0xffc040, radius: 1.8, life: 0.4 });
+          burst(ev.x, 0.9, ev.z, 40, { color: 0xffd060, speed: 1.5, up: 4, life: 0.7, size: 0.32, gravity: -2 });
+        } else if (id === 'windWalk') {
+          ring(ev.x, ev.z, { color: 0x60ffc0, radius: 2.0, life: 0.45 });
+          burst(ev.x, 0.5, ev.z, 50, { color: 0x80ffd0, speed: 3.5, up: 2.5, life: 0.6, size: 0.28, gravity: -1 });
         } else if (id === 'bowlingBash') {
           addShake(world, 0.25);
         } else if (id === 'arrowShower') {
@@ -167,8 +181,12 @@ export function createFx(world) {
       case 'hit': {
         if (ev.target === 'enemy') {
           const crit = ev.crit;
-          number(ev.x, ev.y + 0.4, ev.z, String(ev.dmg), crit ? '#ffd24a' : '#ffffff', crit);
-          burst(ev.x, ev.y, ev.z, crit ? 22 : 12, { color: crit ? 0xffd24a : 0xfff4d0, speed: 4, up: 3, life: 0.35, size: 0.28, dir: Math.sign(ev.launched ? 0 : 1) });
+          number(ev.x, ev.y + 0.4, ev.z, String(ev.dmg), '#ffffff', crit, crit);
+          burst(ev.x, ev.y, ev.z, crit ? 26 : 12, { color: crit ? 0xffd24a : 0xfff4d0, speed: crit ? 5.5 : 4, up: 3, life: 0.35, size: crit ? 0.34 : 0.28, dir: Math.sign(ev.launched ? 0 : 1) });
+          if (crit) {   // the two crossed gold slashes that stamp a critical in RO
+            slash(ev.x, ev.y + 0.9, ev.z, 1, { color: 0xffe08a, scale: 1.3, tilt: 0.8, life: 0.18, spin: -2.5 });
+            slash(ev.x, ev.y + 0.9, ev.z, -1, { color: 0xffe08a, scale: 1.3, tilt: -0.8, life: 0.18, spin: 2.5 });
+          }
           if (ev.monster === 'poring' || ev.monster === 'lunatic') burst(ev.x, ev.y, ev.z, 8, { color: ev.monster === 'poring' ? 0xff86b4 : 0xffffff, speed: 3, up: 3, life: 0.5, size: 0.3, gravity: 12 });
           addShake(world, crit ? 0.35 : 0.14);
           if (ev.attack === 'blitzBeat') burst(ev.x, ev.y + 0.6, ev.z, 14, { color: 0xffe0a0, speed: 5, up: 2, life: 0.4, size: 0.3 });
@@ -185,6 +203,10 @@ export function createFx(world) {
         if (ev.boss) { addShake(world, 1.2); ring(ev.x, ev.z, { color: 0xff6030, radius: 6, life: 1.0 }); }
         break;
       }
+      case 'dodge':
+        number(ev.x, ev.y, ev.z, 'MISS', 0xa0f0ff);
+        burst(ev.x, ev.y - 0.4, ev.z, 10, { color: 0xa0f0ff, speed: 2.5, up: 1, life: 0.3, size: 0.2, gravity: 0 });
+        break;
       case 'land':
         if (ev.hard) { burst(ev.x, 0.1, ev.z, 14, { color: 0x9a8a70, speed: 2.5, up: 1.5, life: 0.45, size: 0.35, gravity: 6 }); addShake(world, 0.15); }
         break;
@@ -219,8 +241,23 @@ export function createFx(world) {
     }
   }
 
+  let auraAcc = 0;
   function update(game, dt) {
     for (const ev of game.events) onEvent(ev, game);
+
+    // Buff aura: motes drifting up around the hero for as long as the buff lasts. Read off
+    // the player's buff state rather than an event, so it stops the instant the buff does.
+    const p = game.player;
+    const auraColor = p?.buffs?.quicken ? 0xffd060 : p?.buffs?.windWalk ? 0x80ffd0 : 0;
+    if (auraColor && p.state !== 'dead') {
+      auraAcc += dt * 26;
+      while (auraAcc >= 1) {
+        auraAcc -= 1;
+        const a = Math.random() * Math.PI * 2, r = 0.45 + Math.random() * 0.35;
+        burst(p.x + Math.cos(a) * r, p.y + 0.15 + Math.random() * 0.4, p.z + Math.sin(a) * r * 0.5, 1,
+          { color: auraColor, speed: 0.2, up: 1.6, life: 0.7, size: 0.22, spread: 0, gravity: -0.6 });
+      }
+    } else auraAcc = 0;
 
     // particles
     for (let i = parts.length - 1; i >= 0; i--) {
@@ -250,6 +287,11 @@ export function createFx(world) {
       n.vy -= 5 * dt;
       const k = n.t / n.life;
       n.sp.material.opacity = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+      if (n.pop) {   // overshoot then settle: 1 + pop at t=0, back to 1 by 0.16s, eased
+        const u = Math.min(1, n.t / 0.16), ease = 1 - (1 - u) * (1 - u);
+        const sc = 1 + n.pop * (1 - ease);
+        n.sp.scale.set(n.w * sc, n.h * sc, 1);
+      }
       if (n.t >= n.life) { scene.remove(n.sp); n.sp.material.dispose(); numbers.splice(i, 1); }
     }
 

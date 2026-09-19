@@ -22,6 +22,14 @@ function botInput(g, frame) {
     return { held, pressed };
   }
   if (!live.length) return { held, pressed };
+  // A self-buff is cast the moment it can be, not when an enemy is in range: it has no hit
+  // box, and holding it back is just leaving attack speed on the table.
+  for (let i = 0; i < 3; i++) {
+    const id = p.def.skills[i], atk = p.def.attacks[id];
+    if (atk.buff && !p.buffs[atk.buff.id] && p.mp >= atk.mp && !(p.cooldowns[id] > 0) && p.grounded && p.state !== 'attack') {
+      pressed[`skill${i + 1}`] = true; return { held, pressed };
+    }
+  }
   live.sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x));
   const t = live[0];
   const dx = t.x - p.x, dz = t.z - p.z;
@@ -52,6 +60,7 @@ function botInput(g, frame) {
     for (let i = 0; i < 3; i++) {
       const id = p.def.skills[i];
       const atk = p.def.attacks[id];
+      if (atk.buff) continue;                     // handled above, before range is considered
       if (p.mp >= atk.mp && !(p.cooldowns[id] > 0) && frame % 3 === 0) { pressed[`skill${i + 1}`] = true; return { held, pressed }; }
     }
     if (frame % 4 === 0) pressed.attack = true;

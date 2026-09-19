@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { hurtPlayer } from '../src/sim/player.js';
 import { createGame, update, EMPTY_INPUT } from '../src/sim/game.js';
 import { createEnemy } from '../src/sim/enemies.js';
 import { HEROES } from '../src/sim/data/heroes.js';
@@ -53,20 +54,85 @@ test('a slash hits an enemy in front once, not one behind, and builds the combo 
 test('skills cost MP, respect cooldowns and can cancel a basic attack', () => {
   const g = createGame({ hero: 'knight', dungeon: quiet });
   const p = g.player;
+  // Whatever sits in slot 1 - it was Bash, it is Quicken now, and the contract is the same.
+  const s1 = HEROES.knight.skills[0], def = HEROES.knight.attacks[s1];
   update(g, press('attack'));
   steps(g, Math.ceil(HEROES.knight.attacks.slash1.cancelAt / SIM.dt));
   const mp = p.mp;
   update(g, press('skill1'));
-  assert.equal(p.attack, 'bash', 'skill cancels the basic attack at cancelAt');
-  assert.ok(p.mp < mp - 9, 'MP deducted');
-  assert.ok(p.cooldowns.bash > 1.5);
+  assert.equal(p.attack, s1, 'skill cancels the basic attack at cancelAt');
+  assert.ok(p.mp <= mp - def.mp + 0.1, 'MP deducted');
+  assert.ok(p.cooldowns[s1] > def.cd - 0.5);
   steps(g, 60);
   update(g, press('skill1'));
-  assert.notEqual(p.attack, 'bash', 'still on cooldown');
-  p.mp = 0; p.cooldowns.bash = 0;
+  assert.notEqual(p.attack, s1, 'still on cooldown');
+  p.mp = 0; p.cooldowns[s1] = 0;
   update(g, press('skill1'));
-  assert.notEqual(p.attack, 'bash', 'no MP');
+  assert.notEqual(p.attack, s1, 'no MP');
 });
+
+test('Quicken is a timed attack-speed buff that a recast refreshes', () => {
+  const swingSteps = (g) => {
+    update(g, press('attack'));
+    let n = 0;
+    while (g.player.state === 'attack' && n < 200) { steps(g, 1); n++; }
+    return n;
+  };
+  const base = swingSteps(createGame({ hero: 'knight', dungeon: quiet }));
+
+  const g = createGame({ hero: 'knight', dungeon: quiet });
+  const p = g.player;
+  update(g, press('skill1'));
+  assert.equal(p.attack, 'quicken');
+  assert.ok(Math.abs(p.atkSpeed - 1.3) < 1e-9, 'buff applies the moment the cast starts');
+  while (p.state === 'attack') steps(g, 1);
+  const quick = swingSteps(g);
+  assert.ok(quick < base * 0.85, `a slash finishes faster under the buff (${quick} vs ${base} steps)`);
+
+  const half = Math.ceil(7 / SIM.dt);
+  steps(g, half);
+  assert.ok(p.buffs.quicken.t < 8 && p.buffs.quicken.t > 6, 'buff is counting down');
+  p.cooldowns.quicken = 0; p.mp = 60;
+  update(g, press('skill1'));
+  assert.ok(p.buffs.quicken.t > 14.9, 'recast refreshes to the full duration');
+  while (p.state === 'attack') steps(g, 1);
+  steps(g, Math.ceil(15.2 / SIM.dt));
+  assert.equal(p.buffs.quicken, undefined, 'buff expires');
+  assert.equal(p.atkSpeed, 1, 'and attack speed returns to normal');
+});
+
+test('Wind Walk grants a seeded, roughly 20% dodge that only rolls while it lasts', () => {
+  const g = createGame({ hero: 'hunter', dungeon: quiet, seed: 7 });
+  const p = g.player;
+  const hits = (n) => {
+    let landed = 0, dodged = 0;
+    for (let i = 0; i < n; i++) {
+      p.iframes = 0; p.hp = p.hpMax; p.state = 'idle';
+      const before = g.events.filter((e) => e.type === 'dodge').length;
+      if (hurtPlayer(g, p, 1, [0, 0], 0, 1)) landed++;
+      else if (g.events.filter((e) => e.type === 'dodge').length > before) dodged++;
+    }
+    return { landed, dodged };
+  };
+  assert.deepEqual(hits(50), { landed: 50, dodged: 0 }, 'nothing dodges without the buff');
+
+  p.state = 'idle'; p.hitstun = 0; p.iframes = 0;    // the last hit left him reeling
+  update(g, press('skill1'));
+  assert.equal(p.attack, 'windWalk');
+  assert.ok(Math.abs(p.dodge - 0.2) < 1e-9);
+  assert.ok(Math.abs(p.atkSpeed - 1.15) < 1e-9);
+  const r = hits(400);
+  assert.ok(r.dodged > 50 && r.dodged < 110, `about a fifth dodged (${r.dodged}/400)`);
+  assert.equal(r.landed + r.dodged, 400);
+
+  // Same seed, same run, same dodges: the roll comes from the run's rng, not Math.random.
+  const g2 = createGame({ hero: 'hunter', dungeon: quiet, seed: 7 });
+  update(g2, press('skill1'));
+  let d2 = 0;
+  for (let i = 0; i < 400; i++) { g2.player.iframes = 0; g2.player.hp = g2.player.hpMax; g2.player.state = 'idle'; if (!hurtPlayer(g2, g2.player, 1, [0, 0], 0, 1)) d2++; }
+  assert.equal(d2, r.dodged, 'deterministic');
+});
+
 
 test('magnum break launches enemies on both sides', () => {
   const g = createGame({ hero: 'knight', dungeon: quiet });

@@ -61,15 +61,28 @@ class Sfx {
         else if (ev.id.startsWith('shoot') || ev.id === 'airShot' || ev.id === 'doubleStrafe') { this.noise({ dur: 0.07, vol: 0.06, freq: 2400, q: 1.5, at: 0.08 }); this.tone({ freq: 1600, to: 600, type: 'triangle', dur: 0.08, vol: 0.05, at: 0.08 }); }
         else if (ev.id === 'bash') { this.noise({ dur: 0.25, vol: 0.12, freq: 500, q: 0.5, at: 0.2 }); this.tone({ freq: 220, to: 60, type: 'sawtooth', dur: 0.3, vol: 0.12, at: 0.22 }); }
         else if (ev.id === 'magnumBreak') { this.tone({ freq: 160, to: 40, type: 'sawtooth', dur: 0.6, vol: 0.18, at: 0.28 }); this.noise({ dur: 0.5, vol: 0.16, freq: 300, q: 0.3, at: 0.28, type: 'lowpass' }); this.tone({ freq: 880, to: 1760, type: 'square', dur: 0.25, vol: 0.05 }); }
+        else if (ev.id === 'quicken') { [660, 880, 1320].forEach((f, i) => this.tone({ freq: f, to: f * 1.5, type: 'sine', dur: 0.22, vol: 0.06, at: i * 0.07 })); this.noise({ dur: 0.35, vol: 0.04, freq: 3000, q: 2, at: 0.1 }); }
+        else if (ev.id === 'windWalk') { this.noise({ dur: 0.45, vol: 0.09, freq: 1200, q: 0.4, type: 'bandpass' }); this.tone({ freq: 520, to: 1560, type: 'triangle', dur: 0.3, vol: 0.05, at: 0.05 }); }
         else if (ev.id === 'bowlingBash') { this.tone({ freq: 300, to: 900, type: 'sawtooth', dur: 0.4, vol: 0.1 }); this.noise({ dur: 0.5, vol: 0.1, freq: 700, q: 0.4, at: 0.1 }); }
         else if (ev.id === 'arrowShower') { for (let i = 0; i < 6; i++) this.noise({ dur: 0.08, vol: 0.05, freq: 2200 + i * 200, q: 1.5, at: 0.35 + i * 0.05 }); }
         else if (ev.id === 'blitzBeat') { this.tone({ freq: 1400, to: 2800, type: 'square', dur: 0.3, vol: 0.06 }); this.tone({ freq: 2600, to: 1800, type: 'square', dur: 0.2, vol: 0.05, at: 0.32 }); }
         break;
       case 'hit':
         if (ev.target === 'enemy') {
+          if (ev.crit) {
+            // Ragnarok's critical: a bright metallic "kshing" - a hard high transient, a pair
+            // of detuned partials that ring out, and a thump underneath. Never rate-gated:
+            // a critical that goes silent because the combo is busy is the one you notice.
+            this.noise({ dur: 0.05, vol: 0.22, freq: 4200, q: 0.6, type: 'highpass' });
+            this.tone({ freq: 2620, to: 2380, type: 'sine', dur: 0.30, vol: 0.10 });
+            this.tone({ freq: 3930, to: 3560, type: 'sine', dur: 0.24, vol: 0.06 });
+            this.tone({ freq: 1310, to: 1180, type: 'triangle', dur: 0.18, vol: 0.05 });
+            this.tone({ freq: 190, to: 60, type: 'square', dur: 0.12, vol: 0.10 });
+            break;
+          }
           if (!this.gate('hit', 0.03)) break;
-          this.noise({ dur: 0.09, vol: ev.crit ? 0.16 : 0.1, freq: ev.crit ? 700 : 1100, q: 0.7 });
-          this.tone({ freq: ev.crit ? 520 : 380, to: 90, type: 'square', dur: 0.09, vol: 0.07 });
+          this.noise({ dur: 0.09, vol: 0.1, freq: 1100, q: 0.7 });
+          this.tone({ freq: 380, to: 90, type: 'square', dur: 0.09, vol: 0.07 });
         } else {
           this.tone({ freq: 240, to: 70, type: 'sawtooth', dur: 0.25, vol: 0.14 });
           this.noise({ dur: 0.2, vol: 0.1, freq: 400, q: 0.5 });
@@ -81,6 +94,7 @@ class Sfx {
         else { this.noise({ dur: 0.25, vol: 0.1, freq: 600, q: 0.5 }); this.tone({ freq: 200, to: 60, type: 'triangle', dur: 0.25, vol: 0.06 }); }
         break;
       case 'jump': this.tone({ freq: 300, to: 600, type: 'triangle', dur: 0.1, vol: 0.04 }); break;
+      case 'dodge': this.noise({ dur: 0.1, vol: 0.06, freq: 2600, q: 1.2 }); this.tone({ freq: 1800, to: 2600, type: 'sine', dur: 0.08, vol: 0.03 }); break;
       case 'dash': this.noise({ dur: 0.12, vol: 0.06, freq: 1500, q: 0.8 }); break;
       case 'land': if (ev.hard) this.noise({ dur: 0.15, vol: 0.08, freq: 250, q: 0.5 }); break;
       case 'shoot': if (ev.owner === 'enemy') this.noise({ dur: 0.08, vol: 0.05, freq: 1800, q: 1.5 }); break;

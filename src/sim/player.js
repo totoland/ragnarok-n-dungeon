@@ -19,7 +19,31 @@ export function createPlayer(heroKey) {
     cooldowns: {}, dashCd: 0, buf: {},
     hitstun: 0, iframes: 0, flash: 0, launched: false,
     moving: false,
+    // Timed modifiers keyed by id, and the values folded from them every tick. Anything that
+    // changes how fast the hero swings or how often he is hit goes through these two numbers
+    // - a buff now, equipment later - so there is exactly one place they combine.
+    buffs: {}, atkSpeed: 1, dodge: 0,
   };
+}
+
+function applyBuff(p, b) {
+  p.buffs[b.id] = { t: b.dur, atkSpeed: b.atkSpeed || 1, dodge: b.dodge || 0 };   // recast refreshes
+  // Fold now rather than on the next tick's timers: the cast that grants a buff should be
+  // under it from its first frame, not from 33 ms later.
+  foldBuffs(p, 0);
+}
+
+function foldBuffs(p, dt) {
+  let atkSpeed = 1, miss = 1;
+  for (const id in p.buffs) {
+    const b = p.buffs[id];
+    b.t -= dt;
+    if (b.t <= 0) { delete p.buffs[id]; continue; }
+    atkSpeed *= b.atkSpeed;
+    miss *= 1 - b.dodge;             // independent dodge chances stack as 1 - prod(1 - p)
+  }
+  p.atkSpeed = atkSpeed;
+  p.dodge = 1 - miss;
 }
 
 const cost = (p, atk) => atk.mp || 0;
@@ -38,6 +62,7 @@ export function startAttack(g, p, id) {
   p.spawned = atk.spawns ? atk.spawns.map(() => false) : [];
   p.mp -= cost(p, atk);
   if (atk.cd) p.cooldowns[id] = atk.cd;
+  if (atk.buff) applyBuff(p, atk.buff);
   p.buf.attack = 0;
   for (const k of SKILL_KEYS) p.buf[k] = 0;
   g.events.push({ type: 'attack', id, hero: p.hero, x: p.x, z: p.z, y: p.y, facing: p.facing });
@@ -56,6 +81,7 @@ function bufferedSkill(p) {
 }
 
 function tickTimers(p, input, dt) {
+  foldBuffs(p, dt);
   for (const k in p.cooldowns) if (p.cooldowns[k] > 0) p.cooldowns[k] -= dt;
   for (const k in p.buf) if (p.buf[k] > 0) p.buf[k] -= dt;
   if (p.dashCd > 0) p.dashCd -= dt;
@@ -66,7 +92,7 @@ function tickTimers(p, input, dt) {
   const pr = input.pressed || {};
   // A press during an attack is held until that attack's cancel point plus the normal buffer,
   // so mashing early still chains — the belt-scroller feel.
-  const untilCancel = p.state === 'attack' ? Math.max(0, p.def.attacks[p.attack].cancelAt - p.attackT) : 0;
+  const untilCancel = p.state === 'attack' ? Math.max(0, p.def.attacks[p.attack].cancelAt - p.attackT) / p.atkSpeed : 0;
   if (pr.attack) p.buf.attack = PLAYER.inputBuffer + untilCancel;
   if (pr.jump) p.buf.jump = PLAYER.inputBuffer;
   if (pr.dash) p.buf.dash = PLAYER.inputBuffer;
@@ -76,11 +102,14 @@ function tickTimers(p, input, dt) {
 function runAttack(g, p, dt) {
   const atk = p.def.attacks[p.attack];
   const t0 = p.attackT;
-  p.attackT += dt;
+  // Attack speed is a rate on attack time. Every window - move, hits, spawns, cancel, end -
+  // is written in attackT, so this one line is the whole of "swing 30% faster".
+  const adt = dt * p.atkSpeed;
+  p.attackT += adt;
   const t = p.attackT;
 
   if (atk.move && t >= atk.move.from && t0 < atk.move.until) {
-    p.x += atk.move.speed * p.facing * dt;
+    p.x += atk.move.speed * p.facing * adt;      // lunge covers the same ground, just quicker
   }
   if (atk.hits) {
     atk.hits.forEach((hit, i) => {
@@ -186,6 +215,12 @@ function physics(g, p, dt) {
 // Called by the enemy side when one of their attacks connects.
 export function hurtPlayer(g, p, dmg, knock, stun, dir) {
   if (p.iframes > 0 || p.state === 'dead') return false;
+  // Rolled off the run's rng so a dodge is as reproducible as a crit. Only consumes a roll
+  // while something grants dodge, so runs without it play out exactly as before.
+  if (p.dodge > 0 && g.rng.next() < p.dodge) {
+    g.events.push({ type: 'dodge', x: p.x, z: p.z, y: p.y + 1.4 });
+    return false;
+  }
   applyHit(p, dmg, knock, stun, dir, 1);
   p.iframes = PLAYER.hurt.iframes;
   p.state = 'hurt';

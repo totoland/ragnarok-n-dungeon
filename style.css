@@ -313,3 +313,11 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
   .slot { height: 26px; }
   .srow { padding: 5px 0; }
 }
+
+/* A skill whose buff is up: gold rim that breathes, and a thin bar draining with the buff. */
+.skill.active { border-color: var(--gold); box-shadow: 0 0 10px rgba(232,182,74,0.55), inset 0 0 8px rgba(232,182,74,0.25); animation: buffbreathe 1.6s ease-in-out infinite; }
+.skill.active::after { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--buff, 0) * 100%); background: var(--gold); }
+.skill.active .cdnum { color: var(--gold); }
+.tbtn.active { border-color: var(--gold); box-shadow: 0 0 12px rgba(232,182,74,0.6); }
+@keyframes buffbreathe { 0%, 100% { box-shadow: 0 0 10px rgba(232,182,74,0.55), inset 0 0 8px rgba(232,182,74,0.25); } 50% { box-shadow: 0 0 16px rgba(232,182,74,0.85), inset 0 0 12px rgba(232,182,74,0.4); } }
+@media (prefers-reduced-motion: reduce) { .skill.active { animation: none; } }

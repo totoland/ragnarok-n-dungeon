@@ -101,8 +101,14 @@ export function createHud() {
       // Driven straight off the sim every frame rather than a CSS transition: a transition
       // would lag the real cooldown and lie about when the skill is actually ready.
       s.el.style.setProperty('--cd', cd.toFixed(4));
-      const label = left > 0.05 ? (left >= 1 ? left.toFixed(0) : left.toFixed(1)) : '';
+      // A buff skill shows how long the buff has left while it is up - that is the number the
+      // player is actually managing - and falls back to the cooldown once it has lapsed.
+      const buff = atk.buff ? p.buffs?.[atk.buff.id] : null;
+      const active = !!buff;
+      const label = active ? buff.t.toFixed(0) : left > 0.05 ? (left >= 1 ? left.toFixed(0) : left.toFixed(1)) : '';
       s.num.textContent = label;
+      s.el.classList.toggle('active', active);
+      if (active) s.el.style.setProperty('--buff', (buff.t / atk.buff.dur).toFixed(4));
       const poor = p.mp < atk.mp;
       s.el.classList.toggle('poor', poor);
 
@@ -110,6 +116,7 @@ export function createHud() {
         s.tb.style.setProperty('--cd', cd.toFixed(4));
         s.tb.classList.toggle('poor', poor);
         s.tb.classList.toggle('cooling', cd > 0);
+        s.tb.classList.toggle('active', active);
         if (s.tcd) s.tcd.textContent = label;
       }
 
