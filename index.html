@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>Dungeon RO</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#07060a">
+  <!-- iOS ignores the manifest for installs and reads these instead. Without the
+       apple-touch-icon it puts a screenshot of the page on the home screen. -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dungeon RO">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <script type="importmap">
     {
       "imports": {
@@ -59,6 +68,8 @@
       </div>
       <p class="controls" id="title-controls"></p>
       <button id="title-settings" class="ghost" type="button">Settings &amp; controls</button>
+      <button id="title-install" class="ghost" type="button" hidden>Install on this device</button>
+      <p id="install-hint" class="sub" hidden></p>
       <p id="loading">Loading heroes…</p>
     </div>
 
@@ -110,5 +121,6 @@
     </div>
   </main>
   <script type="module" src="src/main.js"></script>
+  <script type="module" src="src/install.js"></script>
 </body>
 </html>

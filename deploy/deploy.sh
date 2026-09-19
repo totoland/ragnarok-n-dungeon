@@ -35,6 +35,13 @@ rsync -az --delete \
   --exclude 'docs' --exclude 'assets/blender' --exclude '__pycache__' --exclude '.DS_Store' \
   "$REPO/" "$PI:$REMOTE_CTX/"
 
+# 1b. Stamp the build into the service worker. Done on the Pi rather than in the working
+#     tree so a deploy never dirties git, and before the build so it lands in the image. The
+#     worker's cache name is derived from this, so every deploy ships a byte-different worker
+#     and the browser drops the previous build's cache instead of serving it for one more load.
+echo "▶ Stamping $TAG into sw.js..."
+ssh "$PI" "sed -i 's/__BUILD__/$TAG/' $REMOTE_CTX/sw.js && grep -q \"BUILD = '$TAG'\" $REMOTE_CTX/sw.js"
+
 # 2. Build natively and hand the bytes to k3s.
 echo "▶ Building $IMAGE on $PI (native aarch64)..."
 ssh "$PI" "cd $REMOTE_CTX && docker build -q -t $IMAGE ."
