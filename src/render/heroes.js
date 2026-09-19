@@ -10,7 +10,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
 // Emissive tint per buff. Gold for the Knight's Quicken, a cold wind-green for Wind Walk.
-const AURA = { quicken: new THREE.Color(0.95, 0.72, 0.2), windWalk: new THREE.Color(0.25, 0.9, 0.7) };
+// Only Quicken tints the body. Wind Walk is drawn as dust and gusts at the feet (fx.js), which
+// reads as wind where a green glow just read as poison.
+const AURA = { quicken: new THREE.Color(0.95, 0.72, 0.2) };
 const AURA_TMP = new THREE.Color();
 
 const HALF = Math.PI / 2;
@@ -210,7 +212,7 @@ export function createHeroView(world, heroKey, assets) {
     rig.falcon.position.copy(falconPerch.pos);
     rig.falcon.quaternion.copy(falconPerch.quat);
   }
-  const falcon = { flying: false, t: 0, target: null, from: new THREE.Vector3(), pos: new THREE.Vector3() };
+  const falcon = { flying: false, mode: 'blitz', t: 0, target: null, from: new THREE.Vector3(), pos: new THREE.Vector3() };
 
   const view = {
     group, rig, hero: heroKey, def,
@@ -241,7 +243,11 @@ export function createHeroView(world, heroKey, assets) {
         target.lLx = w.lLx; target.lRx = w.lRx; target.ty = (target.ty ?? 0) + w.ty;
       }
       rate = 34;
-      if (p.attack !== view.lastAttack) { view.lastAttack = p.attack; if (p.attack === 'blitzBeat') startBlitz(game); }
+      if (p.attack !== view.lastAttack) {
+        view.lastAttack = p.attack;
+        if (rig.falcon && p.attack === 'blitzBeat') startBlitz(game);
+        else if (rig.falcon && p.attack === 'windWalk') startCircle();
+      }
     } else {
       view.lastAttack = null;
       switch (p.state) {
@@ -266,7 +272,7 @@ export function createHeroView(world, heroKey, assets) {
     const flashing = p.flash > 0;
     model.visible = !(p.iframes > 0 && p.state !== 'dead' && Math.floor(view.t * 20) % 2 === 0);
     // A buff aura is a slow emissive pulse in the buff's colour; the flash still wins.
-    const aura = p.buffs?.quicken ? AURA.quicken : p.buffs?.windWalk ? AURA.windWalk : null;
+    const aura = p.buffs?.quicken ? AURA.quicken : null;
     const pulse = aura ? 0.35 + 0.25 * Math.sin(view.t * 6) : 0;
     for (const m of materials) {
       if (!m.emissive) continue;
@@ -284,8 +290,23 @@ export function createHeroView(world, heroKey, assets) {
     if (!live.length) return;
     live.sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x));
     falcon.flying = true;
+    falcon.mode = 'blitz';
     falcon.t = 0;
     falcon.target = live[0];
+    world.scene.attach(rig.falcon);
+    falcon.from.copy(rig.falcon.position);
+  }
+
+  // Wind Walk: the falcon takes off and rings the hunter twice while the wind picks up, then
+  // settles back on the arm. Pure flourish - the sim's buff is already applied - so it runs
+  // on its own clock rather than the cast's, which is far too short for a lap.
+  const CIRCLE = { total: 1.5, r: 1.7, laps: 2, height: 1.6 };
+  function startCircle() {
+    if (falcon.flying) return;
+    falcon.flying = true;
+    falcon.mode = 'circle';
+    falcon.t = 0;
+    falcon.target = null;
     world.scene.attach(rig.falcon);
     falcon.from.copy(rig.falcon.position);
   }
@@ -297,9 +318,26 @@ export function createHeroView(world, heroKey, assets) {
     rig.wingL.rotation.z = -flap;
     if (!falcon.flying) return;
     const p = game.player;
+    falcon.t += dt;
+    if (falcon.mode === 'circle') {
+      const u = Math.min(1, falcon.t / CIRCLE.total);
+      // ease in from the hand, two laps, ease back; the ring follows the hunter as he moves
+      const a = view.yaw + u * Math.PI * 2 * CIRCLE.laps;
+      const lift = u < 0.15 ? u / 0.15 : u > 0.85 ? (1 - u) / 0.15 : 1;
+      const r = CIRCLE.r * lift, y = p.y + 0.9 + (CIRCLE.height - 0.9) * lift + 0.25 * Math.sin(u * Math.PI * 6);
+      const target = new THREE.Vector3(p.x + Math.sin(a) * r, y, p.z + Math.cos(a) * r * 0.55);
+      f.position.lerp(target, Math.min(1, 12 * dt));
+      f.rotation.set(0, a + Math.PI / 2, 0);            // beak along the direction of travel
+      if (u >= 1) {
+        falcon.flying = false;
+        rig.armR.attach(f);
+        f.position.copy(falconPerch.pos);
+        f.quaternion.copy(falconPerch.quat);
+      }
+      return;
+    }
     const atk = p.def.attacks.blitzBeat;
     const done = !(p.state === 'attack' && p.attack === 'blitzBeat');
-    falcon.t += dt;
     const total = atk.dur;
     const u = Math.min(1, falcon.t / total);
     const tgt = falcon.target;

@@ -167,8 +167,11 @@ export function createFx(world) {
           ring(ev.x, ev.z, { color: 0xffc040, radius: 1.8, life: 0.4 });
           burst(ev.x, 0.9, ev.z, 40, { color: 0xffd060, speed: 1.5, up: 4, life: 0.7, size: 0.32, gravity: -2 });
         } else if (id === 'windWalk') {
-          ring(ev.x, ev.z, { color: 0x60ffc0, radius: 2.0, life: 0.45 });
-          burst(ev.x, 0.5, ev.z, 50, { color: 0x80ffd0, speed: 3.5, up: 2.5, life: 0.6, size: 0.28, gravity: -1 });
+          // A gust at the feet: two pale rings racing outward and a ground-hugging puff of
+          // dust, the way wind announces itself by what it kicks up.
+          ring(ev.x, ev.z, { color: 0xe6ecef, radius: 2.4, life: 0.5, y: 0.04 });
+          ring(ev.x, ev.z, { color: 0xc9d3d8, radius: 1.5, life: 0.35, y: 0.1 });
+          burst(ev.x, 0.15, ev.z, 60, { color: 0xd9dfe2, speed: 4.5, up: 0.9, life: 0.55, size: 0.42, gravity: -0.4 });
         } else if (id === 'bowlingBash') {
           addShake(world, 0.25);
         } else if (id === 'arrowShower') {
@@ -241,23 +244,33 @@ export function createFx(world) {
     }
   }
 
-  let auraAcc = 0;
+  let auraAcc = 0, windAcc = 0.4;
   function update(game, dt) {
     for (const ev of game.events) onEvent(ev, game);
 
     // Buff aura: motes drifting up around the hero for as long as the buff lasts. Read off
     // the player's buff state rather than an event, so it stops the instant the buff does.
     const p = game.player;
-    const auraColor = p?.buffs?.quicken ? 0xffd060 : p?.buffs?.windWalk ? 0x80ffd0 : 0;
-    if (auraColor && p.state !== 'dead') {
-      auraAcc += dt * 26;
+    const quick = !!p?.buffs?.quicken, wind = !!p?.buffs?.windWalk;
+    if ((quick || wind) && p.state !== 'dead') {
+      auraAcc += dt * (quick ? 26 : 34);
       while (auraAcc >= 1) {
         auraAcc -= 1;
-        const a = Math.random() * Math.PI * 2, r = 0.45 + Math.random() * 0.35;
-        burst(p.x + Math.cos(a) * r, p.y + 0.15 + Math.random() * 0.4, p.z + Math.sin(a) * r * 0.5, 1,
-          { color: auraColor, speed: 0.2, up: 1.6, life: 0.7, size: 0.22, spread: 0, gravity: -0.6 });
+        const a = Math.random() * Math.PI * 2;
+        if (quick) {   // gold motes climbing the body
+          const r = 0.45 + Math.random() * 0.35;
+          burst(p.x + Math.cos(a) * r, p.y + 0.15 + Math.random() * 0.4, p.z + Math.sin(a) * r * 0.5, 1,
+            { color: 0xffd060, speed: 0.2, up: 1.6, life: 0.7, size: 0.22, spread: 0, gravity: -0.6 });
+        }
+        if (wind) {    // dust kicked up around the feet, drifting out and barely rising
+          const r = 0.3 + Math.random() * 0.5;
+          burst(p.x + Math.cos(a) * r, p.y + 0.05 + Math.random() * 0.12, p.z + Math.sin(a) * r * 0.55, 1,
+            { color: Math.random() < 0.5 ? 0xd9dfe2 : 0xb9c3c8, speed: 1.4, up: 0.35, life: 0.6, size: 0.36, spread: 0, gravity: -0.15 });
+        }
       }
-    } else auraAcc = 0;
+      // and, while the wind lasts, a faint gust ring rolling out from the feet now and then
+      if (wind) { windAcc += dt; if (windAcc >= 0.55) { windAcc = 0; ring(p.x, p.z, { color: 0xdfe6ea, radius: 1.6, life: 0.45, y: 0.03 }); } }
+    } else { auraAcc = 0; windAcc = 0.4; }
 
     // particles
     for (let i = parts.length - 1; i >= 0; i--) {
