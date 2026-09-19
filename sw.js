@@ -15,10 +15,17 @@ const DEV = BUILD.includes('BUILD');   // unsubstituted: running off `npm run de
 const SHELL = ['./', './index.html', './style.css', './manifest.webmanifest',
                './assets/icons/icon-192.png'];
 
+// Every fetch the worker makes revalidates with the server. Cloudflare overrides the origin's
+// no-cache with a 4-hour browser TTL, so a plain fetch() after a new build activates could
+// refill the fresh cache from the browser's stale copies of the old modules - the stamp
+// would say new, the files would be old. 'no-cache' sends the conditional request; nginx
+// answers 304 when nothing changed, so it costs a round trip, not a download.
+const fresh = (req) => fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' });
+
 self.addEventListener('install', (e) => {
   if (DEV) return self.skipWaiting();
   e.waitUntil(caches.open(CACHE)
-    .then((c) => c.addAll(SHELL))
+    .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'no-cache' }))))
     .catch(() => {})            // a miss here must not block the worker from installing
     .then(() => self.skipWaiting()));
 });
@@ -41,7 +48,7 @@ self.addEventListener('fetch', (e) => {
   // Navigations go to the network first so a new deploy is picked up the moment it exists,
   // and fall back to the cached shell only when there is no network at all.
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req)
+    e.respondWith(fresh(req)
       .then((res) => { put(req, res.clone()); return res; })
       .catch(() => caches.match('./index.html').then((r) => r || fetch(req))));
     return;
@@ -50,7 +57,7 @@ self.addEventListener('fetch', (e) => {
   // Everything else is cache-first. Within one build these files never change - the cache is
   // thrown away wholesale when the next build's worker activates - so revalidating each of
   // ~10 MB of models and vendored three.js on every launch would buy nothing.
-  e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+  e.respondWith(caches.match(req).then((hit) => hit || fresh(req).then((res) => {
     if (res && res.ok && res.type === 'basic') put(req, res.clone());
     return res;
   })));

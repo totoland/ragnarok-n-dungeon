@@ -11,7 +11,8 @@ const standalone = window.matchMedia('(display-mode: standalone)').matches
 if ('serviceWorker' in navigator) {
   // After load, so the worker's first-run precache never competes with the GLBs for bandwidth.
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // updateViaCache: 'none' - the worker script itself is always fetched past the HTTP cache.
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
   });
   // A new deploy ships a new worker; take it the moment it is ready rather than waiting for
   // every tab to close, and reload once so the page and its modules come from one build.
