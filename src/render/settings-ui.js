@@ -3,7 +3,7 @@
 // input layer and the touch layer can pick the change up live.
 import {
   ACTIONS, GROUPS, SLOTS, bind, unbind, defaultSettings, saveSettings, clearSettings,
-  keyLabel, padLabel, unbound,
+  keyLabel, padLabel, mouseLabel, unbound,
 } from '../settings.js';
 import { startEdit } from './touch-layout.js';
 
@@ -54,6 +54,18 @@ export function createSettingsUI({ input, touch, settings, onChange }) {
     body.querySelectorAll('.slot.listening').forEach((s) => s.classList.remove('listening'));
   }
 
+  // device -> where its bindings live and how a value is shown. Was a pair of ternaries
+  // before the mouse arrived; a third device made them a liability.
+  const mapOf = (device) => (device === 'pad' ? settings.pad
+    : device === 'mouse' ? settings.mouse : settings.keys);
+  const labelOf = (device, v) => (device === 'pad' ? padLabel(v)
+    : device === 'mouse' ? mouseLabel(v) : keyLabel(v));
+  const PROMPT = {
+    key: 'Press a key. Esc cancels, Del clears.',
+    pad: 'Press a gamepad button. Esc cancels, Del clears.',
+    mouse: 'Click on the game behind this panel. Esc cancels, Del clears.',
+  };
+
   let capturing = null;              // { action, slot, device }
   function onCaptureKey(e) {
     if (!capturing) return;
@@ -61,7 +73,7 @@ export function createSettingsUI({ input, touch, settings, onChange }) {
     else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault(); e.stopPropagation();
       const { action, slot, device } = capturing;
-      unbind(device === 'pad' ? settings.pad : settings.keys, action, slot);
+      unbind(mapOf(device), action, slot);
       stopCapture(); capturing = null; commit(); render(); defaultNote();
     }
   }
@@ -71,12 +83,13 @@ export function createSettingsUI({ input, touch, settings, onChange }) {
     capturing = { action, slot, device };
     slotEl.classList.add('listening');
     slotEl.textContent = 'Press…';
-    setNote(device === 'pad' ? 'Press a gamepad button. Esc cancels, Del clears.' : 'Press a key. Esc cancels, Del clears.');
+    setNote(PROMPT[device] || PROMPT.key);
     document.addEventListener('keydown', onCaptureKey, true);
     cancelCapture = input.captureNext((ev) => {
       cancelCapture = null;
       capturing = null;
       if (device === 'pad' && ev.type === 'pad') bind(settings.pad, action, slot, ev.index);
+      else if (device === 'mouse' && ev.type === 'mouse') bind(settings.mouse, action, slot, ev.code);
       else if (device === 'key' && ev.type === 'key') bind(settings.keys, action, slot, ev.code);
       stopCapture();
       commit();
@@ -89,10 +102,10 @@ export function createSettingsUI({ input, touch, settings, onChange }) {
   }
 
   function slotButton(action, slot, device) {
-    const list = (device === 'pad' ? settings.pad : settings.keys)[action] || [];
+    const list = mapOf(device)[action] || [];
     const value = list[slot];
     const has = value !== undefined && value !== null;
-    const b = el('button', `slot${has ? '' : ' empty'}`, has ? (device === 'pad' ? padLabel(value) : keyLabel(value)) : '—');
+    const b = el('button', `slot${has ? '' : ' empty'}`, has ? labelOf(device, value) : '—');
     b.type = 'button';
     b.dataset.action = action; b.dataset.slot = String(slot); b.dataset.device = device;
     b.title = has ? 'Click to rebind, Del to clear' : 'Click to bind';
@@ -107,6 +120,7 @@ export function createSettingsUI({ input, touch, settings, onChange }) {
     head.append(el('span', 'baction', 'Action'));
     for (let i = 0; i < SLOTS; i++) head.append(el('span', 'bslot', i === 0 ? 'Key' : `Alt ${i}`));
     head.append(el('span', 'bslot', 'Gamepad'));
+    head.append(el('span', 'bslot', 'Mouse'));
     wrap.append(head);
     let group = null;
     for (const a of ACTIONS) {
@@ -121,6 +135,13 @@ export function createSettingsUI({ input, touch, settings, onChange }) {
         s.title = 'Gamepad movement is the left stick and d-pad, and is not rebindable';
         row.append(s);
       } else row.append(slotButton(a.id, 0, 'pad'));
+      // Movement has no mouse slot for the same reason it has no pad slot: there is nothing
+      // to aim at on a belt, so the mouse is fire buttons only.
+      if (moves) {
+        const m = el('span', 'slot fixed', '—');
+        m.title = 'Movement is not bound to the mouse';
+        row.append(m);
+      } else row.append(slotButton(a.id, 0, 'mouse'));
       wrap.append(row);
     }
     return wrap;

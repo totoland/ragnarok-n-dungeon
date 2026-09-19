@@ -190,7 +190,7 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 #settings-note.warn { opacity: 1; color: #f2a65f; }
 
 .bindings { display: flex; flex-direction: column; gap: 4px; }
-.brow { display: grid; grid-template-columns: 1fr repeat(4, 96px); gap: 6px; align-items: center; }
+.brow { display: grid; grid-template-columns: 1fr repeat(5, 88px); gap: 6px; align-items: center; }
 .brow.head { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.45; margin-bottom: 2px; }
 .brow.head .bslot { text-align: center; }
 .baction { font-size: 13px; }
@@ -222,7 +222,7 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 
 @media (max-width: 720px) {
   #settings .panel { width: 96vw; max-height: 92vh; }
-  .brow { grid-template-columns: 1fr repeat(4, 62px); gap: 4px; }
+  .brow { grid-template-columns: 1fr repeat(5, 56px); gap: 4px; }
   .slot { font-size: 11px; height: 32px; }
   .srow { grid-template-columns: 1fr; gap: 6px; }
   .shint { grid-column: 1; }

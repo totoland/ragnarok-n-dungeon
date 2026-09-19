@@ -42,6 +42,17 @@ export const DEFAULT_KEYS = {
   mute: ['KeyM'],
 };
 
+// MouseEvent.button, as `Mouse<n>`. Its own map rather than extra key slots: a mouse is a
+// third device like the pad, and folding it into `keys` would spend one of the three key
+// slots an action gets. Movement is deliberately absent - there is nothing to aim at in a
+// belt-scroller, so the mouse is a pair of extra fire buttons and nothing more.
+export const DEFAULT_MOUSE = {
+  left: [], right: [], up: [], down: [],
+  attack: ['Mouse0'], jump: [], dash: [],
+  skill1: ['Mouse2'], skill2: [], skill3: [],
+  confirm: [], pause: [], mute: [],
+};
+
 // Standard-mapping gamepad button indexes. Movement is the stick and d-pad, which are read
 // directly as axes in input.js and are deliberately not rebindable.
 export const DEFAULT_PAD = {
@@ -88,6 +99,7 @@ export function defaultSettings() {
   return {
     keys: Object.fromEntries(ACTION_IDS.map((id) => [id, [...(DEFAULT_KEYS[id] || [])]])),
     pad: Object.fromEntries(ACTION_IDS.map((id) => [id, [...(DEFAULT_PAD[id] || [])]])),
+    mouse: Object.fromEntries(ACTION_IDS.map((id) => [id, [...(DEFAULT_MOUSE[id] || [])]])),
     touch: { ...DEFAULT_TOUCH, layout: {} },
   };
 }
@@ -98,14 +110,17 @@ const clamp = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
 export function normalize(raw) {
   const out = defaultSettings();
   if (!raw || typeof raw !== 'object') return out;
-  for (const field of ['keys', 'pad']) {
+  for (const field of ['keys', 'pad', 'mouse']) {
     const src = raw[field];
     if (!src || typeof src !== 'object') continue;
     for (const id of ACTION_IDS) {
       if (!Array.isArray(src[id])) continue;
-      const valid = src[id]
-        .filter((v) => (field === 'keys' ? typeof v === 'string' && v : Number.isInteger(v) && v >= 0 && v < 32))
-        .slice(0, SLOTS);
+      const ok = field === 'pad'
+        ? (v) => Number.isInteger(v) && v >= 0 && v < 32
+        : field === 'mouse'
+          ? (v) => typeof v === 'string' && /^Mouse[0-4]$/.test(v)
+          : (v) => typeof v === 'string' && !!v;
+      const valid = src[id].filter(ok).slice(0, SLOTS);
       out[field][id] = [...new Set(valid)];
     }
   }
@@ -192,7 +207,8 @@ export function unbind(bindings, action, slot) {
 
 /** Actions left with nothing bound, so the UI can warn instead of silently losing a control. */
 export function unbound(settings) {
-  return ACTION_IDS.filter((id) => !(settings.keys[id] || []).length && !(settings.pad[id] || []).length);
+  return ACTION_IDS.filter((id) => !(settings.keys[id] || []).length
+    && !(settings.pad[id] || []).length && !(settings.mouse?.[id] || []).length);
 }
 
 const NAMED = {
@@ -213,6 +229,14 @@ export function keyLabel(code) {
   if (code.startsWith('Numpad')) return `Num ${code.slice(6)}`;
   return code;
 }
+
+const MOUSE_NAMED = {
+  Mouse0: 'L Click', Mouse1: 'M Click', Mouse2: 'R Click',
+  Mouse3: 'Mouse 4', Mouse4: 'Mouse 5',
+};
+
+/** Human label for a `Mouse<n>` code. */
+export function mouseLabel(code) { return MOUSE_NAMED[code] || code || ''; }
 
 const PAD_NAMED = {
   0: 'A / ✕', 1: 'B / ○', 2: 'X / □', 3: 'Y / △', 4: 'LB / L1', 5: 'RB / R1',

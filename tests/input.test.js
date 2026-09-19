@@ -3,19 +3,28 @@ import assert from 'node:assert/strict';
 import { createInput, stickAxes } from '../src/input.js';
 import { defaultSettings, bind } from '../src/settings.js';
 
-// Stand-in for `window`: collects listeners so tests can fire synthetic key events.
+// Stand-in for `window`: collects listeners so tests can fire synthetic key events. The
+// mouse listeners attach to `target.document`, so that is carried too, with its own map.
 function fakeTarget() {
-  const map = {};
+  const map = {}, dmap = {};
+  const firer = (m) => (type, ev = {}) => {
+    let prevented = false;
+    const e = { repeat: false, button: 0, ...ev, preventDefault() { prevented = true; } };
+    for (const fn of m[type] || []) fn(e);
+    return prevented;
+  };
   return {
     addEventListener(type, fn) { (map[type] ||= []).push(fn); },
-    fire(type, ev = {}) {
-      let prevented = false;
-      const e = { repeat: false, ...ev, preventDefault() { prevented = true; } };
-      for (const fn of map[type] || []) fn(e);
-      return prevented;
-    },
+    fire: firer(map),
+    document: { addEventListener(type, fn) { (dmap[type] ||= []).push(fn); } },
+    fireDoc: firer(dmap),
   };
 }
+
+// input.js only accepts clicks that land on the canvas, which it decides with closest().
+const hit = (re) => ({ target: { closest: (sel) => (re.test(sel) ? {} : null) } });
+const onCanvas = () => hit(/#view/);
+const onButton = () => hit(/button/);
 const mk = (over) => {
   const t = fakeTarget();
   const s = defaultSettings();
@@ -132,4 +141,44 @@ test('set and press drive the same state the touch layer uses', () => {
   assert.equal(pauses, 1, 'edge actions route to listeners');
   input.press('attack');
   assert.equal(input.snapshot().pressed.attack, true);
+});
+
+test('mouse buttons drive attack and skills, and only over the canvas', () => {
+  const { t, input } = mk();
+  const click = (button, where = onCanvas()) => {
+    t.fireDoc('mousedown', { button, ...where });
+    const snap = input.snapshot();
+    t.fireDoc('mouseup', { button, ...where });
+    return Object.keys(snap.pressed);
+  };
+
+  assert.deepEqual(click(0), ['attack'], 'left click is the swing');
+  assert.deepEqual(click(2), ['skill1'], 'right click is the first skill');
+  assert.deepEqual(click(1), [], 'middle click is unbound by default');
+
+  // The whole reason clicks are filtered by target: binding attack to left click must not
+  // make choosing a hero, or opening settings, also swing.
+  assert.deepEqual(click(0, onButton()), [], 'a click on a UI button fires nothing');
+
+  // Repeats have to land - a held flag that never cleared would swallow every click but one.
+  assert.deepEqual([click(0), click(0), click(0)], [['attack'], ['attack'], ['attack']]);
+});
+
+test('a held mouse button releases, and right-click keeps its menu shut only over the canvas', () => {
+  const { t, input } = mk();
+  t.fireDoc('mousedown', { button: 0, ...onCanvas() });
+  assert.equal(input.held.attack, true, 'held while down');
+  t.fireDoc('mouseup', { button: 0, ...onCanvas() });
+  assert.equal(input.held.attack, false, 'released on mouseup');
+
+  assert.equal(t.fireDoc('contextmenu', onCanvas()), true, 'suppressed over the game');
+  assert.equal(t.fireDoc('contextmenu', onButton()), false, 'left alone over the UI');
+});
+
+test('rebinding a mouse button steals it, like every other binding', () => {
+  const { t, s, input } = mk((st) => bind(st.mouse, 'jump', 0, 'Mouse0'));
+  input.setBindings(s);
+  assert.deepEqual(s.mouse.attack, [], 'attack lost the button it shared');
+  t.fireDoc('mousedown', { button: 0, ...onCanvas() });
+  assert.deepEqual(Object.keys(input.snapshot().pressed), ['jump']);
 });

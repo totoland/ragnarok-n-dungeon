@@ -47,6 +47,7 @@ export function createInput(target = window, opts = {}) {
   let keyMap = lookup(settings.keys);
   let altMap = {};
   let padMap = lookup(settings.pad);
+  let mouseMap = lookup(settings.mouse || {});
   const held = {};
   let pressed = {};
   let enabled = true;
@@ -56,6 +57,7 @@ export function createInput(target = window, opts = {}) {
   function rebuild() {
     keyMap = lookup(settings.keys);
     padMap = lookup(settings.pad);
+    mouseMap = lookup(settings.mouse || {});
     altMap = {};
     for (const [code, action] of Object.entries(keyMap)) altMap[fallbackKey(code)] = action;
     for (const k in held) held[k] = false;
@@ -83,6 +85,46 @@ export function createInput(target = window, opts = {}) {
     if (k) { held[k] = false; if (enabled) e.preventDefault(); }
   });
   target.addEventListener('blur', () => { for (const k in held) held[k] = false; });
+
+  // ------------------------------------------------------------------ mouse
+  // Only clicks that land on the canvas count. #hud is pointer-events: none so it never
+  // swallows them, but the title screen, the settings overlay and the touch buttons are all
+  // real controls - binding attack to left click must not make choosing a hero also swing.
+  const onCanvas = (e) => {
+    const el = e.target;
+    if (!el || !el.closest) return false;
+    if (el.closest('button, .overlay, #settings, #touch')) return false;
+    return !!el.closest('#view, #frame');
+  };
+
+  const doc = target.document || (typeof document !== 'undefined' ? document : null);
+  if (doc) {
+    doc.addEventListener('mousedown', (e) => {
+      const code = `Mouse${e.button}`;
+      if (capture) {
+        if (!onCanvas(e) && e.button === 0) return;   // the click that opened the slot
+        e.preventDefault();
+        const fn = capture; capture = null;
+        fn({ type: 'mouse', code });
+        return;
+      }
+      if (!enabled || !onCanvas(e)) return;
+      const k = mouseMap[code];
+      if (!k) return;
+      e.preventDefault();
+      if (listeners[k]) { listeners[k].forEach((fn) => fn()); return; }
+      if (!held[k]) pressed[k] = true;
+      held[k] = true;
+    });
+    doc.addEventListener('mouseup', (e) => {
+      const k = mouseMap[`Mouse${e.button}`];
+      if (k && !listeners[k]) held[k] = false;
+    });
+    // Right-click is worth having as a skill button, but only if the context menu stays shut.
+    doc.addEventListener('contextmenu', (e) => {
+      if ((mouseMap.Mouse2 || capture) && onCanvas(e)) e.preventDefault();
+    });
+  }
 
   // Gamepad: polled once per snapshot. Movement is the left stick / d-pad and is not
   // rebindable; every face and shoulder button goes through padMap.

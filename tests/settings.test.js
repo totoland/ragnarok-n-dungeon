@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ACTION_IDS, SLOTS, defaultSettings, normalize, loadSettings, saveSettings, clearSettings,
-  lookup, bind, unbind, unbound, keyLabel, padLabel, hintLine, STORE_KEY,
+  lookup, bind, unbind, unbound, keyLabel, padLabel, mouseLabel, hintLine, STORE_KEY,
   TOUCH_KEYS, TOUCH_CONTROLS,
 } from '../src/settings.js';
 
@@ -138,4 +138,24 @@ test('a hand-placed layout survives a save and load round trip', () => {
   back.touch.layout = {};
   saveSettings(back, store);
   assert.deepEqual(loadSettings(store).touch.layout, {});
+});
+
+test('mouse bindings default sensibly and reject anything else', () => {
+  const d = defaultSettings();
+  assert.deepEqual(d.mouse.attack, ['Mouse0']);
+  assert.deepEqual(d.mouse.skill1, ['Mouse2']);
+  for (const id of ['left', 'right', 'up', 'down']) {
+    assert.deepEqual(d.mouse[id], [], 'movement stays off the mouse');
+  }
+  assert.equal(mouseLabel('Mouse0'), 'L Click');
+  assert.equal(mouseLabel('Mouse2'), 'R Click');
+
+  // A corrupt store must never brick the game, so keep what parses and drop the rest.
+  const n = normalize({ mouse: { attack: ['Mouse9', 'KeyJ', 7, null, 'Mouse1'] } });
+  assert.deepEqual(n.mouse.attack, ['Mouse1']);
+
+  // An action bound only to the mouse is not "unbound".
+  const only = defaultSettings();
+  only.keys.attack = []; only.pad.attack = [];
+  assert.ok(!unbound(only).includes('attack'), 'a mouse-only binding still counts');
 });
