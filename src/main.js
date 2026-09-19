@@ -172,6 +172,15 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dtReal = Math.min(0.1, (now - last) / 1000);
   last = now;
+
+  // Keyboard and touch arrive as DOM events, which fire whatever the loop is doing. A
+  // gamepad has to be asked, and the only place that asked was the sim step - so on the
+  // title screen and in the pause menu the pad went completely unread, and a controller
+  // could not even start a run. Snapshot here for exactly those two cases: it polls the pad,
+  // fires confirm/pause, and drains the edges, so a button mashed at the title does not
+  // arrive as the first frame of input.
+  if (!game || paused) input.snapshot();
+
   if (!game) { if (preview) updatePreview(dtReal); world.renderer.render(world.scene, world.camera); return; }
 
   if (!paused) {
