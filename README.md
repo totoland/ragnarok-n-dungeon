@@ -101,7 +101,7 @@ tools/export_heroes.py Blender headless: static .blend → limb-segmented GLB
 tools/mixamo_to_clip.py Blender headless: Mixamo .fbx → keys in the rigid-limb clip format
 tools/preview_clip.py  Blender headless: render a clip onto an exported rig, for eyeballing
 tools/playtest.mjs     headless balance harness
-tests/                 45 tests: combat / player / game (pure) + a Three-in-Node render smoke test
+tests/                 46 tests: combat / player / game (pure) + a Three-in-Node render smoke test
 ```
 
 The sim never imports the renderer and never touches `Math.random`, so a run is fully
@@ -141,6 +141,7 @@ smoothstep `evalClip` uses.
 tools/mixamo_to_clip.sh anim.fbx --name cast --range 11:44 --gain legs=0.6,tz=0.5
 tools/mixamo_to_clip.sh walk.fbx --name walk --loop 1     # one cyclic clip, no wind-up split
 tools/mixamo_to_clip.sh spin.fbx --name slam --keepyaw 1  # keep the body turn, on the root
+tools/mixamo_to_clip.sh idle.fbx --name idle --loop 1 --centre all
 tools/preview_clip.sh baphomet cast --json out.json --out strip.png --views sideflat
 ```
 
@@ -153,14 +154,18 @@ last key is the same orientation as the first and the channel can just be droppe
 guards that.
 
 `--loop` emits a single cycle instead of a wind-up/strike pair and re-centres the vertical
-bob on the cycle mean. Mixamo ends a loop on a duplicate of frame 1, so the first and last
+bob on the cycle mean. `--centre all` goes further and subtracts every channel's own mean,
+leaving motion without stance — an idle needs it, because Mixamo's mannequin rests with its
+torso turned 9° and its arms out 17°, and beside 15° of actual breathing that offset *is*
+the pose. A walk keeps its offsets, since leaning into the stride is the walk. Mixamo ends a loop on a duplicate of frame 1, so the first and last
 keys match and `walkPose`'s phase can drive it straight through `evalClip`, one cycle per
 2π — which is how a type opts out of the shared sine walk.
 
 What does *not* survive: elbows, knees and spine bend, and anything that assumes human legs
 — Mixamo's are plantigrade, Baphomet's are digitigrade goat legs that bend the other way.
 Treat the output as a strong first draft to art-direct with `--gain`, not as a finished clip.
-Baphomet's `walk`, `windup` / `attack`, `slamWindup` / `slam` and `castWindup` / `cast` in
+Baphomet's `idle`, `walk`, `windup` / `attack`, `slamWindup` / `slam` and
+`castWindup` / `cast` in
 [monsters.js](src/render/monsters.js) came through this path; everything else there is
 hand-authored. Watch the gains: Mixamo's melee swing twists the torso 54 degrees, which
 turns a boss out of a fight plane whose hit boxes run along X.

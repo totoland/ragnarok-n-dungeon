@@ -104,6 +104,19 @@ test('the spin slam closes on a whole turn, so dropping ryaw is invisible', () =
   // Nothing else may use the channel yet: the raw hand-off is only reasoned about for slam.
   for (const [name, clip] of Object.entries(CLIPS_BY_TYPE.baphomet)) {
     if (name === 'slam' || name === 'slamWindup') continue;
+    assert.equal(clip[0][0], 0, `${name} opens at t=0`);
     for (const [, pose] of clip) assert.equal(pose.ryaw ?? 0, 0, `${name} leaves ryaw alone`);
+  }
+});
+
+test('the looping clips meet themselves', () => {
+  // walk and idle are driven by a phase that wraps, so a first key that does not match the
+  // last one is a visible hitch once per cycle rather than a number that is slightly off.
+  for (const name of ['walk', 'idle']) {
+    const clip = CLIPS_BY_TYPE.baphomet[name];
+    const a = evalClip(clip, 0, {}), b = evalClip(clip, 1, {});
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      assert.ok(Math.abs((a[k] ?? 0) - (b[k] ?? 0)) < 1e-9, `${name}.${k} closes the loop`);
+    }
   }
 });

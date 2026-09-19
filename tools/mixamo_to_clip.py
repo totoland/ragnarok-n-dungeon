@@ -259,7 +259,7 @@ def main():
     argv = sys.argv[sys.argv.index("--") + 1:]
     fbx = argv[0]
     opt = {"name": "clip", "split": "auto", "keys": "5", "tol": "0.05", "drop": "0.04",
-           "height": "3.0", "json": "", "range": "", "gain": "", "loop": "", "keepyaw": ""}
+           "height": "3.0", "json": "", "range": "", "gain": "", "loop": "", "keepyaw": "", "centre": ""}
     for i in range(1, len(argv) - 1, 2):
         opt[argv[i].lstrip("-")] = argv[i + 1]
 
@@ -288,6 +288,19 @@ def main():
         for row in rows:
             row["ty"] -= base
             row["ryaw"] -= yaw0
+
+    # --centre all subtracts each channel's own mean, leaving motion without stance. An idle
+    # needs it: Mixamo's mannequin rests with its torso turned 9 degrees and its arms out 17,
+    # and next to 15 degrees of actual breathing that offset is the whole pose. Baphomet is
+    # sculpted with a stance already, and REST tilts him again on top - a third one just
+    # fights both. A walk keeps its offsets, because leaning into the stride is the walk.
+    if opt["centre"]:
+        want = CHANNELS if opt["centre"] == "all" else opt["centre"].split(",")
+        for c in want:
+            c = c.strip()
+            mean = sum(r[c] for r in rows) / len(rows)
+            for r in rows:
+                r[c] -= mean
 
     apply_gain(rows, opt["gain"])
 

@@ -7,6 +7,8 @@ import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
 const HALF = Math.PI / 2;
 const TAU = Math.PI * 2;
+// Seconds per cycle for the `idle` clips in CLIPS_BY_TYPE, i.e. their source duration.
+const IDLE_SECS = 1.93;
 
 const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, ...opts });
 function mesh(geo, material, x = 0, y = 0, z = 0, parent) {
@@ -258,6 +260,20 @@ export const CLIPS_BY_TYPE = {
       [0.583, { tx: 0.70, tyaw: 0.38, tz: 0.06, hx: 0.11, hy: 0.06, aLx: 1.22, aLz: -0.11, aRx: -0.12, aRz: 0.39, lLx: -0.41, lRx: 0.19 }],
       [1, { tx: 0.83, tyaw: 0.52, tz: 0.23, ty: -0.03, hx: -0.07, hy: 0.02, aLx: 1.49, aLz: 0.24, aRx: -0.25, aRz: 0.28, lLx: -0.43, lLz: 0.13, lRx: 0.19, lRz: -0.06 }],
     ],
+    // Mixamo "Unarmed Idle", the full 58-frame cycle, --centre all. Centring matters more
+    // here than anywhere else: the mannequin rests with its torso turned 9 degrees and its
+    // arms out 17, and beside 15 degrees of actual breathing that stance IS the pose. What
+    // is left is the breath alone, which then layers onto the stance Baphomet is sculpted
+    // in. It is still three to five times the motion idlePose's sines gave him.
+    idle: [
+      [0, { tx: 0.06, ty: -0.01, hx: -0.10, hy: 0.01, aLx: 0.04, aLz: 0.02, aRx: 0.09, lLx: 0.01 }],
+      [0.211, { tx: -0.03, hy: -0.01, aLx: -0.06, aRx: 0.03, aRz: -0.02 }],
+      [0.439, { tx: -0.08, ty: 0.01, hx: 0.15, aLx: -0.07, aLz: -0.02, aRx: -0.10, aRz: -0.03, lLx: -0.01, lRx: -0.01 }],
+      [0.579, { tx: -0.03, hx: 0.07, aLx: 0.01, aLz: -0.01, aRx: -0.08, aRz: 0.01 }],
+      [0.667, { tx: 0.02, aLx: 0.05, aRx: -0.04, aRz: 0.03 }],
+      [0.825, { tx: 0.06, ty: -0.01, hx: -0.09, hy: 0.01, aLx: 0.07, aLz: 0.01, aRx: 0.04, aRz: 0.03, lLx: 0.01 }],
+      [1, { tx: 0.06, ty: -0.01, hx: -0.10, hy: 0.01, aLx: 0.04, aLz: 0.02, aRx: 0.09, lLx: 0.01 }],
+    ],
     // Mixamo "Walking", the full 32-frame cycle, gain ty=0.5,hy=0.4. Frame 32 is a copy of
     // frame 1, so the first and last keys match and the loop closes without a seam.
     walk: [
@@ -416,7 +432,11 @@ export function createMonsterViews(world) {
         ? evalClip(clips.walk, (v.walkPhase / TAU) % 1, v.scratch)
         : walkPose(v.walkPhase, e.boss ? 0.8 : 1, v.scratch);
     } else {
-      target = idlePose(v.t, v.scratch);
+      // v.t opens on a random per-spawn offset, so a pack of minions does not breathe in
+      // lockstep the way a shared clock would make them.
+      target = clips.idle
+        ? evalClip(clips.idle, (v.t / IDLE_SECS) % 1, v.scratch)
+        : idlePose(v.t, v.scratch);
     }
     blendTo(v.cur, target, rate, dt);
     // A spin attack turns the whole body, so its yaw is taken raw rather than blended: an
