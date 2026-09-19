@@ -76,7 +76,13 @@ function disposeRoom(world) {
     if (o.geometry) o.geometry.dispose();
     if (o.material) {
       const mats = Array.isArray(o.material) ? o.material : [o.material];
-      for (const m of mats) { for (const k of ['map']) if (m[k]) m[k].dispose(); m.dispose(); }
+      // Every texture slot, not just `map`. A room material with a normal or emissive map
+      // would otherwise hold its texture forever, and the only symptom is memory creeping up
+      // once there are enough maps to notice - the worst kind of bug to go looking for later.
+      for (const m of mats) {
+        for (const k in m) { const t = m[k]; if (t && t.isTexture) t.dispose(); }
+        m.dispose();
+      }
     }
   });
   world.room = null;
