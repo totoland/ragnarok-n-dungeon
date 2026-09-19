@@ -42,3 +42,7 @@ export const DROPS = {
 };
 
 export const SKILL_KEYS = ['skill1', 'skill2', 'skill3'];
+
+// New Game+: how much harder a town's monsters get per time its boss has been beaten. Applied
+// by resolveMonster() at spawn, so a run's difficulty is fixed when it starts.
+export const NGPLUS = { hp: 0.35, atk: 0.25, speed: 0.06, maxTier: 5 };

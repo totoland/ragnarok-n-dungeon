@@ -2,6 +2,8 @@
 //
 //   node tools/playtest.mjs            # both heroes, 5 seeds each, summary table
 //   node tools/playtest.mjs hunter 7   # one hero, one seed, verbose room log
+//   node tools/playtest.mjs --tier 2    # every monster at New Game+ tier 2
+//   node tools/playtest.mjs --matrix    # tiers 0..2, no pass/fail gate
 //
 // The bot is deliberately simple: walk to the nearest live enemy's lane, mash attack when in
 // range, fire skills when ready, and step off-lane when something winds up nearby. A bot this
@@ -68,8 +70,8 @@ function botInput(g, frame) {
   return { held, pressed };
 }
 
-function run(hero, seed, verbose = false) {
-  const g = createGame({ hero, seed });
+function run(hero, seed, verbose = false, opts = {}) {
+  const g = createGame({ hero, seed, ...opts });
   const log = [];
   let frame = 0;
   const maxFrames = 60 * 60 * 6;
@@ -84,16 +86,34 @@ function run(hero, seed, verbose = false) {
     frame++;
   }
   log.push({ room: lastRoom, name: g.dungeon.rooms[lastRoom].name, secs: ((frame - roomStart) * SIM.dt).toFixed(1), hpLost: hpAtRoom - g.player.hp });
-  const result = { hero, seed, phase: g.phase, room: g.roomIndex, secs: (frame * SIM.dt).toFixed(0), hp: g.player.hp, hpMax: g.player.hpMax, kills: g.kills, best: g.combo.best, dealt: g.stats.damageDealt, score: Math.round(g.score) };
+  const result = { hero, ...(opts.tier ? { tier: opts.tier } : {}), seed, phase: g.phase, room: g.roomIndex, secs: (frame * SIM.dt).toFixed(0), hp: g.player.hp, hpMax: g.player.hpMax, kills: g.kills, best: g.combo.best, dealt: g.stats.damageDealt, score: Math.round(g.score) };
   if (verbose) { console.table(log); }
   return result;
 }
 
-const [, , heroArg, seedArg] = process.argv;
+// Flags first: --tier N plays one New Game+ tier, --matrix sweeps tiers 0..2 and reports each
+// on its own. Positional [hero] [seed] as before. The pass/fail gate below is only applied to
+// the plain run, so it stays comparable across commits; the matrix is for reading.
+const flags = process.argv.slice(2).filter((a) => a.startsWith('--'));
+const positional = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const flag = (name) => { const f = flags.find((a) => a === name || a.startsWith(name + '=')); return f ? (f.includes('=') ? f.split('=')[1] : true) : null; };
+const [heroArg, seedArg] = positional;
 const heroes = heroArg ? [heroArg] : ['knight', 'hunter'];
 const seeds = seedArg ? [Number(seedArg)] : [1, 2, 3, 4, 5];
+const tierFlag = flag('--tier');
+const tier = tierFlag ? Number(tierFlag) : 0;
 const rows = [];
-for (const h of heroes) for (const s of seeds) rows.push(run(h, s, !!seedArg));
+if (flag('--matrix')) {
+  for (const t of [0, 1, 2]) for (const h of heroes) for (const s of seeds) rows.push(run(h, s, false, { tier: t }));
+  console.table(rows);
+  for (const t of [0, 1, 2]) {
+    const r = rows.filter((x) => (x.tier || 0) === t);
+    const w = r.filter((x) => x.phase === 'won').length;
+    console.log(`tier ${t}: ${w}/${r.length} cleared; avg hp left ${(r.reduce((a, x) => a + x.hp / x.hpMax, 0) / r.length * 100).toFixed(0)}%`);
+  }
+  process.exit(0);
+}
+for (const h of heroes) for (const s of seeds) rows.push(run(h, s, !!seedArg, tier ? { tier } : {}));
 console.table(rows);
 const wins = rows.filter((r) => r.phase === 'won').length;
 console.log(`${wins}/${rows.length} runs cleared the dungeon; avg hp left ${(rows.reduce((a, r) => a + r.hp / r.hpMax, 0) / rows.length * 100).toFixed(0)}%`);

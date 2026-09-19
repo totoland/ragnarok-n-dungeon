@@ -15,12 +15,13 @@ export function boxHits(src, facing, box, target, depth = FLOOR.hitDepth) {
   return target.y + hb.h >= yLo && target.y <= yHi;
 }
 
-// Damage roll: atk × multiplier × ±10 % variance, 8 % crits for 1.6×. Integer result, min 1.
-export function rollDamage(atk, mult, rng) {
+// Damage roll: atk × multiplier × ±10 % variance; a crit (rate and multiplier from the
+// resolved hero, 8 % / 1.6× by default) scales it. Integer result, min 1.
+export function rollDamage(atk, mult, rng, crit = 0.08, critDmg = 1.6) {
   const variance = 0.9 + 0.2 * rng.next();
-  const crit = rng.next() < 0.08;
-  const dmg = Math.max(1, Math.round(atk * mult * variance * (crit ? 1.6 : 1)));
-  return { dmg, crit };
+  const isCrit = rng.next() < crit;
+  const dmg = Math.max(1, Math.round(atk * mult * variance * (isCrit ? critDmg : 1)));
+  return { dmg, crit: isCrit };
 }
 
 // Apply a connected hit: hp, knockback, hit-stun and launch. `dir` is the push direction (±1).

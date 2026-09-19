@@ -6,11 +6,15 @@
 import { SIM, FLOOR, PLAYER, SKILL_KEYS } from '../config.js';
 import { HEROES } from './data/heroes.js';
 import { boxHits, rollDamage, applyHit } from './combat.js';
+import { resolveHero } from './resolve.js';
 
-export function createPlayer(heroKey) {
-  const def = HEROES[heroKey];
+export function createPlayer(heroKey, mods) {
+  // mods come from whatever the shell knows about the player - level, gear, skill points -
+  // and are folded into a def-shaped object here, once. See resolve.js.
+  const def = resolveHero(HEROES[heroKey], mods);
   return {
     kind: 'player', hero: heroKey, def,
+    crit: def.crit, critDmg: def.critDmg,
     x: 1.5, z: 0, y: 0, vx: 0, vy: 0, facing: 1, grounded: true,
     hp: def.hp, hpMax: def.hp, mp: def.mp, mpMax: def.mp, atk: def.atk, speed: def.speed,
     hurtbox: def.hurtbox,
@@ -22,7 +26,7 @@ export function createPlayer(heroKey) {
     // Timed modifiers keyed by id, and the values folded from them every tick. Anything that
     // changes how fast the hero swings or how often he is hit goes through these two numbers
     // - a buff now, equipment later - so there is exactly one place they combine.
-    buffs: {}, atkSpeed: 1, dodge: 0,
+    buffs: {}, atkSpeed: def.atkSpeed, dodge: def.dodge,
   };
 }
 
@@ -34,7 +38,9 @@ function applyBuff(p, b) {
 }
 
 function foldBuffs(p, dt) {
-  let atkSpeed = 1, miss = 1;
+  // Start from the resolved baseline (gear, level) and fold the timed buffs on top: a Katana's
+  // +10% and Quicken's +30% multiply here and nowhere else.
+  let atkSpeed = p.def.atkSpeed ?? 1, miss = 1 - (p.def.dodge ?? 0);
   for (const id in p.buffs) {
     const b = p.buffs[id];
     b.t -= dt;
@@ -154,7 +160,7 @@ function runAttack(g, p, dt) {
 }
 
 export function landHit(g, p, e, hit, dir) {
-  const { dmg, crit } = rollDamage(p.atk, hit.dmg, g.rng);
+  const { dmg, crit } = rollDamage(p.atk, hit.dmg, g.rng, p.crit, p.critDmg);
   const killed = applyHit(e, dmg, hit.knock, hit.stun, dir, e.mass);
   e.facing = -dir || e.facing;
   g.onEnemyHit(e, dmg, crit, killed, p.attack);

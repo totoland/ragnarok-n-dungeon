@@ -9,10 +9,12 @@ import { createPlayer, updatePlayer, hurtPlayer } from './player.js';
 import { createEnemy, updateEnemy } from './enemies.js';
 import { boxHits, rollDamage, applyHit } from './combat.js';
 
-export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON } = {}) {
+export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods, tier = 0 } = {}) {
   const g = {
     t: 0, rng: createRng(seed), seed, dungeon,
-    player: createPlayer(hero),
+    // tier: the town's New Game+ level, fixed for the run; every spawn reads it.
+    tier,
+    player: createPlayer(hero, mods),
     roomIndex: -1, room: null, bounds: { xMin: 0, xMax: 16 },
     waveIndex: -1, spawnQueue: [], enemies: [], projectiles: [], pickups: [],
     events: [], nextId: 1,
@@ -99,7 +101,7 @@ function updateProjectiles(g, dt) {
       for (const e of g.enemies) {
         if (e.dead || pr.hitIds.includes(e.id) || !boxHits(pr, pr.facing, box, e)) continue;
         pr.hitIds.push(e.id);
-        const { dmg, crit } = rollDamage(p.atk, pr.dmg, g.rng);
+        const { dmg, crit } = rollDamage(p.atk, pr.dmg, g.rng, p.crit, p.critDmg);
         const killed = applyHit(e, dmg, pr.knock, pr.stun, pr.facing, e.mass);
         e.facing = -pr.facing;
         onEnemyHit(g, e, dmg, crit, killed, pr.kind);
@@ -163,7 +165,7 @@ function resolvePending(g, dt) {
     const e = g.enemies.find((x) => x.id === job.target);
     if (!e || e.dead) continue;               // the bird finds nothing there; no hit, no proc
     const hit = p.def.passive.hit;
-    const { dmg, crit } = rollDamage(p.atk, hit.dmg, g.rng);
+    const { dmg, crit } = rollDamage(p.atk, hit.dmg, g.rng, p.crit, p.critDmg);
     const dir = Math.sign(e.x - p.x) || p.facing;
     const killed = applyHit(e, dmg, hit.knock, hit.stun, dir, e.mass);
     onEnemyHit(g, e, dmg, crit, killed, 'autoBlitz');

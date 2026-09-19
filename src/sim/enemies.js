@@ -4,11 +4,12 @@
 // Wind-ups are deliberately long: the game is about reading them, not about DPS.
 import { SIM, FLOOR } from '../config.js';
 import { MONSTERS } from './data/monsters.js';
+import { resolveMonster } from './resolve.js';
 import { boxHits, rollDamage } from './combat.js';
 import { hurtPlayer } from './player.js';
 
 export function createEnemy(g, type, x, z) {
-  const def = MONSTERS[type];
+  const def = resolveMonster(MONSTERS[type], g.tier || 0);
   return {
     kind: 'enemy', id: g.nextId++, type, def, name: def.name, boss: !!def.boss,
     x, z, y: 0, vx: 0, vz: 0, vy: 0, facing: -1, grounded: true,

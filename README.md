@@ -212,3 +212,21 @@ Screenshots are taken by the game itself: `await __dro.shot('name')` renders one
 frame off the live canvas and `PUT`s it to the dev server, which writes
 `docs/screenshots/name.png` (dev-only route in `serve.mjs`). Stage the moment with `__dro.play`
 first — the ones above are `heroes`, `sewer`, `crypt`, `boss`.
+
+### Loadouts and tiers (the resolve step)
+
+Every number that will ever change on a hero or a monster — level, equipment, skill points,
+a town's New Game+ tier — goes through [src/sim/resolve.js](src/sim/resolve.js) and comes out
+as a def-shaped object the rest of the sim reads exactly as it read the static table. The sim
+never learns what a level or a Katana is; it sees `hp`, `atk`, and a few baseline rates
+(`atkSpeed`, `dodge`, `crit`, `critDmg`) that timed buffs then fold on top of.
+
+```js
+createGame({ hero: 'knight', seed, mods: { atk: 1.1, crit: 0.3 }, tier: 2 })
+```
+
+`mods` is the player's resolved loadout (multipliers over the table); `tier` is how many
+times that town's boss has been beaten, and every spawn scales by it. Tier 0 with no mods is
+byte-for-byte the game before this step existed — a run is still `(loadout, seed, inputs)`.
+The harness sweeps it: `node tools/playtest.mjs --matrix` plays tiers 0–2, and `--tier N`
+plays one; the pass/fail gate applies only to the plain run so it stays comparable.
