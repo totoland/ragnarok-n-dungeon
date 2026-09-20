@@ -326,13 +326,20 @@ export function attachTouch(input, opts = {}) {
     : false);
   const wanted = () => (cfg.mode === 'on' ? true : cfg.mode === 'off' ? false : coarse());
 
-  // An overlay owns the screen: gameplay input goes off, and so do the controls that feed
-  // it. Left up they swallow every tap meant for the panel - the stick zone alone is 46 %
-  // of the width and 78 % of the height, and the Profile panel sits right under it.
+  // The on-screen controls exist to drive a run, and they are the last thing in the document
+  // so they cover everything else. Two ways they get out of the way.
+  //
+  // An overlay turns gameplay input off, and these go with it - left up, the stick zone
+  // alone is 46 % of the width and 78 % of the height and swallows every tap meant for the
+  // panel underneath.
+  //
+  // And between runs there is nothing to drive: on the title screen they sat over the town
+  // buttons, so a tablet could not pick a town at all. `playing` is the run itself.
   let suspended = false;
+  let playing = false;
 
   function layout() {
-    const on = wanted() && !suspended;
+    const on = wanted() && !suspended && playing;
     touch.hidden = !on;
     const body = root.body || (typeof document !== 'undefined' ? document.body : null);
     body?.classList.toggle('touch', on);
@@ -492,6 +499,8 @@ export function attachTouch(input, opts = {}) {
 
   return {
     get active() { return wanted(); },
+    /** True only while a run is live and unpaused. Cheap to call every frame. */
+    setPlaying(on) { if (on === playing) return; playing = on; if (!on) release(); layout(); },
     /** Re-read touch settings after the menu changes them. */
     refresh(settings) { cfg = { ...DEFAULT_TOUCH, ...(settings?.touch || {}) }; release(); layout(); },
     layout,

@@ -398,11 +398,15 @@ function frame(now) {
   // arrive as the first frame of input.
   if (!game || paused) input.snapshot();
 
-  if (!game) { if (preview) updatePreview(dtReal); monsters.tick(); prewarmTick(world); world.renderer.render(world.scene, world.camera); return; }
+  if (!game) { touch.setPlaying(false); if (preview) updatePreview(dtReal); monsters.tick(); prewarmTick(world); world.renderer.render(world.scene, world.camera); return; }
 
   const frameStart = performance.now();
   for (const k in phase) phase[k] = 0;
   readCounts(counts);
+  // The title, the end screen and the pause menu are all places where there is nothing to
+  // drive, and the controls sit over their buttons. One line, checked every frame, rather
+  // than a call at each of the six places the run's state changes.
+  touch.setPlaying(!paused && !ended);
 
   if (!paused) {
     // hit-stop: freeze the sim for a few ms after a solid hit, the belt-scroller crunch
