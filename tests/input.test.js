@@ -297,6 +297,7 @@ test('gamepad: the pad with the newest clock is the one read, and a frozen pad i
     frozen.timestamp = 1001;                  // it moves again: back in play
     snap = input.snapshot();
     assert.equal(snap.held.attack, true);
+    assert.equal(!!snap.pressed.attack, false, 'a button held through the stall is not a fresh press');
     assert.ok(input.trace().some(([, w]) => w === 'pad live again'));
     pads.push(live);                          // a re-enumerated controller: newer clock wins
     live.buttons[3].pressed = true;

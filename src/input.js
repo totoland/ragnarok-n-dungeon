@@ -140,8 +140,10 @@ export function createInput(target = window, opts = {}) {
   // with the newest timestamp is the one read (a re-enumerated controller shows up as a
   // second entry, and the frozen one's clock stops), and a pad whose clock has not moved
   // for `padStaleMs` while it claims a button is down is treated as released until it
-  // moves again. A real hold longer than that has to be pressed again, which is cheap.
-  const padStaleMs = opts.padStaleMs ?? 3000;
+  // moves again. The clock also stands still through an honest steady hold, so the limit
+  // is generous - eight seconds, longer than any hold-to-attack in practice - and when the
+  // pad comes back its buttons are taken as already down, never as fresh presses.
+  const padStaleMs = opts.padStaleMs ?? 8000;
   let padIndex = -1, padStamp = -1, padStampAt = 0, padStale = false;
   const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const firstPad = () => {
@@ -176,7 +178,16 @@ export function createInput(target = window, opts = {}) {
     // Liveness: the clock moves on every change; a pad claiming a button while its clock
     // stands still for too long is frozen, and its buttons are read as up until it moves.
     const t = nowMs();
-    if (pad.timestamp !== padStamp) { padStamp = pad.timestamp; padStampAt = t; if (padStale) { padStale = false; note('pad live again'); listeners.padLive.forEach((fn) => fn()); } }
+    if (pad.timestamp !== padStamp) {
+      padStamp = pad.timestamp; padStampAt = t;
+      if (padStale) {
+        padStale = false;
+        note('pad live again');
+        listeners.padLive.forEach((fn) => fn());
+        padPrev = {};
+        for (let i = 0; i < pad.buttons.length; i++) padPrev['#' + i] = !!pad.buttons[i]?.pressed;   // held through, not pressed anew
+      }
+    }
     const anyDown = [...pad.buttons].some((b) => b?.pressed);
     if (!padStale && anyDown && t - padStampAt > padStaleMs) { padStale = true; note(`pad stale ${Math.round(padStaleMs / 1000)}s - released`); listeners.padStale.forEach((fn) => fn()); }
     if (padStale) { padPrev = {}; return; }
