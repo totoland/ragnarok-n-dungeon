@@ -8,7 +8,7 @@ import { createRng } from './rng.js';
 import { createPlayer, updatePlayer, hurtPlayer, setLevel } from './player.js';
 import { levelFromXp, xpForKill } from './progress.js';
 import { mergeMods } from './resolve.js';
-import { itemMods, wearMods } from './data/items.js';
+import { itemMods, wearMods, isRolled, rollItem } from './data/items.js';
 import { createEnemy, updateEnemy } from './enemies.js';
 import { boxHits, rollDamage, applyHit } from './combat.js';
 
@@ -25,7 +25,7 @@ export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods,
   const g = {
     t: 0, rng: createRng(seed), seed, dungeon,
     tier, xp, xpStart: xp, mods: all, extMods: mods, gear, wear, drop,
-    loot: [],             // item ids the boss dropped this run; the shell banks them at the end
+    loot: [],             // what dropped this run: item ids, or rolled instances; the shell banks them
     player: createPlayer(hero, all, levelFromXp(xp), skills),
     roomIndex: -1, room: null, bounds: { xMin: 0, xMax: 16 },
     waveIndex: -1, spawnQueue: [], enemies: [], projectiles: [], pickups: [],
@@ -232,7 +232,8 @@ function resolvePending(g, dt) {
 function rollItemDrops(g, e) {
   for (const d of e.def.drops || []) {
     if (!g.rng.chance(d.chance)) continue;
-    g.loot.push(d.item);
+    // An accessory is rolled here, off the same rng, so its attributes are part of the run.
+    g.loot.push(isRolled(d.item) ? rollItem(d.item, g.rng) : d.item);
     pushEvent(g, { type: 'itemDrop', item: d.item, monster: e.type, x: e.x, z: e.z, y: e.y });
   }
 }

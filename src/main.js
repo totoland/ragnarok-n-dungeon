@@ -24,6 +24,7 @@ const world = createScene(canvas);
 const hud = createHud();
 const settings = loadSettings();
 const input = createInput(window, { settings });
+hud.onSkill = (i) => { if (game && !paused && !ended) input.press(`skill${i + 1}`); };
 const touch = attachTouch(input, { settings });
 let keyLookup = lookup(settings.keys);
 

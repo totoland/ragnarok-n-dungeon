@@ -3,11 +3,11 @@
 // hero wielding whatever is selected, and one Equip button. Owns no game state: it edits
 // the profile, persists it, and calls back so the title and a live run pick the change up.
 import { HEROES, SKILL_INFO, PASSIVE_INFO } from '../sim/data/heroes.js';
-import { ITEMS, itemName, DEFAULT_WEAPON, SLOTS, SLOT_INFO, slotOf, fits, auraOf } from '../sim/data/items.js';
+import { ITEMS, itemName, DEFAULT_WEAPON, SLOTS, SLOT_INFO, slotOf, fits, auraOf, attrText } from '../sim/data/items.js';
 import { MONSTERS } from '../sim/data/monsters.js';
 import { TOWNS } from '../sim/data/dungeon.js';
 import { xpAtLevel, xpToNext } from '../sim/progress.js';
-import { heroOf, skillPointsLeft, spendSkillPoint, setEquip, saveProfile } from '../profile.js';
+import { heroOf, skillPointsLeft, spendSkillPoint, setEquip, discard, saveProfile } from '../profile.js';
 import { SKILL, REFINE } from '../config.js';
 import { createPreview } from './preview.js';
 
@@ -36,8 +36,9 @@ export function createCharacterUI({ input, getProfile, onChange }) {
   const preview = createPreview();
   let hero = 'knight';
   let tab = 'skills';
-  let selected;          // item id picked in the inventory; null = the hero's own weapon
+  let selected;          // key of the entry picked in the inventory (item id, or a bag uid); null = the hero's own weapon
   let filter = 'all';    // which slot the inventory shows, or every one
+  let confirmDiscard = null;   // uid awaiting a second tap on Discard
 
   const commit = () => { saveProfile(getProfile()); onChange?.(); };
 
@@ -123,9 +124,16 @@ export function createCharacterUI({ input, getProfile, onChange }) {
       if (seen.has(id) || !fits(id, hero)) continue;
       list.push({ id, slot: slotOf(id), name: itemName({ id, plus: it.plus }, hero), held: true, plus: it.plus, tip: ITEMS[id].tip });
     }
+    // Rolled instances: one entry each, keyed by uid, newest last.
+    for (const inst of h.bag) {
+      if (!ITEMS[inst.id]) continue;
+      list.push({ id: inst.id, uid: inst.uid, key: inst.uid, slot: slotOf(inst.id), name: ITEMS[inst.id].name, held: true, inst, rarity: ITEMS[inst.id].rarity, tip: ITEMS[inst.id].tip });
+    }
+    for (const e of list) if (e.key === undefined) e.key = e.id;
     return list;
   }
-  const wornId = (h, slot) => (slot === 'weapon' ? h.gear?.id ?? null : h.wear[slot]?.id ?? null);
+  // What is worn in a slot, as an entry key: the item id, or the bag uid for the accessory.
+  const wornKey = (h, slot) => (slot === 'weapon' ? h.gear?.id ?? null : h.wear[slot]?.uid ?? h.wear[slot]?.id ?? null);
 
   function slot(entry, h, { equipped = false, label = null } = {}) {
     const b = el('button', 'slotb');
@@ -135,21 +143,22 @@ export function createCharacterUI({ input, getProfile, onChange }) {
       if (label) { b.appendChild(el('span', 'slotlabel', label)); b.disabled = false; } else b.disabled = true;
       return b;
     }
-    const url = preview.icon(hero, entry.id);
+    const url = entry.inst ? null : preview.icon(hero, entry.id);
     if (url) { const img = el('img'); img.src = url; img.alt = entry.name; img.draggable = false; b.appendChild(img); }
-    else { const g = el('span', 'glyph'); g.innerHTML = GLYPH[entry.slot] || GLYPH.weapon; b.appendChild(g); }
+    else { const g = el('span', `glyph${entry.rarity ? ` r-${entry.rarity}` : ''}`); g.innerHTML = GLYPH[entry.slot] || GLYPH.weapon; b.appendChild(g); }
     if (!entry.held) b.classList.add('unknown');
     if (entry.plus) b.appendChild(el('span', 'badge', `+${entry.plus}`));
+    if (entry.inst) b.appendChild(el('span', 'badge', attrText(entry.inst.main).split(' ')[0]));
     if (equipped) b.appendChild(el('span', 'tag', 'E'));
-    b.classList.toggle('selected', entry.id === selected);
-    b.title = entry.held ? entry.name : `${entry.name} — ${entry.source}`;
-    b.addEventListener('click', () => { selected = entry.id; render(); });
+    b.classList.toggle('selected', entry.key === selected);
+    b.title = entry.inst ? `${entry.name} · ${attrText(entry.inst.main)} · ${attrText(entry.inst.sub)}` : entry.held ? entry.name : `${entry.name} — ${entry.source}`;
+    b.addEventListener('click', () => { selected = entry.key; confirmDiscard = null; render(); });
     return b;
   }
 
   function renderEquipment(profile, h, def) {
     const list = entries(h);
-    if (selected === undefined || !list.some((e) => e.id === selected)) selected = h.gear?.id ?? null;
+    if (selected === undefined || !list.some((e) => e.key === selected)) selected = h.gear?.id ?? null;
     const wrap = el('div', 'equip');
 
     // Left: what is worn, one slot each, then the inventory. Tapping a worn slot filters
@@ -158,12 +167,12 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     inv.appendChild(el('div', 'bgroup', 'Equipped'));
     const wornRow = el('div', 'slots worn');
     for (const sl of SLOTS) {
-      const id = wornId(h, sl);
-      const entry = list.find((e) => e.id === id && e.slot === sl);
+      const key = wornKey(h, sl);
+      const entry = key !== null ? list.find((e) => e.key === key && e.slot === sl) : null;
       const cell = el('div', `wornslot${filter === sl ? ' on' : ''}`);
       const b = entry ? slot(entry, h, { equipped: true }) : slot(null, h, { label: SLOT_INFO[sl].name });
       if (entry) b.classList.toggle('selected', false);
-      b.addEventListener('click', (ev) => { ev.stopPropagation(); filter = filter === sl ? 'all' : sl; if (entry) selected = entry.id; render(); }, true);
+      b.addEventListener('click', (ev) => { ev.stopPropagation(); filter = filter === sl ? 'all' : sl; if (entry) selected = entry.key; confirmDiscard = null; render(); }, true);
       cell.append(b, el('span', 'wornlabel', SLOT_INFO[sl].name));
       wornRow.appendChild(cell);
     }
@@ -174,7 +183,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     if (filter !== 'all') { const all = el('button', 'showall', 'show all'); all.type = 'button'; all.addEventListener('click', () => { filter = 'all'; render(); }); head.append(all); }
     inv.appendChild(head);
     const grid = el('div', 'slots grid');
-    for (const e of shown) grid.appendChild(slot(e, h, { equipped: e.id === wornId(h, e.slot) }));
+    for (const e of shown) grid.appendChild(slot(e, h, { equipped: e.key === wornKey(h, e.slot) }));
     for (let i = shown.length; i < GRID; i++) grid.appendChild(slot(null, h));
     inv.appendChild(grid);
 
@@ -182,11 +191,16 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     const look = el('div', 'look');
     const stage = el('div', 'stage');
     look.appendChild(stage);
-    const e = list.find((x) => x.id === selected) || list[0];
+    const e = list.find((x) => x.key === selected) || list[0];
     const detail = el('div', 'detail');
-    detail.appendChild(el('strong', null, e.name));
-    detail.appendChild(el('div', 'stat', `${SLOT_INFO[e.slot].name} · ${e.tip}`));
-    if (e.held && e.id) {
+    const nameEl = el('strong', null, e.name);
+    if (e.rarity) nameEl.appendChild(el('span', `rar r-${e.rarity}`, ` ${e.rarity}`));
+    detail.appendChild(nameEl);
+    if (e.inst) {
+      detail.appendChild(el('div', 'stat', `${SLOT_INFO[e.slot].name} · main ${attrText(e.inst.main)}`));
+      detail.appendChild(el('div', 'stat', e.inst.sub ? `secondary ${attrText(e.inst.sub)}` : 'no secondary'));
+    } else detail.appendChild(el('div', 'stat', `${SLOT_INFO[e.slot].name} · ${e.tip}`));
+    if (e.held && e.id && !e.inst) {   // refine line: stackable kinds only, never a rolled instance
       const plus = e.plus || 0;
       const bits = [];
       if (plus) bits.push(e.slot === 'weapon' ? `+${Math.round(REFINE.atk * plus * 100)}% ATK from refining` : `+${Math.round(REFINE.hp * plus * 100)}% HP from refining`);
@@ -196,18 +210,29 @@ export function createCharacterUI({ input, getProfile, onChange }) {
       detail.appendChild(el('div', 'stat', bits.join(' · ')));
     }
     if (!e.held) detail.appendChild(el('div', 'src', e.source));
-    const isWorn = e.id === wornId(h, e.slot);
+    const isWorn = e.key === wornKey(h, e.slot);
+    const ref = e.uid || e.id;
     const btns = el('div', 'equipbtns');
     const btn = el('button', 'equipbtn', !e.held ? 'Not yet found' : isWorn ? (e.slot === 'weapon' ? 'Wielding' : 'Wearing') : 'Equip');
     btn.type = 'button';
     btn.disabled = !e.held || isWorn;
-    btn.addEventListener('click', () => { if (setEquip(profile, hero, e.id, e.slot)) { commit(); render(); } });
+    btn.addEventListener('click', () => { if (setEquip(profile, hero, ref, e.slot)) { commit(); render(); } });
     btns.appendChild(btn);
-    if (isWorn && e.id && e.slot !== 'weapon') {
+    if (isWorn && e.key && e.slot !== 'weapon') {
       const off = el('button', 'equipbtn ghost', 'Take off');
       off.type = 'button';
       off.addEventListener('click', () => { if (setEquip(profile, hero, null, e.slot)) { commit(); render(); } });
       btns.appendChild(off);
+    }
+    if (e.uid) {   // rolled things can be thrown away; two taps, so a slip costs nothing
+      const armed = confirmDiscard === e.uid;
+      const del = el('button', `equipbtn ghost discard${armed ? ' armed' : ''}`, armed ? 'Really discard?' : 'Discard');
+      del.type = 'button';
+      del.addEventListener('click', () => {
+        if (!armed) { confirmDiscard = e.uid; render(); return; }
+        if (discard(profile, hero, e.uid)) { confirmDiscard = null; selected = undefined; commit(); render(); }
+      });
+      btns.appendChild(del);
     }
     detail.appendChild(btns);
     look.appendChild(detail);
@@ -216,10 +241,10 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     body.appendChild(wrap);
     // The turntable shows the selected weapon (with its glow), or the wielded one while a
     // cape or hat is selected, since those have no models yet.
-    const onStage = e.slot === 'weapon' ? e : list.find((x) => x.id === wornId(h, 'weapon') && x.slot === 'weapon');
+    const onStage = e.slot === 'weapon' ? e : list.find((x) => x.key === wornKey(h, 'weapon') && x.slot === 'weapon');
     if (preview.ready) preview.mount(stage, hero, onStage?.id ? { id: onStage.id, plus: onStage.plus || 0 } : null);
     else stage.appendChild(el('div', 'stagenote', 'Loading models…'));
-    note.textContent = 'Tap a slot to preview it on your hero, then Equip. A duplicate drop refines what you hold by +1; from +5 a blade carries an aura — white, blue at +7, gold at +9.';
+    note.textContent = 'Tap a slot to preview it, then Equip. Duplicate weapons refine by +1 (aura from +5); accessories are rolled on the drop - a main stat by kind and a random secondary - and never merge.';
   }
 
   function open(key, which) {
@@ -227,6 +252,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     if (which) tab = which;
     selected = undefined;
     filter = 'all';
+    confirmDiscard = null;
     render();
     root.hidden = false;
     input.setEnabled(false);

@@ -263,8 +263,17 @@ The profile wears one item per slot (`equip: { weapon, cape, hat, accessory }`);
 takes the weapon as `gear` and the rest as `wear` and merges them all in a fixed slot order.
 A monster's own drop table is `drops: [{ item, chance }]` on its def in data/monsters.js —
 rolled per entry on every kill, straight into `game.loot` with an `itemDrop` moment — so a
-new item is data only. Only weapons exist so far; the names are placeholders and will be
-replaced before any store build. Every town names one drop per hero class (`loot` in data/dungeon.js: Baphomet
+new item is data only. The names are placeholders and will be replaced before any store build.
+
+**Accessories** (Ring, Clip, Bell, Brooch, Amulet) are rolled, not fixed: the kind sets the
+main attribute (ATK, SP, ASPD, crit rate, HP) and the drop rolls its value and one random
+secondary from the pool in `ATTRS` (flat ATK/MATK, crit rate 3–6 %, crit damage 5–10 %,
+dodge 3–5 %, HP/SP 1–3 %, ASPD 5–10 %) off the run's rng, so a run's loot is part of its
+seed. Flat and rate bonuses sum across everything worn (`atkAdd`, `critAdd`, … in
+`mergeMods`) on top of what the weapon set; HP/SP/ASPD multiply. Each drop is its own
+instance in the profile's `bag` (never merged, no refine), worn by uid, discardable from the
+panel. They drop from ordinary monsters at 0.5–3 % by rarity — about one per full Prontera
+run. Every town names one drop per hero class (`loot` in data/dungeon.js: Baphomet
 → Katana / Gakkung Bow, Phreeoni → Tsurugi / Arbalest). The shell hands the sim
 `createGame({ gear: { id, plus }, skills: { quicken: 2 }, drop: { item, chance } })`: the
 boss's drop is certain the first time a hero clears the town and `DROPS.boss.chance` after
@@ -278,6 +287,8 @@ names) get an additive shell pushed out along the normals, fading with the view 
 two slow bands flowing up the blade — white at +5, blue from +7, gold from +9, blended
 between the stops (`auraOf()` in items.js) — so the refine shows on the steel alone, never as
 a tint on the whole weapon. Anything worn refines into 2 % HP per plus instead.
+
+The HUD's skill slots take the mouse too: a click is the same press as the key.
 
 Skill points come one per level and are spent in the **Profile** panel
 (`src/render/character-ui.js`), reachable from the title (the gold button under the hero

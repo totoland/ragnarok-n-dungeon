@@ -12,7 +12,7 @@
 // through the culvert just to see the desert.
 import { HEROES } from './sim/data/heroes.js';
 import { TOWNS } from './sim/data/dungeon.js';
-import { ITEMS, SLOTS, slotOf, fits } from './sim/data/items.js';
+import { ITEMS, ATTRS, SLOTS, slotOf, fits, isRolled } from './sim/data/items.js';
 import { NGPLUS, DROPS, REFINE, SKILL } from './config.js';
 import { levelFromXp, skillPointsAt } from './sim/progress.js';
 
@@ -21,16 +21,26 @@ export const HERO_KEYS = Object.keys(HEROES);
 export const TOWN_KEYS = Object.keys(TOWNS);       // unlock order
 
 const townRow = () => ({ clears: 0, best: 0 });
-// items: { itemId: { plus } } - one of each, refined by duplicates. equip: what is worn in
-// each slot, an item id or null (a null weapon is the hero's own). skills: { skillId: level }
-// for the points spent.
+// items: { itemId: { plus } } - one of each, refined by duplicates. bag: rolled instances
+// (accessories), each { uid, id, main, sub }, as many as drop. equip: what is worn in each
+// slot - an item id, or for the accessory slot a bag uid, or null (a null weapon is the
+// hero's own). skills: { skillId: level } for the points spent.
 const emptyEquip = () => Object.fromEntries(SLOTS.map((s) => [s, null]));
 const heroRow = (hero) => ({
   xp: 0,
   towns: Object.fromEntries(TOWN_KEYS.map((t) => [t, townRow()])),
-  items: {}, equip: emptyEquip(),
+  items: {}, bag: [], seq: 0, equip: emptyEquip(),
   skills: Object.fromEntries((HEROES[hero]?.skills || []).map((id) => [id, 0])),
 });
+const ROLLED_SLOTS = new Set(['accessory']);
+
+function cleanAttr(a, allowed) {
+  if (!a || typeof a !== 'object' || !ATTRS[a.stat] || !allowed(a.stat)) return null;
+  const d = ATTRS[a.stat];
+  const v = Number(a.v);
+  if (!Number.isFinite(v)) return null;
+  return { stat: a.stat, v: Math.max(d.min, Math.min(d.max, Math.round(v * 1000) / 1000)) };
+}
 
 export function defaultProfile() {
   return {
@@ -63,11 +73,24 @@ export function normalize(raw) {
         if (fits(id, h) && it && typeof it === 'object') row.items[id] = { plus: int(it.plus, REFINE.max) };
       }
     }
+    // The bag: only well-formed rolled instances of accessory kinds, values clamped to their
+    // ranges, uids unique.
+    row.seq = int(src.seq);
+    const uids = new Set();
+    for (const it of Array.isArray(src.bag) ? src.bag : []) {
+      if (!it || typeof it !== 'object' || !isRolled(it.id) || !fits(it.id, h) || typeof it.uid !== 'string' || uids.has(it.uid)) continue;
+      const main = cleanAttr(it.main, (st) => st === ITEMS[it.id].main);
+      const sub = cleanAttr(it.sub, (st) => st !== ITEMS[it.id].main);
+      if (!main) continue;
+      uids.add(it.uid);
+      row.bag.push({ uid: it.uid, id: it.id, main, sub });
+    }
     const eq = typeof src.equip === 'string' ? { weapon: src.equip } : src.equip;
     if (eq && typeof eq === 'object') {
       for (const slot of SLOTS) {
-        const id = eq[slot];
-        if (typeof id === 'string' && row.items[id] && slotOf(id) === slot) row.equip[slot] = id;
+        const ref = eq[slot];
+        if (typeof ref !== 'string') continue;
+        if (ROLLED_SLOTS.has(slot) ? uids.has(ref) : (row.items[ref] && slotOf(ref) === slot)) row.equip[slot] = ref;
       }
     }
     // Skill levels clamp per skill; points spent beyond what the level grants (a curve or
@@ -116,10 +139,15 @@ export function clearProfile(given) {
 export function heroOf(profile, hero) {
   const row = profile.heroes[hero] || heroRow(hero);
   const level = levelFromXp(row.xp);
-  const worn = (slot) => (row.equip[slot] && row.items[row.equip[slot]] ? { id: row.equip[slot], plus: row.items[row.equip[slot]].plus } : null);
+  const worn = (slot) => {
+    const ref = row.equip[slot];
+    if (!ref) return null;
+    if (ROLLED_SLOTS.has(slot)) return row.bag.find((it) => it.uid === ref) || null;
+    return row.items[ref] ? { id: ref, plus: row.items[ref].plus } : null;
+  };
   return {
     xp: row.xp, level, skillPoints: skillPointsAt(level), towns: row.towns,
-    items: row.items, skills: row.skills, equip: row.equip,
+    items: row.items, bag: row.bag, skills: row.skills, equip: row.equip,
     gear: worn('weapon'),
     wear: Object.fromEntries(SLOTS.filter((s) => s !== 'weapon').map((s) => [s, worn(s)])),
   };
@@ -141,13 +169,27 @@ export function spendSkillPoint(profile, hero, skill) {
   return true;
 }
 
-// Wear an item the hero holds, in the slot it belongs to; `setEquip(profile, hero, null, slot)`
-// empties a slot (a null weapon is the hero's own).
-export function setEquip(profile, hero, id, slot = id ? slotOf(id) : 'weapon') {
+// Wear something the hero holds, in the slot it belongs to: an item id, or a bag uid for
+// the accessory slot. `setEquip(profile, hero, null, slot)` empties a slot (a null weapon
+// is the hero's own).
+export function setEquip(profile, hero, ref, slot = ref && slotOf(ref) ? slotOf(ref) : 'weapon') {
   const row = profile.heroes[hero];
   if (!row || !SLOTS.includes(slot)) return false;
-  if (id !== null && (!row.items[id] || slotOf(id) !== slot)) return false;
-  row.equip[slot] = id;
+  if (ref !== null) {
+    if (ROLLED_SLOTS.has(slot)) { if (!row.bag.some((it) => it.uid === ref)) return false; }
+    else if (!row.items[ref] || slotOf(ref) !== slot) return false;
+  }
+  row.equip[slot] = ref;
+  return true;
+}
+
+// Throw a rolled item away. Worn ones come off first.
+export function discard(profile, hero, uid) {
+  const row = profile.heroes[hero];
+  const i = row ? row.bag.findIndex((it) => it.uid === uid) : -1;
+  if (i < 0) return false;
+  row.bag.splice(i, 1);
+  for (const slot of SLOTS) if (row.equip[slot] === uid) row.equip[slot] = null;
   return true;
 }
 
@@ -202,10 +244,21 @@ export function recordRun(profile, game, { hero, town }) {
     if (next && !openBefore) unlocked = next;
   }
   // Loot: a new item is held (and worn if its slot was empty); a duplicate refines the held
-  // one by +1 up to the cap, where it is simply lost.
+  // one by +1 up to the cap, where it is simply lost. A rolled drop is its own instance in
+  // the bag, worn if the slot was empty, never merged.
   const loot = [];
-  for (const id of game.loot || []) {
+  for (const entry of game.loot || []) {
+    const rolled = typeof entry === 'object' && entry !== null;
+    const id = rolled ? entry.id : entry;
     if (!fits(id, hero)) continue;
+    if (rolled) {
+      const inst = { uid: `a${++row.seq}`, id, main: entry.main, sub: entry.sub };
+      row.bag.push(inst);
+      const slot = slotOf(id);
+      if (!row.equip[slot]) row.equip[slot] = inst.uid;
+      loot.push({ id, rolled: inst, merged: false });
+      continue;
+    }
     const held = row.items[id];
     if (!held) {
       row.items[id] = { plus: 0 };

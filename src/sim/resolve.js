@@ -19,12 +19,19 @@ export const BASE_MODS = { hp: 1, mp: 1, atk: 1, speed: 1, atkSpeed: 1, dodge: 0
 // one. Multipliers multiply; the rates (dodge, crit, critDmg) are absolute and the last set
 // that names one wins, so a Katana's crit rate replaces the baseline rather than adding to
 // it. Sets are sparse: a key a set does not mention is left to the others.
-const MULT = new Set(['hp', 'mp', 'atk', 'speed', 'atkSpeed']);
+// A third kind, the *Add keys (accessories): flat ATK / MATK and rate bonuses that sum
+// across everything worn and land on top of whatever the weapon set.
+const MULT = new Set(['hp', 'mp', 'atk', 'matk', 'speed', 'atkSpeed']);
+const ADD = new Set(['atkAdd', 'matkAdd', 'critAdd', 'critDmgAdd', 'dodgeAdd']);
 export function mergeMods(...sets) {
   const out = {};
   for (const s of sets) {
     if (!s) continue;
-    for (const [k, v] of Object.entries(s)) out[k] = MULT.has(k) && k in out ? out[k] * v : v;
+    for (const [k, v] of Object.entries(s)) {
+      if (MULT.has(k) && k in out) out[k] *= v;
+      else if (ADD.has(k) && k in out) out[k] += v;
+      else out[k] = v;
+    }
   }
   return out;
 }
@@ -35,9 +42,13 @@ export function resolveHero(base, mods = {}) {
     ...base,
     hp: Math.round(base.hp * m.hp),
     mp: Math.round(base.mp * m.mp),
-    atk: base.atk * m.atk,
+    atk: base.atk * m.atk + (m.atkAdd || 0),
+    matk: (base.matk || 0) * (m.matk || 1) + (m.matkAdd || 0),
     speed: base.speed * m.speed,
-    atkSpeed: m.atkSpeed, dodge: m.dodge, crit: m.crit, critDmg: m.critDmg,
+    atkSpeed: m.atkSpeed,
+    dodge: Math.min(0.75, m.dodge + (m.dodgeAdd || 0)),
+    crit: Math.min(1, m.crit + (m.critAdd || 0)),
+    critDmg: m.critDmg + (m.critDmgAdd || 0),
     mods: m,
   };
 }

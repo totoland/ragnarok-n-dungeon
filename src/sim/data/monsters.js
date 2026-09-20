@@ -1,4 +1,6 @@
 // Monster stats and attack patterns. `ai` picks the behaviour in sim/enemies.js.
+// `drops`: the monster's own loot table, each entry rolled on every kill (data/items.js).
+// Accessories: 0.5-3 % by rarity - a full Prontera run is worth about one.
 // Names are Ragnarok Online monsters kept as placeholders (see README); the models,
 // stats and behaviour are original.
 
@@ -9,6 +11,7 @@ export const MONSTERS = {
     hurtbox: { r: 0.42, h: 0.78 },
     attack: { range: 1.1, windup: 0.3, dur: 0.28, cd: 1.5, box: { x0: -0.2, x1: 1.2, y0: -0.3, y1: 1.4 }, knock: [3, 1] },
     hop: { period: 0.62, height: 0.55 },
+    drops: [{ item: 'ring', chance: 0.03 }],
     score: 10,
   },
   lunatic: {
@@ -17,6 +20,7 @@ export const MONSTERS = {
     hurtbox: { r: 0.36, h: 0.7 },
     attack: { range: 1.2, windup: 0.22, dur: 0.24, cd: 1.1, box: { x0: -0.2, x1: 1.3, y0: -0.3, y1: 1.4 }, knock: [3, 1] },
     hop: { period: 0.42, height: 0.45 },
+    drops: [{ item: 'clip', chance: 0.025 }],
     score: 15,
   },
   skeleton: {
@@ -24,6 +28,7 @@ export const MONSTERS = {
     hp: 120, atk: 14, speed: 2.2, mass: 1.0,
     hurtbox: { r: 0.55, h: 1.8 },
     attack: { range: 1.6, windup: 0.5, dur: 0.32, cd: 1.9, box: { x0: 0.0, x1: 1.8, y0: -0.2, y1: 2.2 }, knock: [4, 1.5] },
+    drops: [{ item: 'bell', chance: 0.02 }],
     score: 40,
   },
   skelArcher: {
@@ -31,6 +36,7 @@ export const MONSTERS = {
     hp: 85, atk: 10, speed: 1.8, mass: 0.9,
     hurtbox: { r: 0.5, h: 1.8 },
     attack: { range: 7.5, keep: 4.5, windup: 0.7, dur: 0.3, cd: 2.4, shot: { speed: 11, life: 1.4, y: 1.2 }, knock: [2, 0] },
+    drops: [{ item: 'brooch', chance: 0.01 }],
     score: 45,
   },
   // Kept as-is. No longer spawned by the default dungeon, but the stats, the AI and the
@@ -74,6 +80,7 @@ export const MONSTERS = {
     hp: 75, atk: 9, speed: 4.4, mass: 0.9,
     hurtbox: { r: 0.5, h: 1.5 },
     attack: { range: 1.4, windup: 0.3, dur: 0.26, cd: 1.3, box: { x0: -0.1, x1: 1.6, y0: -0.3, y1: 1.8 }, knock: [4, 1.5] },
+    drops: [{ item: 'ring', chance: 0.03 }],
     score: 35,
   },
   ant: {
@@ -82,6 +89,7 @@ export const MONSTERS = {
     hurtbox: { r: 0.46, h: 0.72 },
     attack: { range: 1.1, windup: 0.28, dur: 0.24, cd: 1.2, box: { x0: -0.2, x1: 1.2, y0: -0.3, y1: 1.3 }, knock: [3, 1] },
     hop: { period: 0.28, height: 0.08 },
+    drops: [{ item: 'bell', chance: 0.02 }],
     score: 25,
   },
   babyWolf: {
@@ -90,6 +98,7 @@ export const MONSTERS = {
     hurtbox: { r: 0.42, h: 0.8 },
     attack: { range: 1.5, windup: 0.24, dur: 0.3, cd: 1.0, box: { x0: -0.2, x1: 1.5, y0: -0.3, y1: 1.5 }, knock: [4, 1.5] },
     hop: { period: 0.36, height: 0.32 },
+    drops: [{ item: 'clip', chance: 0.025 }],
     score: 30,
   },
   // Throws a fistful of sand: the archer kit with its own projectile kind.
@@ -98,6 +107,7 @@ export const MONSTERS = {
     hp: 120, atk: 12, speed: 1.7, mass: 1.2,
     hurtbox: { r: 0.55, h: 1.7 },
     attack: { range: 7, keep: 4, windup: 0.75, dur: 0.3, cd: 2.6, shot: { kind: 'sandBall', speed: 9.5, life: 1.3, y: 1.1 }, knock: [3, 1] },
+    drops: [{ item: 'brooch', chance: 0.01 }],
     score: 55,
   },
   golem: {
@@ -105,6 +115,7 @@ export const MONSTERS = {
     hp: 280, atk: 17, speed: 1.5, mass: 2.6,
     hurtbox: { r: 0.8, h: 2.4 },
     attack: { range: 2.0, windup: 0.7, dur: 0.4, cd: 2.4, box: { x0: 0.0, x1: 2.3, y0: -0.4, y1: 2.6 }, knock: [6, 2.5] },
+    drops: [{ item: 'amulet', chance: 0.005 }],
     score: 90,
   },
   // Town boss. The boss kit again (bite / ground slam / rolling charge / rock volley) with
@@ -127,6 +138,7 @@ export const MONSTERS = {
     hp: 95, atk: 10, speed: 3.1, mass: 0.85,
     hurtbox: { r: 0.44, h: 1.75 },
     attack: { range: 1.5, windup: 0.38, dur: 0.28, cd: 1.35, box: { x0: -0.1, x1: 1.7, y0: -0.3, y1: 2.0 }, knock: [4, 1.2] },
+    drops: [{ item: 'amulet', chance: 0.005 }],
     score: 60,
   },
 };

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PROFILE_KEY, TOWN_KEYS, HERO_KEYS, defaultProfile, normalize, loadProfile, saveProfile, clearProfile,
-  heroOf, isUnlocked, tierFor, nextTown, prevTown, recordRun, dropFor, setEquip, spendSkillPoint, skillPointsLeft,
+  heroOf, isUnlocked, tierFor, nextTown, prevTown, recordRun, dropFor, setEquip, spendSkillPoint, skillPointsLeft, discard,
 } from '../src/profile.js';
 import { xpAtLevel } from '../src/sim/progress.js';
 import { NGPLUS, DROPS, REFINE, SKILL } from '../src/config.js';
@@ -18,7 +18,7 @@ test('a fresh profile: every hero at level 1, only the first town open, tier 0 e
   const p = defaultProfile();
   assert.deepEqual(Object.keys(p.heroes), HERO_KEYS);
   for (const h of HERO_KEYS) {
-    assert.deepEqual(heroOf(p, h), { xp: 0, level: 1, skillPoints: 0, towns: p.heroes[h].towns, items: {}, skills: p.heroes[h].skills, equip: p.heroes[h].equip, gear: null, wear: { cape: null, hat: null, accessory: null } });
+    assert.deepEqual(heroOf(p, h), { xp: 0, level: 1, skillPoints: 0, towns: p.heroes[h].towns, items: {}, bag: [], skills: p.heroes[h].skills, equip: p.heroes[h].equip, gear: null, wear: { cape: null, hat: null, accessory: null } });
     assert.deepEqual(p.heroes[h].equip, { weapon: null, cape: null, hat: null, accessory: null });
     for (const t of TOWN_KEYS) assert.equal(tierFor(p, h, t), 0);
   }
@@ -171,4 +171,33 @@ test('skill points: one per level, spent one at a time, capped per skill, refund
   assert.deepEqual(over.heroes.hunter.skills, { windWalk: 0, arrowShower: 0, blitzBeat: 0 }, 'over budget → refunded');
   const ok = normalize({ heroes: { hunter: { xp: xpAtLevel(6), skills: { windWalk: 3, arrowShower: 2, bogus: 4 } } } });
   assert.deepEqual(ok.heroes.hunter.skills, { windWalk: 3, arrowShower: 2, blitzBeat: 0 });
+});
+
+test('the bag: rolled drops become instances, the first is worn, uids stay unique, take off and discard work, saves survive', () => {
+  const p = defaultProfile();
+  const ring = { id: 'ring', main: { stat: 'atk', v: 2 }, sub: { stat: 'crit', v: 0.04 } };
+  const ring2 = { id: 'ring', main: { stat: 'atk', v: 3 }, sub: { stat: 'hp', v: 0.02 } };
+  const r = recordRun(p, { ...finished('won', 10), loot: [ring, ring2, 'katana'] }, { hero: 'knight', town: 'prontera' });
+  assert.deepEqual(r.loot.map((l) => l.id), ['ring', 'ring', 'katana']);
+  assert.equal(p.heroes.knight.bag.length, 2, 'two rings, two instances, nothing merged');
+  const [a, b] = p.heroes.knight.bag;
+  assert.notEqual(a.uid, b.uid);
+  assert.equal(p.heroes.knight.equip.accessory, a.uid, 'the first fills the empty slot');
+  assert.deepEqual(heroOf(p, 'knight').wear.accessory, a);
+  assert.equal(setEquip(p, 'knight', b.uid, 'accessory'), true);
+  assert.equal(heroOf(p, 'knight').wear.accessory.main.v, 3);
+  assert.equal(setEquip(p, 'knight', 'nope', 'accessory'), false);
+  assert.equal(setEquip(p, 'knight', null, 'accessory'), true);
+  assert.equal(heroOf(p, 'knight').wear.accessory, null);
+  assert.equal(setEquip(p, 'knight', a.uid, 'accessory'), true);
+  assert.equal(discard(p, 'knight', a.uid), true, 'discarding the worn one');
+  assert.equal(p.heroes.knight.equip.accessory, null); assert.equal(p.heroes.knight.bag.length, 1);
+  assert.equal(discard(p, 'knight', 'nope'), false);
+  const back = normalize(JSON.parse(JSON.stringify(p)));
+  assert.deepEqual(back.heroes.knight.bag, p.heroes.knight.bag);
+  const junk = normalize({ heroes: { knight: { bag: [{ uid: 'x', id: 'ring', main: { stat: 'atk', v: 99 }, sub: { stat: 'atk', v: 1 } }, { uid: 'x', id: 'ring', main: { stat: 'atk', v: 1 } }, { uid: 'y', id: 'katana', main: { stat: 'atk', v: 1 } }, 7], equip: { accessory: 'x' } } } });
+  assert.equal(junk.heroes.knight.bag.length, 1, 'duplicate uid, non-rolled kind and garbage dropped');
+  assert.equal(junk.heroes.knight.bag[0].main.v, 3, 'value clamped to the range');
+  assert.equal(junk.heroes.knight.bag[0].sub, null, 'a secondary equal to the main is thrown away');
+  assert.equal(junk.heroes.knight.equip.accessory, 'x', 'the surviving instance stays worn');
 });

@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ITEMS, ITEM_IDS, itemMods, itemName, glowOf, DEFAULT_WEAPON, wearMods, SLOTS, auraOf, AURA_STOPS } from '../src/sim/data/items.js';
+import { ITEMS, ITEM_IDS, itemMods, itemName, glowOf, DEFAULT_WEAPON, wearMods, SLOTS, auraOf, AURA_STOPS, ATTRS, ATTR_IDS, rollItem, attrText, isRolled } from '../src/sim/data/items.js';
+import { createRng } from '../src/sim/rng.js';
+import { resolveHero, mergeMods } from '../src/sim/resolve.js';
 import { MONSTERS } from '../src/sim/data/monsters.js';
 import { HEROES } from '../src/sim/data/heroes.js';
 import { TOWNS } from '../src/sim/data/dungeon.js';
@@ -14,7 +16,7 @@ const quiet = { rooms: [{ name: 't', width: 20, waves: [] }] };
 const press = (...keys) => ({ held: {}, pressed: Object.fromEntries(keys.map((k) => [k, true])) });
 
 test('every item belongs to a real hero and every town boss drops one per hero', () => {
-  for (const id of ITEM_IDS) assert.ok(HEROES[ITEMS[id].hero], `${id} is for a hero that exists`);
+  for (const id of ITEM_IDS) assert.ok(!ITEMS[id].hero || HEROES[ITEMS[id].hero], `${id} is for a hero that exists`);
   for (const [key, town] of Object.entries(TOWNS)) {
     for (const h of Object.keys(HEROES)) {
       const id = town.loot?.[h];
@@ -119,6 +121,7 @@ test('setGear swaps the weapon mid-run: stats re-resolve, HP keeps its fraction,
 
 test('worn slots: a cape refines into HP not ATK, never glows, and reaches the hero merged with the weapon', () => {
   ITEMS.testCape = { name: 'Test Cape', slot: 'cape', mods: { hp: 1.08 }, tip: 't' };
+  const realDrops = MONSTERS.poring.drops;
   MONSTERS.poring.drops = [{ item: 'testCape', chance: 1 }];
   try {
     for (const id of ITEM_IDS) assert.ok(SLOTS.includes(ITEMS[id].slot), `${id} has a slot`);
@@ -136,7 +139,7 @@ test('worn slots: a cape refines into HP not ATK, never glows, and reaches the h
     const e = createEnemy(g, 'poring', 4, 0); g.enemies.push(e); e.hp = 0; g.onEnemyHit(e, 1, false, true, 'slash1');
     assert.deepEqual(g.loot, ['testCape']);
     assert.ok(g.events.some((ev) => ev.type === 'itemDrop' && ev.item === 'testCape' && ev.monster === 'poring'));
-  } finally { delete ITEMS.testCape; delete MONSTERS.poring.drops; }
+  } finally { delete ITEMS.testCape; MONSTERS.poring.drops = realDrops; }
 });
 
 test('the refine aura: none below +5, white at +5, blue at +7, gold at +9, blended between, weapons only', () => {
@@ -151,4 +154,51 @@ test('the refine aura: none below +5, white at +5, blue at +7, gold at +9, blend
   assert.ok(auraOf({ id: 'katana', plus: 10 }).strength === 1 && auraOf({ id: 'katana', plus: 5 }).strength < 0.2);
   ITEMS.testCape = { name: 'c', slot: 'cape', mods: {}, tip: '' };
   try { assert.equal(auraOf({ id: 'testCape', plus: 9 }), null, 'a cape has no blade'); } finally { delete ITEMS.testCape; }
+});
+
+test('accessories roll a fixed main and a random secondary inside their ranges, deterministically', () => {
+  for (const id of ['ring', 'clip', 'bell', 'brooch', 'amulet']) assert.ok(isRolled(id) && ITEMS[id].slot === 'accessory');
+  const seen = new Set();
+  for (let seed = 1; seed <= 300; seed++) {
+    const r = rollItem('ring', createRng(seed));
+    assert.equal(r.id, 'ring'); assert.equal(r.main.stat, 'atk');
+    assert.ok(Number.isInteger(r.main.v) && r.main.v >= 1 && r.main.v <= 3, `ring atk ${r.main.v}`);
+    assert.notEqual(r.sub.stat, 'atk');
+    const a = ATTRS[r.sub.stat];
+    assert.ok(r.sub.v >= a.min - 1e-9 && r.sub.v <= a.max + 1e-9, `${r.sub.stat} ${r.sub.v} in range`);
+    seen.add(r.sub.stat);
+  }
+  assert.ok(seen.size >= 6, `secondaries vary (${[...seen].join(',')})`);
+  assert.deepEqual(rollItem('bell', createRng(7)), rollItem('bell', createRng(7)), 'same rng, same roll');
+  assert.equal(attrText({ stat: 'atk', v: 2 }), '+2 ATK'); assert.equal(attrText({ stat: 'crit', v: 0.04 }), '+4% Crit rate');
+  assert.equal(itemName({ id: 'ring', main: { stat: 'atk', v: 2 }, sub: { stat: 'hp', v: 0.02 } }), 'Ring · +2 ATK');
+});
+
+test('rolled attributes reach the hero: flat ATK and rates add, HP / SP / ASPD multiply, on top of the weapon', () => {
+  const ring = { id: 'ring', uid: 'a1', main: { stat: 'atk', v: 2 }, sub: { stat: 'crit', v: 0.04 } };
+  assert.deepEqual(itemMods(ring), { atkAdd: 2, critAdd: 0.04 });
+  const bell = { id: 'bell', uid: 'a2', main: { stat: 'aspd', v: 0.08 }, sub: { stat: 'hp', v: 0.02 } };
+  assert.deepEqual(itemMods(bell), { atkSpeed: 1.08, hp: 1.02 });
+  const m = mergeMods({ atkAdd: 2, critAdd: 0.04 }, { atkAdd: 1, critAdd: 0.03, atkSpeed: 1.1 }, { atkSpeed: 1.05 });
+  assert.equal(m.atkAdd, 3); assert.ok(Math.abs(m.critAdd - 0.07) < 1e-9); assert.ok(Math.abs(m.atkSpeed - 1.155) < 1e-9);
+  const wear = { cape: null, hat: null, accessory: ring };
+  const g = createGame({ hero: 'knight', dungeon: quiet, gear: { id: 'katana', plus: 0 }, wear });
+  assert.equal(g.player.atk, HEROES.knight.atk + 2, 'flat ATK after the multiplier');
+  assert.ok(Math.abs(g.player.crit - 0.34) < 1e-9, 'katana 30% + ring 4%');
+  const d = resolveHero(HEROES.knight, { dodgeAdd: 0.9, critDmgAdd: 0.1 });
+  assert.equal(d.dodge, 0.75, 'dodge is capped'); assert.ok(Math.abs(d.critDmg - 1.7) < 1e-9);
+});
+
+test('a monster drop table pays out near its rate and every hit is a rolled instance', () => {
+  const g = createGame({ hero: 'knight', dungeon: quiet, seed: 21 });
+  const N = 4000;
+  for (let i = 0; i < N; i++) {
+    const e = createEnemy(g, 'poring', 4, 0); g.enemies.push(e); e.hp = 0;
+    g.onEnemyHit(e, 1, false, true, 'slash1');
+    g.enemies.length = 0; g.events.length = 0;
+  }
+  const rings = g.loot.filter((l) => typeof l === 'object' && l.id === 'ring');
+  assert.equal(rings.length, g.loot.length, 'porings drop rings and nothing else');
+  assert.ok(rings.length > N * 0.02 && rings.length < N * 0.04, `~3% (${rings.length}/${N})`);
+  assert.ok(rings.every((r) => r.main.stat === 'atk' && r.sub && r.sub.stat !== 'atk'));
 });

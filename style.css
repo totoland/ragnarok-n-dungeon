@@ -440,3 +440,15 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
   .slotb { width: 60px; height: 60px; }
   .slots.worn { grid-template-columns: repeat(4, 60px); }
 }
+/* Rolled items: rarity tints the glyph and the name tag. */
+.glyph.r-common { color: #d8d4c8; }
+.glyph.r-uncommon { color: #7fc8ff; }
+.glyph.r-rare { color: #ffd76a; }
+.rar { font-size: 11px; font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.85; }
+.rar.r-common { color: #d8d4c8; } .rar.r-uncommon { color: #7fc8ff; } .rar.r-rare { color: #ffd76a; }
+.equipbtn.discard { border-color: rgba(255,90,70,0.5); color: #ff8a7a; }
+.equipbtn.discard:hover, .equipbtn.discard.armed { border-color: #ff6a5a; background: rgba(255,90,70,0.15); color: #ffb0a6; }
+/* The HUD skill slots take the mouse: a click casts, like the key. */
+#skills { pointer-events: auto; }
+.skill { cursor: pointer; user-select: none; }
+.skill:active { transform: translateY(1px); }

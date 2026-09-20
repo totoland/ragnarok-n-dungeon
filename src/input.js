@@ -93,7 +93,7 @@ export function createInput(target = window, opts = {}) {
   const onCanvas = (e) => {
     const el = e.target;
     if (!el || !el.closest) return false;
-    if (el.closest('button, .overlay, #settings, #touch')) return false;
+    if (el.closest('button, .overlay, #settings, #touch, #skills')) return false;
     return !!el.closest('#view, #frame');
   };
 

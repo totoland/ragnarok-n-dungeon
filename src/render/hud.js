@@ -2,7 +2,7 @@
 import { SKILL_INFO, PASSIVE_INFO } from '../sim/data/heroes.js';
 import { MONSTERS } from '../sim/data/monsters.js';
 import { TOWNS } from '../sim/data/dungeon.js';
-import { ITEMS, itemName } from '../sim/data/items.js';
+import { ITEMS, itemName, attrText } from '../sim/data/items.js';
 import { levelFromXp, xpAtLevel, xpToNext } from '../sim/progress.js';
 
 const $ = (id) => document.getElementById(id);
@@ -20,6 +20,7 @@ export function createHud() {
   let slots = [];
   let lastCombo = 0;
   let lastXp = -1;
+  let onSkill = null;   // set by the shell: (index) => input.press('skill<n>')
 
   function bindHero(player) {
     el.heroName.textContent = player.def.name;
@@ -37,6 +38,9 @@ export function createHud() {
       d.title = info.tip;
       d.innerHTML = `<span class="key">${info.key}</span><span class="cost">${atk.mp} MP</span><span class="name">${info.name}</span>`
         + '<div class="cd"></div><span class="cdnum"></span>';
+      // A mouse click on the slot is the same press as the key; pointerdown so it lands
+      // before the click filter in input.js decides this was a swing at the canvas.
+      d.addEventListener('pointerdown', (ev) => { ev.preventDefault(); onSkill?.(i); });
       el.skills.appendChild(d);
       // The touch button for the same skill. On a phone #skills is hidden, so without this
       // there is no cooldown feedback anywhere at all.
@@ -179,7 +183,8 @@ export function createHud() {
       for (const l of progress.loot || []) {
         const li = document.createElement('span');
         li.className = 'loot';
-        li.textContent = l.merged ? `${ITEMS[l.id].name} refined to +${l.plus}` : `${itemName({ id: l.id, plus: 0 })} obtained!`;
+        li.textContent = l.rolled ? `${ITEMS[l.id].name} found! ${attrText(l.rolled.main)} · ${attrText(l.rolled.sub)}`
+          : l.merged ? `${ITEMS[l.id].name} refined to +${l.plus}` : `${itemName({ id: l.id, plus: 0 })} obtained!`;
         el.endProgress.appendChild(li);
       }
       if (progress.unlocked) {
@@ -198,5 +203,5 @@ export function createHud() {
   function showPause(show) { el.pause.hidden = !show; }
   function setLoading(text) { el.loading.textContent = text; }
 
-  return { el, bindHero, update, showTitle, showEnd, hideEnd, showPause, setLoading, banner };
+  return { el, bindHero, update, showTitle, showEnd, hideEnd, showPause, setLoading, banner, set onSkill(fn) { onSkill = fn; } };
 }
