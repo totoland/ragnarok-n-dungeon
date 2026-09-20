@@ -26,7 +26,20 @@ for line in sys.stdin:
         print(f"   gpu: programs {gpu.get('programs')} geometries {gpu.get('geometries')} "
               f"textures {gpu.get('textures')} calls {gpu.get('calls')} tris {gpu.get('tris')}")
     if r.get('spikes'):
-        print('   spikes: ' + ' | '.join(r['spikes']))
+        # Spikes are stamped with the page clock; show how long before this report each was,
+        # so a stale one stops reading like a fresh one.
+        up = r.get('upSec')
+        out = []
+        for sp in r['spikes']:
+            if up is not None and sp.startswith('['):
+                try:
+                    at = int(sp[1:sp.index('s]')])
+                    out.append(f"({up - at}s ago) {sp[sp.index(']') + 2:]}")
+                    continue
+                except (ValueError, IndexError):
+                    pass
+            out.append(sp)
+        print(f"   spikes (now {up}s in): " + ' | '.join(out))
     if g:
         print(f"   game: {g.get('hero')} {g.get('town')}/{g.get('room')} t={g.get('t')} {g.get('phase')} lv{g.get('level')} "
               f"hp{g.get('hp')} state={g.get('state')}/{g.get('attack')} hold={g.get('hold')} "

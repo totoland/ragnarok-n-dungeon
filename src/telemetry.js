@@ -48,7 +48,11 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
     if (dt > 40) {
       const near = (world.marks || []).filter((m) => now - m.at < 400).map((m) => m.label);
       const g = getGame();
-      spikes.push(`${dt.toFixed(0)}ms ${near.length ? '@ ' + near.join(', ') : g ? `in ${g.room?.name} t=${g.t.toFixed(0)}s` : 'title'}`);
+      // The ring holds the last six spikes of the whole session, so a report keeps showing
+      // the same ones long after they happened - and reading old spikes as new ones cost two
+      // rounds of chasing something that had already been fixed. Stamp each with the page
+      // clock, and the report says how long ago beside it.
+      spikes.push(`[${(now / 1000).toFixed(0)}s] ${dt.toFixed(0)}ms ${near.length ? '@ ' + near.join(', ') : g ? `in ${g.room?.name} t=${g.t.toFixed(0)}s` : 'title'}`);
       if (spikes.length > 6) spikes.shift();
     }
   }
@@ -66,6 +70,7 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
         // the renderer recompiling what it just threw away, which shows up as draw time.
         gpu: r ? { programs: r.info.programs?.length || 0, geometries: r.info.memory.geometries, textures: r.info.memory.textures, calls: r.info.render.calls, tris: r.info.render.triangles } : null },
       spikes: spikes.slice(),
+      upSec: Math.round(performance.now() / 1000),
       marks: (world.marks || []).slice(-8).map((m) => m.label),
       game: g ? { hero: g.player.hero, town: g.dungeon.town, room: g.room?.name, t: +g.t.toFixed(1), phase: g.phase, level: g.player.level, hp: Math.round(g.player.hp), state: g.player.state, attack: g.player.attack, hold: g.player.holdAttack, enemies: g.enemies.length, alive: g.enemies.filter((e) => !e.dead).length } : null,
       input: { raw: input.raw(), trace: input.trace().slice(-40) },
