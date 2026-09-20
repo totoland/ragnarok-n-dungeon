@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ITEMS, ITEM_IDS, itemMods, itemName, glowOf, DEFAULT_WEAPON, wearMods, SLOTS } from '../src/sim/data/items.js';
+import { ITEMS, ITEM_IDS, itemMods, itemName, glowOf, DEFAULT_WEAPON, wearMods, SLOTS, auraOf, AURA_STOPS } from '../src/sim/data/items.js';
 import { MONSTERS } from '../src/sim/data/monsters.js';
 import { HEROES } from '../src/sim/data/heroes.js';
 import { TOWNS } from '../src/sim/data/dungeon.js';
@@ -137,4 +137,18 @@ test('worn slots: a cape refines into HP not ATK, never glows, and reaches the h
     assert.deepEqual(g.loot, ['testCape']);
     assert.ok(g.events.some((ev) => ev.type === 'itemDrop' && ev.item === 'testCape' && ev.monster === 'poring'));
   } finally { delete ITEMS.testCape; delete MONSTERS.poring.drops; }
+});
+
+test('the refine aura: none below +5, white at +5, blue at +7, gold at +9, blended between, weapons only', () => {
+  assert.equal(auraOf({ id: 'katana', plus: 4 }), null);
+  assert.equal(auraOf(null), null);
+  const w = auraOf({ id: 'katana', plus: 5 }); assert.deepEqual(w.color, [1, 1, 1]); assert.equal(w.name, 'white');
+  const b = auraOf({ id: 'katana', plus: 7 }); assert.deepEqual(b.color, AURA_STOPS[1].color); assert.equal(b.name, 'blue');
+  const g = auraOf({ id: 'katana', plus: 9 }); assert.deepEqual(g.color, AURA_STOPS[2].color); assert.equal(g.name, 'gold');
+  const mid = auraOf({ id: 'katana', plus: 6 });
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(mid.color[i] - (1 + AURA_STOPS[1].color[i]) / 2) < 1e-9, 'half way white → blue');
+  assert.equal(mid.name, 'white-blue');
+  assert.ok(auraOf({ id: 'katana', plus: 10 }).strength === 1 && auraOf({ id: 'katana', plus: 5 }).strength < 0.2);
+  ITEMS.testCape = { name: 'c', slot: 'cape', mods: {}, tip: '' };
+  try { assert.equal(auraOf({ id: 'testCape', plus: 9 }), null, 'a cape has no blade'); } finally { delete ITEMS.testCape; }
 });

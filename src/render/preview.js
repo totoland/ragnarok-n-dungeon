@@ -4,7 +4,8 @@
 // own model wielding the selected weapon, turning slowly in a box in the profile panel.
 import * as THREE from 'three';
 import { showWeapon, restPose } from './heroes.js';
-import { ITEMS, glowOf } from '../sim/data/items.js';
+import { ITEMS, auraOf } from '../sim/data/items.js';
+import { auraTick, stripAura } from './aura.js';
 
 const ICON = 112;
 
@@ -28,13 +29,15 @@ export function createPreview() {
 
   // Materials on the shared asset carry whatever the live view last did to them - a +7's
   // glow, a hit flash - so anything rendered here gets its own copies, emissive reset.
-  const GOLD = new THREE.Color(0xffd35a);
-  function ownMaterials(root, glow = 0) {
+  function ownMaterials(root, aura = null) {
     root.traverse((o) => {
-      if (!o.isMesh) return;
+      if (!o.isMesh || o.name === '__aura') return;
       const mats = (Array.isArray(o.material) ? o.material : [o.material]).map((m) => {
         const c = m.clone();
-        if (c.emissive) { c.emissive.copy(m.userData.emissive || new THREE.Color(0)); if (glow > 0) c.emissive.add(GOLD.clone().multiplyScalar(0.25 + 0.6 * glow)); }
+        if (c.emissive) {
+          c.emissive.copy(m.userData.emissive || new THREE.Color(0));
+          if (aura) c.emissive.add(new THREE.Color(aura.color[0], aura.color[1], aura.color[2]).multiplyScalar(0.05 + 0.1 * aura.strength));
+        }
         return c;
       });
       o.material = Array.isArray(o.material) ? mats : mats[0];
@@ -51,6 +54,7 @@ export function createPreview() {
     if (!node && slot === 'weapon') node = model.getObjectByName('weapon');
     if (!node) return null;
     const c = node.clone();
+    stripAura(c);
     c.position.set(0, 0, 0); c.rotation.set(0, 0, 0); c.scale.set(1, 1, 1);
     c.traverse((o) => { o.visible = true; });
     ownMaterials(c);
@@ -108,12 +112,13 @@ export function createPreview() {
     if (mounted && mounted.hero !== hero) unmount();
     if (!mounted) {
       const model = assets[hero].clone();
+      stripAura(model);
       restPose(model, hero);
       ownMaterials(model);
       const holder = new THREE.Group();
       holder.add(model);
       scene.add(holder);
-      mounted = { hero, model, holder, raf: 0, t: 0, last: performance.now(), container: null };
+      mounted = { hero, model, holder, raf: 0, t: 0, last: performance.now(), container: null, gear: null };
       // A slow swing about the front rather than a spin: the weapon hand stays in view and
       // the flat of the blade catches the light on every pass.
       const loop = (now) => {
@@ -122,6 +127,7 @@ export function createPreview() {
         mounted.last = now;
         mounted.t += dt;
         mounted.holder.rotation.y = 0.85 * Math.sin(mounted.t * 0.6);
+        auraTick(mounted.model, mounted.gear, mounted.t);
         renderer.render(scene, camera);
       };
       mounted.raf = requestAnimationFrame(loop);
@@ -131,11 +137,12 @@ export function createPreview() {
   }
   function setGear(gear) {
     if (!mounted) return;
+    mounted.gear = gear;
     showWeapon(mounted.model, gear?.id ?? null);
-    const glow = glowOf(gear);
+    const aura = auraOf(gear);
     mounted.model.traverse((o) => {
       if (!(o.name === 'weapon' || /^weapon_[a-z]+$/.test(o.name)) || !o.visible) return;
-      ownMaterials(o, glow);
+      ownMaterials(o, aura);
     });
   }
   function unmount() {

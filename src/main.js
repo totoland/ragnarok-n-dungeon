@@ -12,6 +12,7 @@ import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
 import { createScene, buildRoom, disposeRoom, updateScene } from './render/scene.js';
 import { loadHeroAssets, createHeroView, showWeapon, restPose } from './render/heroes.js';
+import { auraTick, stripAura } from './render/aura.js';
 import { createMonsterViews, loadMonsterAssets } from './render/monsters.js';
 import { createFx } from './render/fx.js';
 import { createHud } from './render/hud.js';
@@ -197,6 +198,7 @@ function buildPreview() {
     const rim = new THREE.Mesh(new THREE.TorusGeometry(1.27, 0.03, 8, 48), rimMat);
     rim.rotation.x = Math.PI / 2;
     const model = assets[key].clone();
+    stripAura(model);
     model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     restPose(model, key);                                          // a run may have left the shared asset mid-swing
     showWeapon(model, heroOf(profile, key).gear?.id ?? null);   // the plinth shows what is wielded
@@ -226,6 +228,7 @@ function updatePreview(dt) {
     s.stand.position.z += (targetZ - s.stand.position.z) * Math.min(1, 4 * dt);
     s.rim.material.emissive.setHex(sel ? 0xe8b64a : 0x000000);
     s.rim.material.emissiveIntensity = sel ? 0.8 + 0.3 * Math.sin(preview.t * 3) : 0;
+    auraTick(s.model, heroOf(profile, key).gear, preview.t);
   }
 }
 function disposePreview() {

@@ -3,7 +3,7 @@
 // hero wielding whatever is selected, and one Equip button. Owns no game state: it edits
 // the profile, persists it, and calls back so the title and a live run pick the change up.
 import { HEROES, SKILL_INFO, PASSIVE_INFO } from '../sim/data/heroes.js';
-import { ITEMS, itemName, DEFAULT_WEAPON, SLOTS, SLOT_INFO, slotOf, fits } from '../sim/data/items.js';
+import { ITEMS, itemName, DEFAULT_WEAPON, SLOTS, SLOT_INFO, slotOf, fits, auraOf } from '../sim/data/items.js';
 import { MONSTERS } from '../sim/data/monsters.js';
 import { TOWNS } from '../sim/data/dungeon.js';
 import { xpAtLevel, xpToNext } from '../sim/progress.js';
@@ -190,7 +190,8 @@ export function createCharacterUI({ input, getProfile, onChange }) {
       const plus = e.plus || 0;
       const bits = [];
       if (plus) bits.push(e.slot === 'weapon' ? `+${Math.round(REFINE.atk * plus * 100)}% ATK from refining` : `+${Math.round(REFINE.hp * plus * 100)}% HP from refining`);
-      if (e.slot === 'weapon' && plus >= REFINE.glowAt) bits.push(`glowing, +${Math.round(REFINE.critDmg * 100)}% crit damage`);
+      const au = e.slot === 'weapon' ? auraOf({ id: e.id, plus }) : null;
+      if (au) bits.push(`${au.name} aura, +${Math.round(REFINE.critDmg * 100)}% crit damage`);
       bits.push(plus >= REFINE.max ? 'fully refined' : `next duplicate → +${plus + 1}`);
       detail.appendChild(el('div', 'stat', bits.join(' · ')));
     }
@@ -218,7 +219,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     const onStage = e.slot === 'weapon' ? e : list.find((x) => x.id === wornId(h, 'weapon') && x.slot === 'weapon');
     if (preview.ready) preview.mount(stage, hero, onStage?.id ? { id: onStage.id, plus: onStage.plus || 0 } : null);
     else stage.appendChild(el('div', 'stagenote', 'Loading models…'));
-    note.textContent = 'Tap a slot to preview it on your hero, then Equip. A duplicate drop refines the weapon you hold by +1; from +5 it glows.';
+    note.textContent = 'Tap a slot to preview it on your hero, then Equip. A duplicate drop refines what you hold by +1; from +5 a blade carries an aura — white, blue at +7, gold at +9.';
   }
 
   function open(key, which) {

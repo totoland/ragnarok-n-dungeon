@@ -6,7 +6,8 @@
 // Channel sign conventions (see anim.js): aLx/aRx/lLx/lRx positive = limb swings forward,
 // tx/hx positive = lean/nod forward, cx positive = cape blown back, rx = root tips forward.
 import * as THREE from 'three';
-import { glowOf } from '../sim/data/items.js';
+import { auraOf } from '../sim/data/items.js';
+import { auraTick } from './aura.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
@@ -15,7 +16,6 @@ import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 // reads as wind where a green glow just read as poison.
 const AURA = { quicken: new THREE.Color(0.95, 0.72, 0.2) };
 const AURA_TMP = new THREE.Color();
-const GLOW = new THREE.Color(0xffd35a);
 
 const HALF = Math.PI / 2;
 
@@ -235,7 +235,7 @@ export function createHeroView(world, heroKey, assets) {
   const weaponMats = new Set();
   for (const node of [rig.weapon, ...Object.values(rig.variants)]) {
     node?.traverse((o) => {
-      if (!o.isMesh) return;
+      if (!o.isMesh || o.name === '__aura') return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       const cloned = mats.map((m) => {
         if (m.userData.weaponClone) return m;
@@ -340,16 +340,17 @@ export function createHeroView(world, heroKey, assets) {
       else if (aura) m.emissive.copy(m.userData.emissive).add(AURA_TMP.copy(aura).multiplyScalar(pulse));
       else m.emissive.copy(m.userData.emissive);
     }
-    // A refined weapon glows gold, brighter with every plus past the threshold, breathing
-    // slowly; the hit flash still wins.
-    const glow = glowOf(p.gear);
+    // A refined weapon carries an aura on its blade (aura.js) and the steel takes a faint
+    // cast of the same colour; the hit flash still wins.
+    const wa = auraOf(p.gear);
     for (const m of weaponMats) {
       if (!m.emissive) continue;
       if (flashing) m.emissive.setRGB(0.9, 0.2, 0.15);
-      else if (glow > 0) m.emissive.copy(m.userData.emissive).add(AURA_TMP.copy(GLOW).multiplyScalar((0.25 + 0.6 * glow) * (0.8 + 0.2 * Math.sin(view.t * 3))));
+      else if (wa) m.emissive.copy(m.userData.emissive).add(AURA_TMP.setRGB(wa.color[0], wa.color[1], wa.color[2]).multiplyScalar(0.05 + 0.1 * wa.strength));
       else if (aura) m.emissive.copy(m.userData.emissive).add(AURA_TMP.copy(aura).multiplyScalar(pulse));
       else m.emissive.copy(m.userData.emissive);
     }
+    auraTick(model, p.gear, view.t);
 
     if (rig.falcon) updateFalcon(game, dt);
   };

@@ -272,8 +272,12 @@ boss's drop is certain the first time a hero clears the town and `DROPS.boss.cha
 `bossDrop` event (pillar of light, bell, the name) and lists it in `game.loot`, which
 `recordRun()` banks — a new weapon is held and wielded if the hands were empty, a duplicate
 refines the held one by +1. Refining (`REFINE` in config.js) adds 3 % ATK per plus on a
-weapon and, from +5, a gold glow on the weapon's own materials and 5 % more crit damage;
-anything worn refines into 2 % HP per plus instead.
+weapon and 5 % more crit damage from +5, when the blade also carries an **aura**
+([src/render/aura.js](src/render/aura.js)): the blade meshes (picked by their steel material
+names) get an additive shell pushed out along the normals, fading with the view angle, with
+two slow bands flowing up the blade — white at +5, blue from +7, gold from +9, blended
+between the stops (`auraOf()` in items.js) — so the refine shows on the steel alone, never as
+a tint on the whole weapon. Anything worn refines into 2 % HP per plus instead.
 
 Skill points come one per level and are spent in the **Profile** panel
 (`src/render/character-ui.js`), reachable from the title (the gold button under the hero

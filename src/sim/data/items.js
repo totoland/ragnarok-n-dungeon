@@ -56,6 +56,30 @@ export function itemName(gear, hero) {
   return gear.plus ? `${ITEMS[gear.id].name} +${gear.plus}` : ITEMS[gear.id].name;
 }
 
+// The refine aura: from glowAt the blade carries a soft light that steps through these
+// colours - white at +5, blue from +7, gold from +9 - blending between stops so +6 sits
+// between white and blue. The renderer draws it on the blade alone (render/aura.js).
+export const AURA_STOPS = [
+  { at: 5, color: [1.0, 1.0, 1.0] },
+  { at: 7, color: [0.45, 0.78, 1.0] },
+  { at: 9, color: [1.0, 0.78, 0.30] },
+];
+export function auraOf(gear) {
+  const strength = glowOf(gear);
+  if (!strength) return null;
+  const plus = Math.min(REFINE.max, gear.plus | 0);
+  let color = AURA_STOPS[AURA_STOPS.length - 1].color, name = 'gold';
+  for (let i = 0; i < AURA_STOPS.length - 1; i++) {
+    const a = AURA_STOPS[i], b = AURA_STOPS[i + 1];
+    if (plus >= a.at && plus < b.at) {
+      const k = (plus - a.at) / (b.at - a.at);
+      color = a.color.map((c, j) => c + (b.color[j] - c) * k);
+      name = k === 0 ? ['white', 'blue', 'gold'][i] : `${['white', 'blue', 'gold'][i]}-${['white', 'blue', 'gold'][i + 1]}`;
+    }
+  }
+  return { color, strength, name };
+}
+
 // How strongly a refined weapon glows, 0..1: nothing below glowAt, then brighter per plus.
 export function glowOf(gear) {
   if (!gear || (gear.plus | 0) < REFINE.glowAt || ITEMS[gear.id]?.slot !== 'weapon') return 0;
