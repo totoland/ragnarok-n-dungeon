@@ -95,7 +95,7 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
   if (ENDPOINT) {
     // A build with an endpoint stamped in was built to be watched: there is no /__env to ask
     // and no address bar to put ?log=1 in, so it reports from the first frame.
-    env = NATIVE ? `ios-${(window.Capacitor?.getPlatform?.() || 'app')}` : 'packaged';
+    env = NATIVE ? (window.Capacitor?.getPlatform?.() || 'native') : 'packaged';
     start();
   } else {
     // The server names the environment; lab reports by default.
