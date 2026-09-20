@@ -23,7 +23,7 @@ export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods,
   const all = mergeMods(itemMods(gear), mods);
   const g = {
     t: 0, rng: createRng(seed), seed, dungeon,
-    tier, xp, xpStart: xp, mods: all, gear, drop,
+    tier, xp, xpStart: xp, mods: all, extMods: mods, gear, drop,
     loot: [],             // item ids the boss dropped this run; the shell banks them at the end
     player: createPlayer(hero, all, levelFromXp(xp), skills),
     roomIndex: -1, room: null, bounds: { xMin: 0, xMax: 16 },
@@ -151,6 +151,24 @@ function onEnemyHit(g, e, dmg, crit, killed, attackId) {
     }
     gainXp(g, xpForKill(e.def, g.tier));
   }
+}
+
+// Swap the wielded weapon mid-run: the loadout is re-merged and the hero re-resolved at his
+// level, keeping the same fraction of HP and SP. This is the shell reaching into a run
+// (profile panel from the pause menu); a run that does it is no longer (loadout, seed,
+// inputs), which is fine for a player and is why the harness never calls it.
+export function setGear(g, gear) {
+  const p = g.player;
+  const same = (g.gear?.id ?? null) === (gear?.id ?? null) && (g.gear?.plus ?? 0) === (gear?.plus ?? 0);
+  if (same) return;
+  g.gear = gear;
+  g.mods = mergeMods(itemMods(gear), g.extMods);
+  const hpF = p.hp / p.hpMax, mpF = p.mp / p.mpMax;
+  setLevel(p, p.level, g.mods);
+  p.hp = Math.max(1, Math.round(hpF * p.hpMax));
+  p.mp = Math.round(mpF * p.mpMax);
+  p.gear = gear;
+  pushEvent(g, { type: 'equip', item: gear?.id ?? null, plus: gear?.plus ?? 0 });
 }
 
 // XP is flat per kill - no combo multiplier, unlike score - so a level is a count of what was

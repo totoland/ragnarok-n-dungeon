@@ -267,10 +267,15 @@ boss's drop is certain the first time a hero clears the town and `DROPS.boss.cha
 refines the held one by +1. Refining (`REFINE` in config.js) adds 3 % ATK per plus and,
 from +5, a gold glow on the weapon's own materials and 5 % more crit damage.
 
-Skill points come one per level and are spent in the **Character** panel on the title
-(`src/render/character-ui.js`): each level on an attack skill adds `SKILL.dmg` (10 %) to its
+Skill points come one per level and are spent in the **Profile** panel
+(`src/render/character-ui.js`), reachable from the title (the gold button under the hero
+cards) and from the pause menu: each level on an attack skill adds `SKILL.dmg` (10 %) to its
 damage, on a buff skill `SKILL.buffDur` (15 %) to its duration. `p.skillLv` is read at the
-hit and at the cast, nowhere else. The town card of the selected town grows a `‹ NG+N ›`
+hit and at the cast, nowhere else. The same panel wields a weapon. Both apply at once, even
+mid-run: the shell writes the new skill levels onto the live player and calls
+`setGear(game, gear)`, which re-merges the loadout and re-resolves the hero at his level
+keeping his HP/SP fraction (that run is no longer `(loadout, seed, inputs)`, which is fine
+for a player and why the harness never does it). The town card of the selected town grows a `‹ NG+N ›`
 picker once it has been cleared, to replay a lower tier. The harness takes `--gear katana:5
 --skill 3` alongside `--level`.
 

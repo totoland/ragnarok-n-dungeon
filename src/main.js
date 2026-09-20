@@ -3,7 +3,7 @@
 import { SIM } from './config.js';
 import { TOWNS } from './sim/data/dungeon.js';
 import { MONSTERS } from './sim/data/monsters.js';
-import { createGame, update as simUpdate } from './sim/game.js';
+import { createGame, update as simUpdate, setGear } from './sim/game.js';
 import { loadProfile, saveProfile, clearProfile, heroOf, isUnlocked, tierFor, prevTown, recordRun, dropFor, skillPointsLeft } from './profile.js';
 import { createCharacterUI } from './render/character-ui.js';
 import { itemName } from './sim/data/items.js';
@@ -43,8 +43,18 @@ const hintKey = (code) => (code.startsWith('Key') ? code.slice(3) : code === 'Es
 
 const settingsUI = createSettingsUI({ input, touch, settings, onChange: applyBindings });
 applyBindings();
-const characterUI = createCharacterUI({ input, getProfile: () => profile, onChange: () => refreshTitle() });
+const characterUI = createCharacterUI({ input, getProfile: () => profile, onChange: () => { refreshTitle(); applyLoadout(); } });
 document.getElementById('title-character').addEventListener('click', () => characterUI.open(selectedHero));
+document.getElementById('pause-profile').addEventListener('click', () => characterUI.open(selectedHero));
+// The profile panel edits the wielded weapon and the skill levels; mid-run those land on the
+// live hero straight away (the sim re-resolves him, the view swaps the model), so a point
+// earned in the boss room can be spent in the boss room.
+function applyLoadout() {
+  if (!game || ended) return;
+  const me = heroOf(profile, selectedHero);
+  setGear(game, me.gear);
+  game.player.skillLv = { ...me.skills };
+}
 document.getElementById('title-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-resume').addEventListener('click', () => { paused = false; hud.showPause(false); });
@@ -91,7 +101,6 @@ for (const b of townButtons) b.addEventListener('click', () => { if (b.disabled)
 
 // Everything on the title that depends on the profile or the pick: level pills on the hero
 // cards, lock / tier state on the town cards, and the one-line blurb for the selected town.
-const HEROES_NAME = { knight: 'Knight', hunter: 'Hunter' };
 function refreshTitle() {
   for (const b of heroButtons) {
     const h = heroOf(profile, b.dataset.hero);
@@ -101,7 +110,9 @@ function refreshTitle() {
   const me = heroOf(profile, selectedHero), myPts = skillPointsLeft(profile, selectedHero);
   if (preview) for (const [key, s] of Object.entries(preview.stands)) showWeapon(s.model, heroOf(profile, key).gear?.id ?? null);
   const cbtn = document.getElementById('title-character');
-  cbtn.textContent = `${HEROES_NAME[selectedHero]} · Lv ${me.level} · ${itemName(me.gear)}${myPts ? ` · ${myPts} point${myPts === 1 ? '' : 's'} to spend` : ''}`;
+  cbtn.innerHTML = '';
+  cbtn.append(`Profile · ${itemName(me.gear)}`);
+  if (myPts) { const sp = document.createElement('span'); sp.className = 'pts'; sp.textContent = ` · ${myPts} skill point${myPts === 1 ? '' : 's'} to spend`; cbtn.append(sp); }
   cbtn.classList.toggle('attention', myPts > 0);
   for (const b of townButtons) {
     const key = b.dataset.town, em = b.querySelector('em');
@@ -156,7 +167,7 @@ window.addEventListener('keydown', (e) => {
   if (a === 'left' || a === 'right') { selectedHero = selectedHero === 'knight' ? 'hunter' : 'knight'; markSelected(); }
 });
 input.on('mute', () => { sfx.init(); sfx.toggleMute(); });
-input.on('pause', () => { if (!game || ended || settingsUI.isOpen) return; paused = !paused; hud.showPause(paused); });
+input.on('pause', () => { if (!game || ended || settingsUI.isOpen || characterUI.isOpen) return; paused = !paused; hud.showPause(paused); });
 hud.el.retry.addEventListener('click', () => start());
 hud.el.endContinue.addEventListener('click', () => continueRun());
 hud.el.endHome.addEventListener('click', () => toTitle());

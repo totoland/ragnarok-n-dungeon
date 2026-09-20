@@ -383,4 +383,12 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 .tierpick span[role="button"].off { opacity: 0.3; cursor: default; }
 #end-progress .loot { display: block; color: #ffe08a; }
 #banner.loot { color: #ffe08a; text-shadow: 0 0 28px rgba(255,224,138,0.85), 0 4px 0 #6a4a10; }
-#title-character.attention { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 14px rgba(232,182,74,0.35); }
+/* The profile button sits right under the hero cards, gold, and breathes while there are
+   points to spend. #title scrolls instead of clipping on a short phone screen. */
+#title { overflow-y: auto; justify-content: safe center; padding-block: 12px; }
+@supports not (justify-content: safe center) { #title { justify-content: flex-start; } }
+#profile-row { margin-top: 2px; }
+#title-character { padding: 9px 22px; border-radius: 8px; border: 2px solid var(--gold); background: var(--panel); color: var(--gold); font-size: 14px; font-weight: 700; cursor: pointer; }
+#title-character:hover { background: rgba(232,182,74,0.15); }
+#title-character.attention { animation: buffbreathe 1.6s ease-in-out infinite; }
+#title-character .pts { font-weight: 400; opacity: 0.85; }

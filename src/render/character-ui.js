@@ -31,7 +31,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     const h = heroOf(profile, hero);
     const def = HEROES[hero];
     const left = skillPointsLeft(profile, hero);
-    title.textContent = `${def.name} · Lv ${h.level}`;
+    title.textContent = `Profile — ${def.name} · Lv ${h.level}`;
     body.innerHTML = '';
 
     // XP
@@ -101,7 +101,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     body.appendChild(rows);
     const pv = def.passive && PASSIVE_INFO[def.passive.id];
     if (pv) body.appendChild(el('p', 'tip', `Passive: ${pv.name} — ${pv.tip}`));
-    note.textContent = 'One skill point per level. Points stay where you put them.';
+    note.textContent = 'Tap a weapon to wield it, + to raise a skill. Both take effect at once, even mid-run. One skill point per level; points stay where you put them.';
   }
 
   function open(key) {

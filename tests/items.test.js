@@ -5,7 +5,7 @@ import { HEROES } from '../src/sim/data/heroes.js';
 import { TOWNS } from '../src/sim/data/dungeon.js';
 import { BASE_MODS } from '../src/sim/resolve.js';
 import { REFINE, SKILL } from '../src/config.js';
-import { createGame, update, EMPTY_INPUT } from '../src/sim/game.js';
+import { createGame, update, EMPTY_INPUT, setGear } from '../src/sim/game.js';
 import { createEnemy } from '../src/sim/enemies.js';
 import { xpAtLevel } from '../src/sim/progress.js';
 
@@ -93,4 +93,25 @@ test('the boss drops its weapon at the run\'s chance, deterministically, only wh
   const g = createGame({ hero: 'knight', dungeon: quiet, seed: 2, drop: { item: 'katana', chance: 1 } });
   const e = createEnemy(g, 'poring', 4, 0); g.enemies.push(e); e.hp = 0; g.onEnemyHit(e, 1, false, true, 'slash1');
   assert.deepEqual(g.loot, []);
+});
+
+test('setGear swaps the weapon mid-run: stats re-resolve, HP keeps its fraction, the view can see it', () => {
+  const g = createGame({ hero: 'knight', dungeon: quiet, xp: xpAtLevel(3), gear: { id: 'katana', plus: 2 } });
+  const p = g.player;
+  const atkBefore = p.atk;
+  p.hp = Math.round(p.hpMax / 2);
+  setGear(g, null);
+  assert.equal(p.gear, null); assert.equal(g.gear, null);
+  assert.equal(p.crit, BASE_MODS.crit); assert.equal(p.atkSpeed, 1);
+  assert.ok(Math.abs(p.atk - atkBefore / (1 + REFINE.atk * 2)) < 1e-9, 'the refine share comes off');
+  assert.equal(p.hp, Math.round(p.hpMax / 2), 'half health stays half');
+  assert.ok(g.events.some((ev) => ev.type === 'equip' && ev.item === null));
+  setGear(g, { id: 'tsurugi', plus: 5 });
+  assert.equal(p.crit, 0.15); assert.equal(p.critDmg, BASE_MODS.critDmg * (1 + REFINE.critDmg));
+  assert.deepEqual(p.gear, { id: 'tsurugi', plus: 5 });
+  const n = g.events.length;
+  setGear(g, { id: 'tsurugi', plus: 5 });
+  assert.equal(g.events.length, n, 'same weapon again is a no-op');
+  update(g, EMPTY_INPUT);
+  assert.equal(p.level, 3);
 });
