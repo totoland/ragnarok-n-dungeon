@@ -10,6 +10,14 @@ resources:
   - ../../base
   - ingress.yaml
 
+patches:
+  - target: { kind: Deployment, name: ragnarok-n-dungeon }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env
+        value:
+          - { name: DRO_ENV, value: prod }
+
 # Pinned by `deploy.sh prod` to an immutable commit-sha tag, so a rollback is a one-line revert.
 images:
   - name: ghcr.io/totoland/ragnarok-n-dungeon

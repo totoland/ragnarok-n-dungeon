@@ -17,6 +17,10 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 1
+      - op: add
+        path: /spec/template/spec/containers/0/env
+        value:
+          - { name: DRO_ENV, value: lab }
 
 # Pinned by deploy.sh to an immutable commit-sha tag.
 images:

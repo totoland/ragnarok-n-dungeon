@@ -51,6 +51,10 @@ export function createInput(target = window, opts = {}) {
   const held = {};
   let pressed = {};
   let enabled = true;
+  // A short trace of what the input layer saw - pad edges, touch presses, releases and
+  // why - for the diagnostics report. Ring of the last 80 entries, stamped in ms.
+  const trace = [];
+  const note = (what) => { trace.push([Math.round(typeof performance !== 'undefined' ? performance.now() : Date.now()), what]); if (trace.length > 80) trace.shift(); };
   let capture = null;               // set while the settings menu is listening for a button
   const listeners = { confirm: [], mute: [], pause: [] };
 
@@ -163,7 +167,8 @@ export function createInput(target = window, opts = {}) {
       now['#' + i] = on;
       const k = padMap[i];
       if (!k) continue;
-      if (on && !padPrev['#' + i]) { if (listeners[k]) listeners[k].forEach((fn) => fn()); else pressed[k] = true; }
+      if (on && !padPrev['#' + i]) { note(`pad #${i} ${k} down`); if (listeners[k]) listeners[k].forEach((fn) => fn()); else pressed[k] = true; }
+      else if (!on && padPrev['#' + i]) note(`pad #${i} ${k} up`);
       if (!listeners[k]) padHeld[k] = padHeld[k] || on;
     }
     padPrev = now;
@@ -182,8 +187,19 @@ export function createInput(target = window, opts = {}) {
     get capturing() { return !!capture; },
     /** Drive the pad poll while the sim loop is not running (settings menu open). */
     pollCapture() { pollPad(); },
-    press(k) { if (listeners[k]) listeners[k].forEach((fn) => fn()); else { pressed[k] = true; } },
-    set(k, on) { if (on && !held[k]) pressed[k] = true; held[k] = on; },
+    press(k) { note(`press ${k}`); if (listeners[k]) listeners[k].forEach((fn) => fn()); else { pressed[k] = true; } },
+    set(k, on) { if (on !== !!held[k]) note(`set ${k} ${on ? 'on' : 'off'}`); if (on && !held[k]) pressed[k] = true; held[k] = on; },
+    note,
+    /** The trace and the raw state, for the diagnostics report. */
+    trace() { return trace.slice(); },
+    raw() {
+      const pad = firstPad();
+      return {
+        held: Object.keys(held).filter((k) => held[k]),
+        pad: pad ? { id: pad.id, buttons: [...pad.buttons].map((b, i) => (b?.pressed ? i : -1)).filter((i) => i >= 0), axes: [...pad.axes].map((a) => Math.round(a * 100) / 100) } : null,
+        padHeld: Object.keys(padHeld).filter((k) => padHeld[k]),
+      };
+    },
     snapshot() {
       pollPad();
       const merged = { ...held };
@@ -318,7 +334,7 @@ export function attachTouch(input, opts = {}) {
   // finger leaves the screen nothing can still be held, so everything releases.
   const down = new Map();       // release fn -> pointerType
   let touches = 0;              // fingers on the glass, from the touch events
-  const releaseAll = () => { for (const fn of [...down.keys()]) fn(); release(); };
+  const releaseAll = (why = 'release-all') => { if (down.size || sid !== null) input.note(`touch ${why}`); for (const fn of [...down.keys()]) fn(); release(); };
   for (const b of touch.querySelectorAll('.tbtn')) {
     const k = b.dataset.k;
     const edge = b.dataset.edge === '1';
@@ -353,22 +369,24 @@ export function attachTouch(input, opts = {}) {
     b.addEventListener('contextmenu', (e) => e.preventDefault());
   }
   if (win) {
-    const count = (e) => { touches = e.touches ? e.touches.length : 0; if (touches === 0 && e.type !== 'touchstart') releaseAll(); };
+    const count = (e) => { touches = e.touches ? e.touches.length : 0; if (touches === 0 && e.type !== 'touchstart') releaseAll('no fingers'); };
     for (const t of ['touchstart', 'touchend', 'touchcancel']) win.addEventListener(t, count, { passive: true });
     // A finger arriving on a glass the browser says is otherwise empty means every hold we
     // still think is down lost its release somewhere; let go before the new press lands.
     win.addEventListener('touchstart', (e) => {
-      if (e.touches && e.changedTouches && e.touches.length === e.changedTouches.length && (down.size || sid !== null)) releaseAll();
+      if (e.touches && e.changedTouches && e.touches.length === e.changedTouches.length && (down.size || sid !== null)) releaseAll('stale hold');
     }, { capture: true, passive: true });
-    win.addEventListener('blur', releaseAll);
-    if (root.addEventListener) root.addEventListener('visibilitychange', () => { if (root.hidden) releaseAll(); });
+    win.addEventListener('blur', () => releaseAll('blur'));
+    if (root.addEventListener) root.addEventListener('visibilitychange', () => { if (root.hidden) releaseAll('hidden'); });
     // Hold watchdog: a touch-pressed button still down while no finger is on the glass is
     // a lost release, whatever event went missing. Mouse presses (touch controls forced on
     // at a desk) are left alone - a mouse is not a touch.
     if (win.setInterval) win.setInterval(() => {
       if (touches !== 0) return;
-      for (const [fn, type] of down) if (type === 'touch') fn();
-      if (sid !== null && sidType === 'touch') release();
+      let freed = false;
+      for (const [fn, type] of down) if (type === 'touch') { fn(); freed = true; }
+      if (sid !== null && sidType === 'touch') { release(); freed = true; }
+      if (freed) input.note('touch watchdog');
     }, 200);
   }
 

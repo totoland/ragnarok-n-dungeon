@@ -27,6 +27,13 @@ createServer(async (req, res) => {
   try {
     let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     if (req.method === 'PUT' && path.startsWith('/__screenshot/')) return saveScreenshot(req, res, path.slice('/__screenshot/'.length));
+    if (path === '/__env') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('dev'); }
+    if (req.method === 'POST' && path === '/__log') {   // the client's diagnostics: one JSON line per report
+      const chunks = []; for await (const c of req) chunks.push(c);
+      await mkdir(join(root, 'docs'), { recursive: true });
+      await writeFile(join(root, 'docs', 'telemetry.ndjson'), Buffer.concat(chunks).toString() + '\n', { flag: 'a' });
+      res.writeHead(204); return res.end();
+    }
     if (path.endsWith('/')) path += 'index.html';
     const file = normalize(join(root, path));
     if (!file.startsWith(root)) throw Object.assign(new Error('forbidden'), { code: 'EACCES' });

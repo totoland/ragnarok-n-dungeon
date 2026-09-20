@@ -13,6 +13,7 @@ import { createSettingsUI } from './render/settings-ui.js';
 import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom } from './render/scene.js';
 import { loadHeroAssets, createHeroView, showWeapon, restPose } from './render/heroes.js';
 import { auraTick, stripAura } from './render/aura.js';
+import { createTelemetry } from './telemetry.js';
 import { createMonsterViews, loadMonsterAssets } from './render/monsters.js';
 import { createFx } from './render/fx.js';
 import { createHud } from './render/hud.js';
@@ -25,6 +26,7 @@ const hud = createHud();
 const settings = loadSettings();
 const input = createInput(window, { settings });
 hud.onSkill = (i) => { if (game && !paused && !ended) input.press(`skill${i + 1}`); };
+const telemetry = createTelemetry({ world, input, game: () => game });
 const touch = attachTouch(input, { settings });
 let keyLookup = lookup(settings.keys);
 
@@ -425,8 +427,13 @@ requestAnimationFrame(frame);
 const MARKED = { roomEnter: (e) => `room ${e.name}`, wave: (e) => `wave ${e.index + 1}`, bossAdds: () => 'boss adds', levelUp: (e) => `level ${e.level}`, bossDrop: (e) => `drop ${e.item}`, itemDrop: (e) => `drop ${e.item}`, won: () => 'won', gameOver: () => 'game over', attack: (e) => (e.id?.startsWith('slash') || e.id?.startsWith('arrow') ? null : `skill ${e.id}`) };
 world.marks = [];
 function mark(label) { world.marks.push({ at: performance.now(), label }); if (world.marks.length > 12) world.marks.shift(); }
+let heldSince = 0;
 function renderFrame(dt) {
   if (game.roomIndex !== roomBuilt) mark(`build room ${game.room.name}`);
+  // A held attack that never lets go is the bug being chased; stamp it with what the input
+  // layer sees the moment it passes six seconds, so the report can be read back.
+  if (game.player.holdAttack) { if (!heldSince) heldSince = performance.now(); else if (performance.now() - heldSince > 6000) { const raw = input.raw(); mark(`attack held 6s+ (held ${raw.held.join('/')}; pad ${raw.pad ? raw.pad.buttons.join(',') : '-'})`); heldSince = -1; } }
+  else heldSince = 0;
   syncRoom();
   // The walk to the exit is the quiet moment to draw the next room's textures.
   const next = game.roomIndex + 1;
@@ -474,7 +481,7 @@ window.__dro = {
   shot,
   get game() { return game; },
   get heroView() { return heroView; },
-  world, fx, monsters, input,
+  world, fx, monsters, input, telemetry,
   tick(n = 1) { for (let i = 0; i < n; i++) simUpdate(game, input.snapshot(), SIM.dt); },
   play(n = 1) { for (let i = 0; i < n; i++) { simUpdate(game, input.snapshot(), SIM.dt); renderFrame(SIM.dt); } },
   start, hero(key) { selectedHero = key; start(); },

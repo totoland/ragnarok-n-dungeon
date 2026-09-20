@@ -8,7 +8,9 @@
 # the final stage deliberately has no RUN and needs no QEMU.
 FROM nginx:1.27-alpine
 
-COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
+# A template, not a conf: the image's entrypoint runs envsubst over /etc/nginx/templates and
+# writes conf.d/default.conf, which is how ${DRO_ENV} (lab / prod) gets into /__env.
+COPY deploy/nginx.conf /etc/nginx/templates/default.conf.template
 COPY index.html style.css gamepad.html manifest.webmanifest sw.js /usr/share/nginx/html/
 COPY src/ /usr/share/nginx/html/src/
 COPY vendor/ /usr/share/nginx/html/vendor/

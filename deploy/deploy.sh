@@ -103,7 +103,7 @@ rsync -az --delete \
 #     worker's cache name is derived from this, so every deploy ships a byte-different worker
 #     and the browser drops the previous build's cache instead of serving it for one more load.
 echo "▶ Stamping $TAG into sw.js..."
-ssh "$PI" "sed -i 's/__BUILD__/$TAG/' $REMOTE_CTX/sw.js && grep -q \"BUILD = '$TAG'\" $REMOTE_CTX/sw.js"
+ssh "$PI" "sed -i 's/__BUILD__/$TAG/' $REMOTE_CTX/sw.js $REMOTE_CTX/index.html && grep -q \"BUILD = '$TAG'\" $REMOTE_CTX/sw.js"
 
 # 2. Build natively and hand the bytes to k3s.
 echo "▶ Building $IMAGE on $PI (native aarch64)..."

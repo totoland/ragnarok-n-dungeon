@@ -11,3 +11,4 @@ assets/blender/**/preview*.png
 # Deploy targets: the Pi's address and the real hostnames stay out of a public repo.
 deploy/.deployrc
 deploy/.deployrc.local
+docs/telemetry.ndjson
