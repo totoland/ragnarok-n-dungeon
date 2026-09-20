@@ -184,7 +184,18 @@ body.touch-edit #hud { opacity: 0.25; }
 .tedit-done { padding: 8px 20px; border-radius: 8px; border: 2px solid var(--gold); background: var(--panel); color: var(--gold); font-weight: 700; cursor: pointer; }
 .seg-loose { display: flex; gap: 8px; justify-self: start; flex-wrap: wrap; }
 @media (max-width: 720px) { .tedit-hint { display: none; } }
-#title:not([hidden]) ~ #touch, #end:not([hidden]) ~ #touch, #pause:not([hidden]) ~ #touch, #settings:not([hidden]) ~ #touch, #character:not([hidden]) ~ #touch { display: none; }
+#title:not([hidden]) ~ #touch, #end:not([hidden]) ~ #touch, #pause:not([hidden]) ~ #touch, #settings:not([hidden]) ~ #touch, /* Pad and keyboard navigation put focus on a real button, so focus has to be visible -
+   without a ring the player is moving an invisible cursor around the panel. Bright enough
+   to find on the inventory grid, where the tiles are dark and close together. */
+#character button:focus,
+#character button:focus-visible {
+  outline: 2px solid #ffd76a;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+#character button::-moz-focus-inner { border: 0; }
+
+#character:not([hidden]) ~ #touch { display: none; }
 
 /* ---------------------------------------------------------------- settings overlay */
 .overlay .row { display: flex; gap: 12px; margin-top: 8px; }

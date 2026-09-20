@@ -94,7 +94,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
       plus.type = 'button';
       plus.disabled = left <= 0 || lv >= SKILL.maxLevel;
       plus.title = lv >= SKILL.maxLevel ? 'Maxed' : left <= 0 ? 'Level up to earn points' : `Raise ${info.name} to ${lv + 1}`;
-      plus.addEventListener('click', () => { if (spendSkillPoint(profile, hero, id)) { commit(); render(); } });
+      plus.addEventListener('click', () => { if (spendSkillPoint(profile, hero, id)) { commit(); keepFocus(render); } });
       right.append(el('span', 'seffect', lv ? effect : 'Lv 0'), plus);
       row.append(name, pips, right);
       rows.appendChild(row);
@@ -152,7 +152,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     if (equipped) b.appendChild(el('span', 'tag', 'E'));
     b.classList.toggle('selected', entry.key === selected);
     b.title = entry.inst ? `${entry.name} · ${attrText(entry.inst.main)} · ${attrText(entry.inst.sub)}` : entry.held ? entry.name : `${entry.name} — ${entry.source}`;
-    b.addEventListener('click', () => { selected = entry.key; confirmDiscard = null; render(); });
+    b.addEventListener('click', () => { selected = entry.key; confirmDiscard = null; keepFocus(render); });
     return b;
   }
 
@@ -216,12 +216,12 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     const btn = el('button', 'equipbtn', !e.held ? 'Not yet found' : isWorn ? (e.slot === 'weapon' ? 'Wielding' : 'Wearing') : 'Equip');
     btn.type = 'button';
     btn.disabled = !e.held || isWorn;
-    btn.addEventListener('click', () => { if (setEquip(profile, hero, ref, e.slot)) { commit(); render(); } });
+    btn.addEventListener('click', () => { if (setEquip(profile, hero, ref, e.slot)) { commit(); keepFocus(render); } });
     btns.appendChild(btn);
     if (isWorn && e.key && e.slot !== 'weapon') {
       const off = el('button', 'equipbtn ghost', 'Take off');
       off.type = 'button';
-      off.addEventListener('click', () => { if (setEquip(profile, hero, null, e.slot)) { commit(); render(); } });
+      off.addEventListener('click', () => { if (setEquip(profile, hero, null, e.slot)) { commit(); keepFocus(render); } });
       btns.appendChild(off);
     }
     if (e.uid) {   // rolled things can be thrown away; two taps, so a slip costs nothing
@@ -247,6 +247,61 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     note.textContent = 'Tap a slot to preview it, then Equip. Duplicate weapons refine by +1 (aura from +5); accessories are rolled on the drop - a main stat by kind and a random secondary - and never merge.';
   }
 
+  // ------------------------------------------------------------------ the pad
+  // Everything in this panel is a button, so the pad drives the browser's own focus and
+  // presses whatever is focused. Moving is geometric rather than by DOM order: the
+  // inventory is a grid, and "down" in a grid means the slot below, not the next sibling.
+  let navLoop = 0;
+  const focusables = () => [...root.querySelectorAll('button:not([disabled])')]
+    .filter((b) => b.offsetParent !== null);
+
+  function moveFocus(dir) {
+    const list = focusables();
+    if (!list.length) return;
+    const cur = document.activeElement;
+    if (!list.includes(cur)) { list[0].focus(); return; }
+    const r = cur.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    let best = null, score = Infinity;
+    for (const b of list) {
+      if (b === cur) continue;
+      const q = b.getBoundingClientRect();
+      const dx = q.left + q.width / 2 - cx, dy = q.top + q.height / 2 - cy;
+      const along = dir === 'left' ? -dx : dir === 'right' ? dx : dir === 'up' ? -dy : dy;
+      if (along <= 2) continue;                       // behind us, or level with us
+      const across = (dir === 'left' || dir === 'right') ? Math.abs(dy) : Math.abs(dx);
+      const s = along + across * 2.5;                 // straight ahead beats far to the side
+      if (s < score) { score = s; best = b; }
+    }
+    if (best) best.focus();
+  }
+
+  function navTick() {
+    navLoop = requestAnimationFrame(navTick);
+    if (root.hidden) return;
+    const nav = input.menuNav();
+    if (nav.up) moveFocus('up');
+    if (nav.down) moveFocus('down');
+    if (nav.left) moveFocus('left');
+    if (nav.right) moveFocus('right');
+    if (nav.confirm) {
+      const cur = document.activeElement;
+      if (focusables().includes(cur)) cur.click(); else focusables()[0]?.focus();
+    }
+    if (nav.back) close();
+  }
+
+  /** render() rebuilds the panel, so the focused element stops existing. Put focus back on
+   *  whatever is now in its place, which keeps a run of presses on the same row. */
+  function keepFocus(fn) {
+    const before = focusables();
+    const at = before.indexOf(document.activeElement);
+    fn();
+    if (at < 0) return;
+    const after = focusables();
+    (after[Math.min(at, after.length - 1)] || after[0])?.focus();
+  }
+
   function open(key, which) {
     if (key) hero = key;
     if (which) tab = which;
@@ -256,10 +311,14 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     render();
     root.hidden = false;
     input.setEnabled(false);
+    // The sim loop is not stepping while this is up, so the pad is read here.
+    if (!navLoop) navLoop = requestAnimationFrame(navTick);
+    focusables()[0]?.focus();
   }
   function close() {
     preview.unmount();
     root.hidden = true;
+    if (navLoop) { cancelAnimationFrame(navLoop); navLoop = 0; }
     input.setEnabled(true);
     onChange?.();
   }

@@ -209,8 +209,48 @@ export function createInput(target = window, opts = {}) {
     padPrev = now;
   }
 
+  // ------------------------------------------------------------------ menus
+  // An overlay turns gameplay input off, which is right - but pollPad() returns early when
+  // it is off, so the pad went completely dead and the Profile panel could not be used with
+  // a controller at all. This reads the pad for a menu instead: edge-triggered directions
+  // with a repeat, confirm and back, no bindings involved, and nothing written into the
+  // sim's held or pressed state.
+  const NAV_DELAY = 380, NAV_REPEAT = 130;
+  const navNextAt = {};
+  let navPrev = {};
+  function menuNav() {
+    const out = { up: false, down: false, left: false, right: false, confirm: false, back: false };
+    const pad = firstPad();
+    if (!pad) { navPrev = {}; return out; }
+    const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+    const btn = (i) => !!pad.buttons[i]?.pressed;
+    const now = {
+      left: ax < -0.45 || btn(14), right: ax > 0.45 || btn(15),
+      up: ay < -0.45 || btn(12), down: ay > 0.45 || btn(13),
+      // A and B in the standard mapping, plus whatever the player bound to confirm.
+      confirm: btn(0) || btn(9) || Object.keys(padMap).some((i) => padMap[i] === 'confirm' && btn(+i)),
+      back: btn(1) || btn(8),
+    };
+    const t = nowMs();
+    for (const k in now) {
+      if (!now[k]) { navNextAt[k] = 0; navPrev[k] = false; continue; }
+      if (!navPrev[k]) {                        // the press itself, always
+        out[k] = true;
+        navNextAt[k] = t + NAV_DELAY;
+      } else if (k !== 'confirm' && k !== 'back' && t >= navNextAt[k]) {
+        // Only the directions repeat. Holding A should press a button once, not forever.
+        out[k] = true;
+        navNextAt[k] = t + NAV_REPEAT;
+      }
+      navPrev[k] = true;
+    }
+    return out;
+  }
+
   return {
     held,
+    /** Pad edges for an overlay, which works while gameplay input is disabled. */
+    menuNav,
     get settings() { return settings; },
     /** Swap in edited bindings. Clears held state so a key released while rebinding cannot stick. */
     setBindings(next) { settings = next; rebuild(); },
