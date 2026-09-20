@@ -8,3 +8,6 @@ assets/blender/**/*_preview.png
 assets/blender/**/*_detail.png
 assets/blender/**/preview*.png
 .playwright-mcp/
+# Deploy targets: the Pi's address and the real hostnames stay out of a public repo.
+deploy/.deployrc
+deploy/.deployrc.local

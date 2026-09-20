@@ -1,0 +1,22 @@
+# Deploy config for ragnarok-n-dungeon. Copy to deploy/.deployrc (gitignored) and fill in.
+# Nothing here belongs in a public repo: the target machine, its LAN address, your hostnames.
+
+PI=user@your-pi                                      # SSH target running k3s
+IMAGE_REPO=ghcr.io/you/ragnarok-n-dungeon           # repo WITHOUT tag - deploy.sh appends :sha-<gitsha>; never pushed, side-loaded
+DEPLOYMENT=ragnarok-n-dungeon                       # same Deployment name in both namespaces
+PLATFORM=linux/arm64
+GIT_BRANCH=main                                     # branch Argo CD tracks
+REMOTE_CTX=/home/user/build/ragnarok-n-dungeon      # build context on the Pi (no ~: it would expand locally)
+
+# Two environments, one image. `deploy.sh` builds into lab; `deploy.sh prod` promotes.
+# The Ingress in each overlay answers to a private .internal name; the Cloudflare tunnel rule
+# for the public hostname points at http://localhost:80 with httpHostHeader set to that name,
+# so the public hostnames never appear in the manifests.
+LAB_NAMESPACE=ragnarok-n-dungeon-lab
+LAB_ARGOCD_APP=ragnarok-n-dungeon-lab
+LAB_HOST=ragnarok-lab.internal                      # Ingress host (curl -H "Host: ..." on the LAN)
+LAB_PUBLIC=https://lab.example.com
+PROD_NAMESPACE=ragnarok-n-dungeon
+PROD_ARGOCD_APP=ragnarok-n-dungeon
+PROD_HOST=ragnarok.internal
+PROD_PUBLIC=https://game.example.com

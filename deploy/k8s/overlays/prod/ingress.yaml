@@ -14,6 +14,15 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
+    - host: ragnarok.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ragnarok-n-dungeon
+                port: { name: http }
     - host: ragnarok-n-dungeon.192-168-0-125.nip.io
       http:
         paths:

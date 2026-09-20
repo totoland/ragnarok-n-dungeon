@@ -9,14 +9,17 @@
 # imagePullPolicy: IfNotPresent.
 #
 # Two environments, one image:
-#   ./deploy/deploy.sh          build → lab   (ragnarok-lab.totoland.cloud)
+#   ./deploy/deploy.sh          build → lab
 #   ./deploy/deploy.sh prod     promote the tag lab is running to prod - no rebuild, the
 #                               image is already in containerd, so prod gets the exact bytes
 #                               that were tested on lab. TAG=sha-... promotes a specific one.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
-# shellcheck source=.deployrc
+# Hosts, the Pi's address and the public URLs live in .deployrc, which is NOT tracked: this
+# repo is public and its infrastructure is not. Copy .deployrc.example and fill it in.
+[ -f "$SCRIPT_DIR/.deployrc" ] || { echo "✗ deploy/.deployrc missing - copy deploy/.deployrc.example and fill in your hosts"; exit 1; }
+# shellcheck source=.deployrc.example
 source "$SCRIPT_DIR/.deployrc"
 [ -f "$SCRIPT_DIR/.deployrc.local" ] && source "$SCRIPT_DIR/.deployrc.local"
 

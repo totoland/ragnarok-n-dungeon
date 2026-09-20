@@ -1,5 +1,5 @@
-# Production: ragnarok.totoland.cloud. Nothing lands here by a build - deploy.sh prod
-# promotes the tag already proven on lab, so prod and lab run byte-identical images.
+# Production. Nothing lands here by a build - `deploy.sh prod` promotes the tag already
+# proven on lab, so prod and lab run byte-identical images.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 

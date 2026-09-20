@@ -306,10 +306,13 @@ with `node tools/playtest.mjs --dungeon morroc`; the pass/fail gate stays on Pro
 ### Lab and production
 
 Two environments, one image. `./deploy/deploy.sh` (no argument) builds on the Pi, side-loads
-the image, pins the tag in `deploy/k8s/overlays/lab` and syncs the **lab** app —
-https://ragnarok-lab.totoland.cloud (LAN: `ragnarok-lab.192-168-0-125.nip.io`, one replica).
+the image, pins the tag in `deploy/k8s/overlays/lab` and syncs the **lab** app (one replica).
 `./deploy/deploy.sh prod` promotes the tag lab is running to `overlays/prod` and syncs the
-**production** app — https://ragnarok.totoland.cloud (two replicas, zero-downtime roll). No
+**production** app (two replicas, zero-downtime roll). Where those are — the Pi's address,
+the public hostnames — is `deploy/.deployrc`, which is not tracked; `deploy/.deployrc.example`
+is the template. The Ingresses answer to private `.internal` names and the Cloudflare tunnel
+maps the public hostnames onto them, so no host or address of the real deployment is in this
+repository. No
 rebuild on promotion: prod gets the exact bytes that were tested on lab, and the promotion
 commit (`promote: sha-… → prod`) is the audit trail; a rollback is reverting it. `TAG=sha-…
 ./deploy/deploy.sh prod` promotes a specific image. `deploy/k8s/base` holds the Deployment

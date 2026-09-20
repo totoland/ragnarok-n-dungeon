@@ -1,5 +1,6 @@
-# Lab: ragnarok-lab.totoland.cloud. Every `deploy.sh` (no argument) builds and lands here
-# first; one replica is plenty for a test bed and a broken build never touches prod.
+# Lab. Every `deploy.sh` (no argument) builds and lands here first; one replica is plenty
+# for a test bed and a broken build never touches prod. Hosts are private names the tunnel
+# maps public hostnames onto (see deploy/.deployrc.example).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
