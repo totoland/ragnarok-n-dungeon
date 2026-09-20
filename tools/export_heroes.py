@@ -53,6 +53,8 @@ def _has(name, *keys):
 def classify_knight(group, name, cx):
     if group.startswith("Sword"):
         return "weapon"
+    if group.startswith("Katana"):       # add_katana.py; a sibling of the sword on the same grip
+        return "weapon_katana"
     if group.startswith("Hair"):
         return "head"
     if name.startswith(("Face", "Ear")):
@@ -112,8 +114,10 @@ MODELS = {
         "height": 1.9,                      # game units, feet at 0
         "model_height": 3.75,               # Blender units, top of hair
         "classify": classify_knight,
+        # weapon_* nodes are alternative weapons on the sword's grip: same parent, same pivot.
+        # The game shows the one the hero wields and hides the rest (render/heroes.js).
         "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
-                   "cape": "torso", "weapon": "armL", "legL": "root", "legR": "root"},
+                   "cape": "torso", "weapon": "armL", "weapon_katana": "armL", "legL": "root", "legR": "root"},
         "pivot": {
             "root": (0, 0, 0),
             "torso": (0, 0, 1.68),
@@ -124,7 +128,7 @@ MODELS = {
             # translated with the hand. A stale pivot here swings the sword about the wrong
             # point, which only shows up mid-attack.
             "cape": (0, 0.168, 2.70),
-            "weapon": (-0.80, -0.408, 2.00),
+            "weapon": (-0.80, -0.408, 2.00), "weapon_katana": (-0.80, -0.408, 2.00),
             "legL": (-0.22, 0, 1.62), "legR": (0.24, 0, 1.62),
         },
     },

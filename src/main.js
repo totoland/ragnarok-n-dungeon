@@ -11,7 +11,7 @@ import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
 import { createScene, buildRoom, disposeRoom, updateScene } from './render/scene.js';
-import { loadHeroAssets, createHeroView } from './render/heroes.js';
+import { loadHeroAssets, createHeroView, showWeapon } from './render/heroes.js';
 import { createMonsterViews, loadMonsterAssets } from './render/monsters.js';
 import { createFx } from './render/fx.js';
 import { createHud } from './render/hud.js';
@@ -60,6 +60,7 @@ let profile = loadProfile();
 let selectedHero = profile.last.hero;
 let selectedTown = profile.last.town;
 let progress = null;   // what recordRun() said about the run that just ended
+let preview = null;    // the title's plinths (built once the assets are in)
 // A New Game+ tier picked below the hero's own on a town card, keyed hero:town; unset
 // means the hero's clear count, which is the default and the ceiling.
 const tierPick = new Map();
@@ -98,6 +99,7 @@ function refreshTitle() {
     b.querySelector('.lv').textContent = h.level > 1 || h.xp > 0 ? `Lv ${h.level}${pts ? ` · ${pts} pt${pts === 1 ? '' : 's'}` : ''}` : '';
   }
   const me = heroOf(profile, selectedHero), myPts = skillPointsLeft(profile, selectedHero);
+  if (preview) for (const [key, s] of Object.entries(preview.stands)) showWeapon(s.model, heroOf(profile, key).gear?.id ?? null);
   const cbtn = document.getElementById('title-character');
   cbtn.textContent = `${HEROES_NAME[selectedHero]} · Lv ${me.level} · ${itemName(me.gear)}${myPts ? ` · ${myPts} point${myPts === 1 ? '' : 's'} to spend` : ''}`;
   cbtn.classList.toggle('attention', myPts > 0);
@@ -171,7 +173,6 @@ markTown();
 markSelected();
 
 // Title screen: both heroes on plinths, turning slowly; the selected one steps forward.
-let preview = null;
 function buildPreview() {
   const g = new THREE.Group();
   const plinthMat = new THREE.MeshStandardMaterial({ color: 0x1a1620, roughness: 0.6, metalness: 0.2 });
@@ -186,6 +187,7 @@ function buildPreview() {
     rim.rotation.x = Math.PI / 2;
     const model = assets[key].clone();
     model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    showWeapon(model, heroOf(profile, key).gear?.id ?? null);   // the plinth shows what is wielded
     stand.add(plinth, rim, model);
     stands[key] = { stand, model, rim };
     g.add(stand);

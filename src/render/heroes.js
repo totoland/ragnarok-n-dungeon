@@ -164,13 +164,37 @@ export async function loadHeroAssets(base = 'assets/heroes/') {
   return { knight: knight.scene, hunter: hunter.scene, meta };
 }
 
+// Alternative weapons the exporter baked next to `weapon` (weapon_katana, ...): same
+// pivot, same parent, shown one at a time by showWeapon(). The pattern is deliberate:
+// GLTFLoader splits a multi-material mesh into primitives it names weapon_1, weapon_2,
+// weapon_katana_1, ... and those are parts of a weapon, not weapons.
+const VARIANT = /^weapon_([a-z][a-zA-Z]*)$/;
+function weaponNodes(root) {
+  const out = { weapon: null, variants: {} };
+  root.traverse((o) => {
+    if (o.name === 'weapon') out.weapon = o;
+    else { const m = VARIANT.exec(o.name); if (m) out.variants[m[1]] = o; }
+  });
+  return out;
+}
+
 function findRig(root) {
   const rig = { root };
   for (const name of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'cape', 'weapon', 'falcon', 'wingL', 'wingR']) {
     const n = root.getObjectByName(name);
     if (n) rig[name] = n;
   }
+  rig.variants = weaponNodes(root).variants;
   return rig;
+}
+
+// Show the wielded weapon and hide the rest. `gearId` is the item id (data/items.js) or
+// null for the hero's own weapon; an item with no baked model falls back to that.
+export function showWeapon(model, gearId) {
+  const { weapon, variants } = weaponNodes(model);
+  const variant = gearId ? variants[gearId] || null : null;
+  if (weapon) weapon.visible = !variant;
+  for (const node of Object.values(variants)) node.visible = node === variant;
 }
 
 // ------------------------------------------------------------------ view
@@ -198,17 +222,20 @@ export function createHeroView(world, heroKey, assets) {
   // own without lighting the gauntlet that shares its material in the export. The model is
   // reused across runs, so a clone already made is kept rather than cloned again.
   const weaponMats = new Set();
-  rig.weapon?.traverse((o) => {
-    if (!o.isMesh) return;
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    const cloned = mats.map((m) => {
-      if (m.userData.weaponClone) return m;
-      const c = m.clone(); c.userData.weaponClone = true; c.userData.emissive = m.userData.emissive ? m.userData.emissive.clone() : null;
-      return c;
+  for (const node of [rig.weapon, ...Object.values(rig.variants)]) {
+    node?.traverse((o) => {
+      if (!o.isMesh) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      const cloned = mats.map((m) => {
+        if (m.userData.weaponClone) return m;
+        const c = m.clone(); c.userData.weaponClone = true; c.userData.emissive = m.userData.emissive ? m.userData.emissive.clone() : null;
+        return c;
+      });
+      o.material = Array.isArray(o.material) ? cloned : cloned[0];
+      for (const m of cloned) { weaponMats.add(m); materials.delete(m); }
     });
-    o.material = Array.isArray(o.material) ? cloned : cloned[0];
-    for (const m of cloned) { weaponMats.add(m); materials.delete(m); }
-  });
+  }
+  let shownGear = undefined;
   if (!model.userData.base) {
     model.userData.base = {};
     for (const k of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'cape', 'weapon', 'root']) if (rig[k]) model.userData.base[k] = rig[k].position.clone();
@@ -286,6 +313,9 @@ export function createHeroView(world, heroKey, assets) {
     }
     blendTo(view.cur, target, rate, dt);
     applyPose(rig, base, def.rest, view.cur, view.yaw);
+    // The wielded weapon rides the sword's grip: same pose every frame, and only it shows.
+    if (shownGear !== (p.gear?.id ?? null)) { shownGear = p.gear?.id ?? null; showWeapon(model, shownGear); }
+    for (const v of Object.values(rig.variants)) { v.rotation.copy(rig.weapon.rotation); v.position.copy(rig.weapon.position); }
 
     // hit flash (red tint) and the classic i-frame blink
     const flashing = p.flash > 0;

@@ -31,3 +31,19 @@ is the pre-pass state.
 Changing depth moves two pivots that `tools/export_heroes.py` hardcodes for the knight,
 `weapon` and `cape`. Both were updated to match; a stale pivot there swings the sword about
 the wrong point and only shows up mid-attack.
+
+## Katana (second weapon)
+
+`add_katana.py` builds a katana on the same grip as the sword - same centre, same upright
+blade axis - as a sibling group `Katana | edit group` under the model root. It runs
+standalone and headless, is idempotent, and saves the file:
+
+    /Applications/Blender.app/Contents/MacOS/Blender -b ro_knight.blend -P add_katana.py
+
+`tools/export_heroes.py` classifies the group into its own limb, `weapon_katana`, parented to
+`armL` on the sword's pivot; the game shows whichever weapon the hero wields and hides the
+other (`showWeapon` in src/render/heroes.js). The blade is a lofted five-point section
+(spine, shinogi, edge) with a sori that bends toward the spine, a brass habaki, a four-lobed
+iron tsuba between two seppa, and a black silk-wrapped tsuka with rayskin diamonds, gold
+menuki, iron fuchi and kashira. New materials are prefixed `Katana |`; steel, gold and
+leather are the sword's own.
