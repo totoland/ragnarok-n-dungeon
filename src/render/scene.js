@@ -126,14 +126,28 @@ function roomTextures(theme, themeKey, index) {
 }
 
 // Draw and upload a room's textures now, so building it later costs geometry alone.
+// Drawing the next room's textures ahead of time is the right idea; doing all three in the
+// frame that decides to is a 48 ms one, which the tablet reported as the only spike left once
+// the shader churn was gone. Queue them and upload one a frame, the way the next room's
+// monsters are already built one a frame, over a walk that lasts seconds.
+let warmQueue = [];
 export function prewarmRoom(world, roomDef, index) {
   const theme = THEMES[roomDef.theme] || THEMES.sewer;
   const { ground, bg, wall } = roomTextures(theme, roomDef.theme, index);
+  warmQueue = [];
   for (const t of [ground, bg, wall]) {
     if (!t) continue;
     t.userData.warm = world.renderer;
-    if (t.image && (t.image.width || t.image.complete)) { try { world.renderer.initTexture(t); } catch { /* not uploadable yet */ } }
+    warmQueue.push(t);
   }
+}
+
+// Upload one queued texture. Returns true while there is more to do.
+export function prewarmTick(world) {
+  const t = warmQueue.shift();
+  if (!t) return false;
+  if (t.image && (t.image.width || t.image.complete)) { try { world.renderer.initTexture(t); } catch { /* not uploadable yet */ } }
+  return warmQueue.length > 0;
 }
 
 export function disposeRoom(world) {

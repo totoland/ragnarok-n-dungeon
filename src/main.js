@@ -10,7 +10,7 @@ import { itemName } from './sim/data/items.js';
 import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
-import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom } from './render/scene.js';
+import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom, prewarmTick } from './render/scene.js';
 import { loadHeroAssets, createHeroView, showWeapon, restPose } from './render/heroes.js';
 import { auraTick, stripAura } from './render/aura.js';
 import { createTelemetry } from './telemetry.js';
@@ -269,6 +269,7 @@ Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   characterUI.setAssets(a);
   warmUp();
   prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0);
+  while (prewarmTick(world));   // the first room is drawn next; spreading it over frames it does not have would only defer the cost into them
   monsters.prebuild(TOWNS[selectedTown].rooms[0], MONSTERS);
   hud.setLoading('Pick a hero, or press Enter for the Knight.');
   for (const b of heroButtons) { b.disabled = false; b.addEventListener('mouseenter', () => { selectedHero = b.dataset.hero; markSelected(); }); }
@@ -381,7 +382,7 @@ function frame(now) {
   // arrive as the first frame of input.
   if (!game || paused) input.snapshot();
 
-  if (!game) { if (preview) updatePreview(dtReal); monsters.tick(); world.renderer.render(world.scene, world.camera); return; }
+  if (!game) { if (preview) updatePreview(dtReal); monsters.tick(); prewarmTick(world); world.renderer.render(world.scene, world.camera); return; }
 
   const frameStart = performance.now();
   for (const k in phase) phase[k] = 0;
@@ -517,7 +518,9 @@ function renderFrame(dt) {
     monsters.prebuild(game.dungeon.rooms[next], MONSTERS);
     mark(`prewarm room ${game.dungeon.rooms[next].name}`);
   }
-  if (game.phase === 'cleared') monsters.tick();   // one queued monster view per frame on the walk out
+  // The walk out is the budget: one monster view and one room texture per frame, not all of
+  // either in the frame that noticed.
+  if (game.phase === 'cleared') { monsters.tick(); prewarmTick(world); }
   for (const ev of game.events) { const f = MARKED[ev.type]; const label = f && f(ev); if (label) mark(label); sfx.handle(ev); }
   phase.pre = performance.now() - preStart;   // room sync, the next room's textures, the event drain
   let t = performance.now();
