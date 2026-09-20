@@ -173,6 +173,10 @@ window.addEventListener('keydown', (e) => {
   if (a === 'left' || a === 'right') { selectedHero = selectedHero === 'knight' ? 'hunter' : 'knight'; markSelected(); }
 });
 input.on('mute', () => { sfx.init(); sfx.toggleMute(); });
+// A controller whose state froze (seen on iPadOS Safari): the hero has already let go of
+// the attack; say why the pad is dead, and that it came back.
+input.on('padStale', () => { if (game && !ended) hud.banner('Controller stalled', 'boss'); });
+input.on('padLive', () => { if (game && !ended) hud.banner('Controller back'); });
 input.on('pause', () => { if (!game || ended || settingsUI.isOpen || characterUI.isOpen) return; paused = !paused; hud.showPause(paused); });
 hud.el.retry.addEventListener('click', () => start());
 hud.el.endContinue.addEventListener('click', () => continueRun());

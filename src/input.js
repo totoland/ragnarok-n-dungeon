@@ -56,7 +56,7 @@ export function createInput(target = window, opts = {}) {
   const trace = [];
   const note = (what) => { trace.push([Math.round(typeof performance !== 'undefined' ? performance.now() : Date.now()), what]); if (trace.length > 80) trace.shift(); };
   let capture = null;               // set while the settings menu is listening for a button
-  const listeners = { confirm: [], mute: [], pause: [] };
+  const listeners = { confirm: [], mute: [], pause: [], padStale: [], padLive: [] };
 
   function rebuild() {
     keyMap = lookup(settings.keys);
@@ -176,9 +176,9 @@ export function createInput(target = window, opts = {}) {
     // Liveness: the clock moves on every change; a pad claiming a button while its clock
     // stands still for too long is frozen, and its buttons are read as up until it moves.
     const t = nowMs();
-    if (pad.timestamp !== padStamp) { padStamp = pad.timestamp; padStampAt = t; if (padStale) { padStale = false; note('pad live again'); } }
+    if (pad.timestamp !== padStamp) { padStamp = pad.timestamp; padStampAt = t; if (padStale) { padStale = false; note('pad live again'); listeners.padLive.forEach((fn) => fn()); } }
     const anyDown = [...pad.buttons].some((b) => b?.pressed);
-    if (!padStale && anyDown && t - padStampAt > padStaleMs) { padStale = true; note(`pad stale ${Math.round(padStaleMs / 1000)}s - released`); }
+    if (!padStale && anyDown && t - padStampAt > padStaleMs) { padStale = true; note(`pad stale ${Math.round(padStaleMs / 1000)}s - released`); listeners.padStale.forEach((fn) => fn()); }
     if (padStale) { padPrev = {}; return; }
     const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
     padHeld.left = ax < -0.4 || !!pad.buttons[14]?.pressed;

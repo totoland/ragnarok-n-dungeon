@@ -288,3 +288,30 @@ test("Hunter's Auto Blitz sends the falcon after a share of arrow hits, and the 
   for (let i = 0; i < 4000; i++) { update(g2, hold('attack')); for (const ev of g2.events) if (ev.type === 'autoBlitz') procs2++; g2.events.length = 0; e2.hp = 1e9; e2.x = 4.5; e2.z = 0; e2.vx = 0; e2.dead = false; e2.state = 'chase'; e2.hitstun = 0; e2.launched = false; e2.y = 0; e2.vy = 0; e2.grounded = true; g2.player.x = 1.5; g2.player.z = 0; g2.player.vx = 0; g2.player.facing = 1; }
   assert.equal(procs2, procs, 'deterministic');
 });
+
+test('a skill disarms hold-to-attack; the next press arms it again', () => {
+  const g = createGame({ hero: 'knight', dungeon: quiet, seed: 2 });
+  const p = g.player; p.mp = 999;
+  const e = dummy(g, 3); e.hp = 99999; e.hpMax = 99999;
+  const holdInput = (extra = {}) => ({ held: { attack: true }, pressed: extra });
+  update(g, holdInput({ attack: true }));
+  assert.equal(p.holdAttack, true, 'a press while holding arms it');
+  steps(g, 40, holdInput());
+  assert.equal(p.state, 'attack', 'still swinging on the hold');
+  const swingsBefore = g.stats.hits;
+  update(g, holdInput({ skill1: true }));
+  let guard = 0;
+  while (p.attack !== 'quicken' && guard++ < 30) { update(g, holdInput()); e.x = 3; }
+  assert.equal(p.attack, 'quicken', 'the skill went out');
+  assert.equal(p.holdAttack, false, 'the skill disarmed the hold, though the button is still down');
+  steps(g, 120, holdInput());
+  e.x = 3;
+  assert.equal(p.state, 'idle', 'no more swings while the button stays down');
+  assert.equal(g.stats.hits, swingsBefore, 'and nothing landed since');
+  update(g, holdInput({ attack: true }));
+  assert.equal(p.holdAttack, true, 'a fresh press arms it again');
+  steps(g, 30, holdInput());
+  assert.equal(p.state, 'attack');
+  update(g, { held: {}, pressed: {} });
+  assert.equal(p.holdAttack, false, 'letting go disarms');
+});

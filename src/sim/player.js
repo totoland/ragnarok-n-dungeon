@@ -21,7 +21,7 @@ export function createPlayer(heroKey, mods, level = 1, skills = {}) {
     hurtbox: null,
     state: 'idle', stateT: 0,
     attack: null, attackT: 0, hitLog: [], spawned: [],
-    cooldowns: {}, dashCd: 0, buf: {}, holdAttack: false,
+    cooldowns: {}, dashCd: 0, buf: {}, holdAttack: false, holdArmed: false,
     hitstun: 0, iframes: 0, flash: 0, launched: false,
     moving: false,
     // Timed modifiers keyed by id, and the values folded from them every tick. Anything that
@@ -91,6 +91,7 @@ export function startAttack(g, p, id) {
   p.spawned = atk.spawns ? atk.spawns.map(() => false) : [];
   p.mp -= cost(p, atk);
   if (atk.cd) p.cooldowns[id] = atk.cd;
+  if (p.def.skills.includes(id)) { p.holdArmed = false; p.holdAttack = false; }
   if (atk.buff) applyBuff(p, atk.buff, atk.buff.dur * skillDur(p, id));
   p.buf.attack = 0;
   for (const k of SKILL_KEYS) p.buf[k] = 0;
@@ -123,7 +124,14 @@ function tickTimers(p, input, dt) {
   // top, at the rate the attack timeline allows. That is what makes attack speed something
   // the player can feel - with press-to-swing the finger is the bottleneck, and a faster
   // attack only closes the chain window sooner. Single presses still work as they always did.
-  p.holdAttack = !!(input.held && input.held.attack);
+  // Hold-to-attack is armed by a press and stays armed while the button is held; casting
+  // a skill disarms it, so a hand that came off the attack button to reach a skill and a
+  // controller whose state froze with "attack" down both stop swinging - the next press
+  // (a real edge) arms it again. Deterministic: it is a function of the input stream.
+  const heldAttack = !!(input.held && input.held.attack);
+  if (pr.attack) p.holdArmed = true;
+  if (!heldAttack) p.holdArmed = false;
+  p.holdAttack = heldAttack && p.holdArmed;
   // A press during an attack is held until that attack's cancel point plus the normal buffer,
   // so mashing early still chains — the belt-scroller feel.
   const untilCancel = p.state === 'attack' ? Math.max(0, p.def.attacks[p.attack].cancelAt - p.attackT) / p.atkSpeed : 0;
