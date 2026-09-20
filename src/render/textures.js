@@ -255,17 +255,17 @@ export function particleSprite() {
 
 // Damage number as a sprite texture. Cached by text+style, bounded.
 const textCache = new Map();
-export function textTexture(text, { color = '#fff', size = 64, stroke = '#000', font = '900' } = {}) {
-  const key = `${text}|${color}|${size}|${stroke}`;
+export function textTexture(text, { color = '#fff', size = 64, stroke = '#000', font = '900', w = 256, h = 128 } = {}) {
+  const key = `${text}|${color}|${size}|${stroke}|${w}x${h}`;
   if (textCache.has(key)) return textCache.get(key);
   const c = document.createElement('canvas');
-  c.width = 256; c.height = 128;
+  c.width = w; c.height = h;
   const ctx = c.getContext('2d');
   ctx.font = `${font} ${size}px "Trebuchet MS", "Segoe UI", system-ui, sans-serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.lineWidth = 8; ctx.strokeStyle = stroke; ctx.lineJoin = 'round';
-  ctx.strokeText(text, 128, 64);
-  ctx.fillStyle = color; ctx.fillText(text, 128, 64);
+  ctx.strokeText(text, w / 2, h / 2);
+  ctx.fillStyle = color; ctx.fillText(text, w / 2, h / 2);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   if (textCache.size > 300) { const first = textCache.keys().next().value; textCache.get(first).dispose(); textCache.delete(first); }

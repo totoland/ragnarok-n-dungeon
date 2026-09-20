@@ -58,20 +58,36 @@ export function createFx(world) {
   }
   function freeNumber(sp) {
     scene.remove(sp);
-    if (numberPool.length < 48) numberPool.push(sp); else sp.material.dispose();
+    if (numberPool.length < 120) numberPool.push(sp); else sp.material.dispose();
   }
+  // Ten glyphs, drawn once, spelled out. Caching whole numbers meant a new canvas for every
+  // damage value the game had not shown before, and damage has hundreds of values - the cache
+  // was climbing towards its three-hundred ceiling on a tablet, every entry a 256x128 image.
+  // Digits do not run out: twenty of these exist, ten plain and ten in the critical's colours,
+  // and after warm-up a number never draws anything again.
+  const GLYPH_W = 80, GLYPH_H = 128;
+  const glyph = (ch, crit) => (crit
+    ? textTexture(ch, { color: '#ff3b2a', size: 96, stroke: '#ffd85a', w: GLYPH_W, h: GLYPH_H })
+    : textTexture(ch, { color: '#ffffff', size: 88, w: GLYPH_W, h: GLYPH_H }));
+
   function number(x, y, z, text, color, big = false, crit = false) {
     // A critical is drawn the way Ragnarok draws one: red digits rimmed in gold, bigger than
     // any other number, punched in at 1.7x and settling as it rises.
-    const tex = crit
-      ? textTexture(text, { color: '#ff3b2a', size: 96, stroke: '#ffd85a' })
-      : textTexture(text, { color, size: big ? 80 : 60 });
-    const sp = takeNumber(tex, crit ? 11 : 10);
-    const w = crit ? 3.2 : big ? 2.4 : 1.6, h = crit ? 1.6 : big ? 1.2 : 0.8;
-    sp.scale.set(w, h, 1);
-    sp.position.set(x + (Math.random() - 0.5) * 0.4, y, z + 0.3);
-    scene.add(sp);
-    numbers.push({ sp, t: 0, vy: crit ? 2.0 : 2.6 + Math.random(), life: crit ? 1.0 : 0.8, w, h, pop: crit ? 0.7 : 0 });
+    const h = crit ? 1.6 : big ? 1.2 : 0.8;
+    const dw = h * (GLYPH_W / GLYPH_H);
+    const kern = 0.78;                       // digits sit closer than their boxes suggest
+    const chars = String(text);
+    const sps = [], offs = [];
+    const order = crit ? 11 : 10;
+    for (let i = 0; i < chars.length; i++) {
+      const sp = takeNumber(glyph(chars[i], crit), order);
+      sp.scale.set(dw, h, 1);
+      sps.push(sp);
+      offs.push((i - (chars.length - 1) / 2) * dw * kern);
+      scene.add(sp);
+    }
+    const bx = x + (Math.random() - 0.5) * 0.4;
+    numbers.push({ sps, offs, x: bx, y, z: z + 0.3, t: 0, vy: crit ? 2.0 : 2.6 + Math.random(), life: crit ? 1.0 : 0.8, dw, h, pop: crit ? 0.7 : 0 });
   }
 
   // ---- transient meshes (slash arcs, rings, shockwaves)
@@ -397,20 +413,26 @@ export function createFx(world) {
     geo.attributes.color.needsUpdate = true;
     geo.attributes.size.needsUpdate = true;
 
-    // numbers
+    // numbers - a row of digit sprites that rise, fade and are put back together
     for (let i = numbers.length - 1; i >= 0; i--) {
       const n = numbers[i];
       n.t += dt;
-      n.sp.position.y += n.vy * dt;
+      n.y += n.vy * dt;
       n.vy -= 5 * dt;
       const k = n.t / n.life;
-      n.sp.material.opacity = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+      const op = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+      let sc = 1;
       if (n.pop) {   // overshoot then settle: 1 + pop at t=0, back to 1 by 0.16s, eased
         const u = Math.min(1, n.t / 0.16), ease = 1 - (1 - u) * (1 - u);
-        const sc = 1 + n.pop * (1 - ease);
-        n.sp.scale.set(n.w * sc, n.h * sc, 1);
+        sc = 1 + n.pop * (1 - ease);
       }
-      if (n.t >= n.life) { freeNumber(n.sp); numbers.splice(i, 1); }
+      for (let j = 0; j < n.sps.length; j++) {
+        const sp = n.sps[j];
+        sp.position.set(n.x + n.offs[j] * sc, n.y, n.z);
+        sp.material.opacity = op;
+        if (n.pop) sp.scale.set(n.dw * sc, n.h * sc, 1);
+      }
+      if (n.t >= n.life) { for (const sp of n.sps) freeNumber(sp); numbers.splice(i, 1); }
     }
 
     // transients
@@ -469,7 +491,7 @@ export function createFx(world) {
 
   function clear() {
     parts.length = 0;
-    for (const n of numbers) freeNumber(n.sp);
+    for (const n of numbers) for (const sp of n.sps) freeNumber(sp);
     numbers.length = 0;
     for (const t of transients) freeTransient(t);
     transients.length = 0;
@@ -486,6 +508,7 @@ export function createFx(world) {
   // exists, so it only needs the points to have been drawn once.
   function warm() {
     burst(-200, 1, 0, 4, { life: 9 });
+    for (const ch of '0123456789') { glyph(ch, false); glyph(ch, true); }
     number(-200, 1, 0, '99', '#fff', true); number(-200, 1, 0, '99', '#fff', false, true);
     slash(-200, 0, 0, 1); ring(-200, 0, { life: 9 }); beam(-200, 0, { life: 9 });
     let id = -1;
