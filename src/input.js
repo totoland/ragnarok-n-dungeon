@@ -56,7 +56,7 @@ export function createInput(target = window, opts = {}) {
   const trace = [];
   const note = (what) => { trace.push([Math.round(typeof performance !== 'undefined' ? performance.now() : Date.now()), what]); if (trace.length > 80) trace.shift(); };
   let capture = null;               // set while the settings menu is listening for a button
-  const listeners = { confirm: [], mute: [], pause: [], padStale: [], padLive: [] };
+  const listeners = { confirm: [], mute: [], pause: [], padStale: [], padLive: [], enabled: [] };
 
   function rebuild() {
     keyMap = lookup(settings.keys);
@@ -255,7 +255,15 @@ export function createInput(target = window, opts = {}) {
     /** Swap in edited bindings. Clears held state so a key released while rebinding cannot stick. */
     setBindings(next) { settings = next; rebuild(); },
     /** Gameplay input off while a menu owns the keyboard; capture still works. */
-    setEnabled(on) { enabled = on; if (!on) { for (const k in held) held[k] = false; pressed = {}; } },
+    setEnabled(on) {
+      if (on === enabled) return;
+      enabled = on;
+      if (!on) { for (const k in held) held[k] = false; pressed = {}; }
+      // The on-screen controls belong to the game, not to a menu sitting over it, and they
+      // are the last thing in the DOM so they cover every overlay. Anyone drawing them
+      // listens here rather than being told separately by each panel.
+      listeners.enabled.forEach((fn) => fn(on));
+    },
     get enabled() { return enabled; },
     /** Resolve the next key or pad button to `fn`, for the rebind UI. Returns a canceller. */
     captureNext(fn) { capture = fn; return () => { if (capture === fn) capture = null; }; },
@@ -318,8 +326,13 @@ export function attachTouch(input, opts = {}) {
     : false);
   const wanted = () => (cfg.mode === 'on' ? true : cfg.mode === 'off' ? false : coarse());
 
+  // An overlay owns the screen: gameplay input goes off, and so do the controls that feed
+  // it. Left up they swallow every tap meant for the panel - the stick zone alone is 46 %
+  // of the width and 78 % of the height, and the Profile panel sits right under it.
+  let suspended = false;
+
   function layout() {
-    const on = wanted();
+    const on = wanted() && !suspended;
     touch.hidden = !on;
     const body = root.body || (typeof document !== 'undefined' ? document.body : null);
     body?.classList.toggle('touch', on);
@@ -474,6 +487,8 @@ export function attachTouch(input, opts = {}) {
     win.addEventListener('orientationchange', () => { onResize(); setTimeout(onResize, 250); });
   }
   layout();
+
+  input.on('enabled', (on) => { suspended = !on; release(); layout(); });
 
   return {
     get active() { return wanted(); },
