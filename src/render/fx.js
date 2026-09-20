@@ -438,5 +438,16 @@ export function createFx(world) {
     rain.length = 0;
   }
 
-  return { update, clear, burst, number };
+  // Shader warm-up: one of every visual the run can spawn, off-screen, into the same
+  // containers clear() empties. burst() writes into the one particle cloud that already
+  // exists, so it only needs the points to have been drawn once.
+  function warm() {
+    burst(-200, 1, 0, 4, { life: 9 });
+    number(-200, 1, 0, '99', '#fff', true); number(-200, 1, 0, '99', '#fff', false, true);
+    slash(-200, 0, 0, 1); ring(-200, 0, { life: 9 }); beam(-200, 0, { life: 9 });
+    let id = -1;
+    for (const kind of ['arrow', 'hellOrb', 'sandBall', 'rock']) { const m = makeArrow(kind); m.position.set(-200, 1, 0); scene.add(m); projectiles.set(id--, m); }
+    for (const kind of ['hp', 'mp']) { const m = makePotion(kind); m.position.set(-200, 0, 0); scene.add(m); pickups.set(id--, m); }
+  }
+  return { update, clear, burst, number, warm };
 }

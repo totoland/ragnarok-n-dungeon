@@ -678,6 +678,13 @@ export function createMonsterViews(world) {
   }
 
   return {
+    // Shader warm-up: one of every monster, far off-screen, so the renderer can compile
+    // their programs at load instead of on the frame the first one walks in. Returns the
+    // teardown; call it after renderer.compile().
+    warm() {
+      const built = Object.keys(BUILDERS).map((type) => { const b = BUILDERS[type](); b.root.position.set(-200, 0, 0); world.scene.add(b.root); return b.root; });
+      return () => { for (const r of built) { world.scene.remove(r); r.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); } };
+    },
     update(game, dt) {
       const seen = new Set();
       for (const e of game.enemies) {

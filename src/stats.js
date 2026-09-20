@@ -27,6 +27,7 @@ function init() {
   document.body.append(box, btn);
 
   const frames = [];
+  const spikes = [];   // the last long frames, with what the game was doing
   let last = performance.now(), worst = 0, report = '';
 
   const pct = (arr, p) => arr.length ? arr[Math.min(arr.length - 1, Math.floor(arr.length * p))] : 0;
@@ -38,7 +39,16 @@ function init() {
     const dt = now - last;
     last = now;
     // Ignore the first frame after a tab switch, which is arbitrarily long.
-    if (dt < 500) { frames.push(dt); worst = Math.max(worst, dt); }
+    if (dt < 500) {
+      frames.push(dt); worst = Math.max(worst, dt);
+      if (dt > 40) {
+        const marks = window.__dro?.world?.marks || [];
+        const near = marks.filter((m) => now - m.at < 400).map((m) => m.label);
+        const g = window.__dro?.game;
+        spikes.push(`${dt.toFixed(0)}ms ${near.length ? '@ ' + near.join(', ') : g ? `in ${g.room?.name} t=${g.t.toFixed(0)}s` : 'on title'}`);
+        if (spikes.length > 5) spikes.shift();
+      }
+    }
     if (frames.length > 240) frames.shift();
     if (frames.length < 10 || frames.length % 15) return;
 
@@ -62,7 +72,8 @@ function init() {
 
     report = [
       `FPS ${(1000 / p50).toFixed(0)}   frame ${p50.toFixed(1)} / ${p95.toFixed(1)} ms (p50/p95)`,
-      `worst ${worst.toFixed(0)} ms since load`,
+      `worst ${worst.toFixed(0)} ms since load${w?.warmMs != null ? ` · warm-up ${w.warmMs} ms` : ''}${w?.longShare != null ? ` · long frames ${w.longShare}%/s` : ''}`,
+      spikes.length ? `spikes ${spikes.join(' | ')}` : 'spikes none',
       i ? `draw ${i.render.calls}  tris ${fmt(i.render.triangles)}  tex ${i.memory.textures}  geo ${i.memory.geometries}` : 'renderer not up yet',
       r ? `dpr ${r.getPixelRatio()} of max ${w.dprMax ?? '?'} (device ${window.devicePixelRatio})  canvas ${r.domElement.width}x${r.domElement.height}` : '',
       w ? `refresh ~${w.refreshHz ?? '?'} Hz  pacing ${w.pacing ?? '-'}  touch ${w.coarse ? 'yes' : 'no'}  shadows ${r?.shadowMap?.type === 1 ? 'PCF' : 'PCFSoft'}` : '',

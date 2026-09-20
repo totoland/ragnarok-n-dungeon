@@ -240,9 +240,26 @@ function disposePreview() {
 
 // The boss is a GLB like the heroes, so it loads on the same gate: the title screen stays
 // on "Loading" until every model the run can need is in memory.
+// Compile every shader the run can need while the title is still up - each monster, each
+// effect, both heroes with a refined blade - so the first boss, the first skill and the
+// first drop do not each cost a 60-100 ms frame on Safari, which compiles lazily and slowly.
+function warmUp() {
+  const t0 = performance.now();
+  const heroes = ['knight', 'hunter'].map((k) => { const m = assets[k].clone(); stripAura(m); m.position.set(-200, 0, 0); world.scene.add(m); auraTick(m, { id: 'katana', plus: 9 }, 0); return m; });
+  const undoMonsters = monsters.warm();
+  fx.warm();
+  try { world.renderer.compile(world.scene, world.camera); } catch (err) { console.warn('warm-up compile failed', err); }
+  world.renderer.render(world.scene, world.camera);   // uploads the textures the compile did not
+  for (const m of heroes) world.scene.remove(m);
+  undoMonsters();
+  fx.clear();
+  world.warmMs = Math.round(performance.now() - t0);
+}
+
 Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   assets = a;
   characterUI.setAssets(a);
+  warmUp();
   hud.setLoading('Pick a hero, or press Enter for the Knight.');
   for (const b of heroButtons) { b.disabled = false; b.addEventListener('mouseenter', () => { selectedHero = b.dataset.hero; markSelected(); }); }
   markTown();
@@ -330,9 +347,13 @@ function syncRoom() {
 // frames run long the resolution comes down a notch at a time (and back up when they are
 // comfortably short), which is what keeps a tablet at its native 2x from stuttering.
 let refreshEma = 1 / 60;    // measured frame interval
-let frameEma = 1 / 60;      // measured frame cost proxy: the interval while playing
 let pendingDt = 0;          // render time carried over skipped frames
 let tuneAt = 0;
+let longFrames = 0, drawnFrames = 0, cleanSeconds = 0;
+// ?dpr=1.5 pins the pixel ratio and turns the auto-tuner off - for measuring, or a player
+// who prefers crisp over smooth.
+const dprPin = Number(new URLSearchParams(location.search).get('dpr'));
+if (dprPin > 0) { world.setDpr(dprPin); world.autoDpr = false; } else world.autoDpr = true;
 function frame(now) {
   requestAnimationFrame(frame);
   const dtReal = Math.min(0.1, (now - last) / 1000);
@@ -369,14 +390,22 @@ function frame(now) {
       world.pacing = hiHz ? (world.coarse ? 'skip-dup' : 'every-frame') : '60hz';
       if (hiHz && world.coarse && steps === 0) { pendingDt += dtReal; return; }
     }
-    // Adaptive resolution, judged every second on the interval between drawn frames.
+    // Adaptive resolution, judged once a second on the share of drawn frames that ran
+    // long. A mean hides a GPU that misses every fifth vsync; a share does not. Down a
+    // notch when more than 8 % of frames overran, up a notch after three clean seconds.
     const drawn = dtReal + pendingDt;
-    frameEma += (drawn - frameEma) * 0.1;
+    drawnFrames++;
+    if (drawn > (1 / 60) * 1.25) longFrames++;
     if (now > tuneAt) {
       tuneAt = now + 1000;
-      const target = 1 / 60;   // drawn frames are meant to land on the sim's 60 Hz either way
-      if (frameEma > target * 1.35 && world.dpr > 0.75) world.setDpr(world.dpr - 0.25);
-      else if (frameEma < target * 1.08 && world.dpr < world.dprMax) world.setDpr(world.dpr + 0.25);
+      const share = drawnFrames ? longFrames / drawnFrames : 0;
+      world.longShare = Math.round(share * 100);
+      if (world.autoDpr && drawnFrames >= 20) {
+        if (share > 0.08) { cleanSeconds = 0; if (world.dpr > 0.75) world.setDpr(world.dpr - 0.25); }
+        else if (share === 0) { if (++cleanSeconds >= 3 && world.dpr < world.dprMax) { world.setDpr(world.dpr + 0.25); cleanSeconds = 0; } }
+        else cleanSeconds = 0;
+      }
+      longFrames = 0; drawnFrames = 0;
     }
   }
 
@@ -387,9 +416,15 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // The visual layer for one frame: drain events into sfx / fx / hud, advance the views.
+// Notable moments, stamped with the clock the stats overlay uses, so a long frame can be
+// blamed on what was happening: a room build, a boss walking in, a first skill.
+const MARKED = { roomEnter: (e) => `room ${e.name}`, wave: (e) => `wave ${e.index + 1}`, bossAdds: () => 'boss adds', levelUp: (e) => `level ${e.level}`, bossDrop: (e) => `drop ${e.item}`, itemDrop: (e) => `drop ${e.item}`, won: () => 'won', gameOver: () => 'game over', attack: (e) => (e.id?.startsWith('slash') || e.id?.startsWith('arrow') ? null : `skill ${e.id}`) };
+world.marks = [];
+function mark(label) { world.marks.push({ at: performance.now(), label }); if (world.marks.length > 12) world.marks.shift(); }
 function renderFrame(dt) {
+  if (game.roomIndex !== roomBuilt) mark(`build room ${game.room.name}`);
   syncRoom();
-  for (const ev of game.events) sfx.handle(ev);
+  for (const ev of game.events) { const f = MARKED[ev.type]; const label = f && f(ev); if (label) mark(label); sfx.handle(ev); }
   fx.update(game, dt);
   heroView.update(game, dt);
   monsters.update(game, dt);
