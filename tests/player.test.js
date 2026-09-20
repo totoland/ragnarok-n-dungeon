@@ -298,12 +298,12 @@ test('a skill disarms hold-to-attack; the next press arms it again', () => {
   assert.equal(p.holdAttack, true, 'a press while holding arms it');
   steps(g, 40, holdInput());
   assert.equal(p.state, 'attack', 'still swinging on the hold');
-  const swingsBefore = g.stats.hits;
   update(g, holdInput({ skill1: true }));
   let guard = 0;
   while (p.attack !== 'quicken' && guard++ < 30) { update(g, holdInput()); e.x = 3; }
   assert.equal(p.attack, 'quicken', 'the skill went out');
   assert.equal(p.holdAttack, false, 'the skill disarmed the hold, though the button is still down');
+  const swingsBefore = g.stats.hits;   // the swing in flight before the cancel may have landed; from here, nothing should
   steps(g, 120, holdInput());
   e.x = 3;
   assert.equal(p.state, 'idle', 'no more swings while the button stays down');

@@ -21,7 +21,7 @@ export function createPlayer(heroKey, mods, level = 1, skills = {}) {
     hurtbox: null,
     state: 'idle', stateT: 0,
     attack: null, attackT: 0, hitLog: [], spawned: [],
-    cooldowns: {}, dashCd: 0, buf: {}, holdAttack: false, holdArmed: false,
+    cooldowns: {}, dashCd: 0, buf: {}, holdAttack: false, holdArmed: false, heldAttackPrev: false,
     hitstun: 0, iframes: 0, flash: 0, launched: false,
     moving: false,
     // Timed modifiers keyed by id, and the values folded from them every tick. Anything that
@@ -129,8 +129,9 @@ function tickTimers(p, input, dt) {
   // controller whose state froze with "attack" down both stop swinging - the next press
   // (a real edge) arms it again. Deterministic: it is a function of the input stream.
   const heldAttack = !!(input.held && input.held.attack);
-  if (pr.attack) p.holdArmed = true;
+  if (pr.attack || (heldAttack && !p.heldAttackPrev)) p.holdArmed = true;   // a press, or the held line rising
   if (!heldAttack) p.holdArmed = false;
+  p.heldAttackPrev = heldAttack;
   p.holdAttack = heldAttack && p.holdArmed;
   // A press during an attack is held until that attack's cancel point plus the normal buffer,
   // so mashing early still chains — the belt-scroller feel.
