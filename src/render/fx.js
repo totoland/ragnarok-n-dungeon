@@ -66,9 +66,12 @@ export function createFx(world) {
   // Digits do not run out: twenty of these exist, ten plain and ten in the critical's colours,
   // and after warm-up a number never draws anything again.
   const GLYPH_W = 80, GLYPH_H = 128;
-  const glyph = (ch, crit) => (crit
+  // The colour belongs to the glyph, not to the sprite: a heal is green, a miss is pale blue,
+  // an item's name is gold. Dropping it on the way through - which the first version of this
+  // did - turns every number in the game white.
+  const glyph = (ch, color, crit) => (crit
     ? textTexture(ch, { color: '#ff3b2a', size: 96, stroke: '#ffd85a', w: GLYPH_W, h: GLYPH_H })
-    : textTexture(ch, { color: '#ffffff', size: 88, w: GLYPH_W, h: GLYPH_H }));
+    : textTexture(ch, { color, size: 88, w: GLYPH_W, h: GLYPH_H }));
 
   function number(x, y, z, text, color, big = false, crit = false) {
     // A critical is drawn the way Ragnarok draws one: red digits rimmed in gold, bigger than
@@ -80,7 +83,7 @@ export function createFx(world) {
     const sps = [], offs = [];
     const order = crit ? 11 : 10;
     for (let i = 0; i < chars.length; i++) {
-      const sp = takeNumber(glyph(chars[i], crit), order);
+      const sp = takeNumber(glyph(chars[i], color, crit), order);
       sp.scale.set(dw, h, 1);
       sps.push(sp);
       offs.push((i - (chars.length - 1) / 2) * dw * kern);
@@ -328,7 +331,7 @@ export function createFx(world) {
         break;
       }
       case 'dodge':
-        number(ev.x, ev.y, ev.z, 'MISS', 0xa0f0ff);
+        number(ev.x, ev.y, ev.z, 'MISS', '#a0f0ff');
         burst(ev.x, ev.y - 0.4, ev.z, 10, { color: 0xa0f0ff, speed: 2.5, up: 1, life: 0.3, size: 0.2, gravity: 0 });
         break;
       case 'land':
@@ -508,7 +511,26 @@ export function createFx(world) {
   // exists, so it only needs the points to have been drawn once.
   function warm() {
     burst(-200, 1, 0, 4, { life: 9 });
-    for (const ch of '0123456789') { glyph(ch, false); glyph(ch, true); }
+    // Every glyph the game can show, in the colour it shows it in - and no others. Warming
+    // each character against every colour instead came to three hundred textures and most of
+    // a second, for combinations nothing ever asks for. Drawing the canvas is only half of
+    // it; initTexture does the upload here, where nothing else is happening, rather than on
+    // the frame a ring lands.
+    const DIGITS = '0123456789';
+    const names = new Set(['Loot']);
+    for (const it of Object.values(ITEMS)) if (it.name) names.add(it.name);
+    const wanted = [
+      [DIGITS, '#ffffff'],            // damage dealt
+      [DIGITS, '#ff5a4a'],            // damage taken
+      ['+' + DIGITS, '#7dff9a'],      // Soul Drain
+      ['+' + DIGITS, '#7dff7d'],      // a health potion
+      ['+' + DIGITS, '#7db8ff'],      // a mana potion
+      ['MISS', '#a0f0ff'],
+      ['LEVEL UP' + DIGITS + [...names].join(''), '#ffe08a'],
+    ];
+    const up = (t) => { try { world.renderer.initTexture(t); } catch { /* not ready yet */ } };
+    for (const [chars, color] of wanted) for (const ch of new Set(chars)) up(glyph(ch, color, false));
+    for (const ch of DIGITS) up(glyph(ch, '#ffffff', true));   // the critical's own red and gold
     number(-200, 1, 0, '99', '#fff', true); number(-200, 1, 0, '99', '#fff', false, true);
     slash(-200, 0, 0, 1); ring(-200, 0, { life: 9 }); beam(-200, 0, { life: 9 });
     let id = -1;
