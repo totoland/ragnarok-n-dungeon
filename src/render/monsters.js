@@ -581,7 +581,24 @@ export function createMonsterViews(world) {
   // the next room will spawn and tick() builds one per frame while the player walks out.
   const pool = {};
   let queue = [];
-  const take = (type) => { const list = pool[type]; return list && list.length ? list.pop() : BUILDERS[type](); };
+
+  // Frame-spike attribution. The stutter to explain is "several monsters at once", and the
+  // two candidates look identical from the outside: a view built on the frame it is needed
+  // because the pool ran dry, or a batch of them freed at once when a wave dies. Stamp both
+  // with what they cost, so a report from a tablet says which it was instead of suggesting
+  // both. world.marks is read by src/telemetry.js and by the stats overlay.
+  const note = (label) => { if (world.marks) { world.marks.push({ at: performance.now(), label }); if (world.marks.length > 12) world.marks.shift(); } };
+
+  const take = (type) => {
+    const list = pool[type];
+    if (list && list.length) return list.pop();
+    // The expensive path: a few dozen primitives, 40-75 ms on a tablet, on the frame a
+    // monster is already meant to be on screen.
+    const t0 = performance.now();
+    const built = BUILDERS[type]();
+    note(`monster ${type} built cold ${Math.round(performance.now() - t0)}ms (queue ${queue.length})`);
+    return built;
+  };
 
   function create(e) {
     const built = take(e.type);
@@ -738,7 +755,12 @@ export function createMonsterViews(world) {
           if (fade < 1) { m.transparent = true; m.opacity = m.userData.opacity * fade; }
         }
       }
-      for (const v of [...views.values()]) if (!seen.has(v.id)) dispose(v);
+      // Freeing is not free: every primitive's geometry and material goes back to the driver,
+      // and a wave that dies together frees them together.
+      let freed = 0;
+      const t0 = performance.now();
+      for (const v of [...views.values()]) if (!seen.has(v.id)) { dispose(v); freed++; }
+      if (freed > 1) note(`${freed} monsters freed ${Math.round(performance.now() - t0)}ms (${views.size} left)`);
     },
     clear() { for (const v of [...views.values()]) dispose(v); },
   };

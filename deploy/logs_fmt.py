@@ -23,7 +23,8 @@ for line in sys.stdin:
         print('   spikes: ' + ' | '.join(r['spikes']))
     if g:
         print(f"   game: {g.get('hero')} {g.get('town')}/{g.get('room')} t={g.get('t')} {g.get('phase')} lv{g.get('level')} "
-              f"hp{g.get('hp')} state={g.get('state')}/{g.get('attack')} hold={g.get('hold')}")
+              f"hp{g.get('hp')} state={g.get('state')}/{g.get('attack')} hold={g.get('hold')} "
+              f"enemies={g.get('alive')}/{g.get('enemies')}")
     raw = i.get('raw') or {}
     if raw:
         print(f"   input: held {raw.get('held')} pad {raw.get('pad')} padHeld {raw.get('padHeld')}")

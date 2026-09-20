@@ -64,7 +64,7 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
       perf: { fps: s.length ? Math.round(1000 / pct(0.5)) : 0, p50: +pct(0.5).toFixed(1), p95: +pct(0.95).toFixed(1), worst: Math.round(worst), frames: s.length, dpr: world.dpr, dprMax: world.dprMax, refreshHz: world.refreshHz, pacing: world.pacing, longShare: world.longShare, warmMs: world.warmMs, canvas: r ? `${r.domElement.width}x${r.domElement.height}` : '' },
       spikes: spikes.slice(),
       marks: (world.marks || []).slice(-8).map((m) => m.label),
-      game: g ? { hero: g.player.hero, town: g.dungeon.town, room: g.room?.name, t: +g.t.toFixed(1), phase: g.phase, level: g.player.level, hp: Math.round(g.player.hp), state: g.player.state, attack: g.player.attack, hold: g.player.holdAttack } : null,
+      game: g ? { hero: g.player.hero, town: g.dungeon.town, room: g.room?.name, t: +g.t.toFixed(1), phase: g.phase, level: g.player.level, hp: Math.round(g.player.hp), state: g.player.state, attack: g.player.attack, hold: g.player.holdAttack, enemies: g.enemies.length, alive: g.enemies.filter((e) => !e.dead).length } : null,
       input: { raw: input.raw(), trace: input.trace().slice(-40) },
       errors: errors.slice(),
       ...(extra ? extra() : {}),
