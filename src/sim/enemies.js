@@ -115,7 +115,13 @@ function stepAttack(g, e, dt) {
     return;
   }
   if (e.state === 'recover') {
-    if (e.stateT >= 0.45) { e.state = 'chase'; e.stateT = 0; e.cd = pat.cd; }
+    // e.cd gates the basic attack and nothing else - every special move counts its own
+    // (chargeCd, slamCd, castCd). Setting it from the move that just ended meant a boss who
+    // charged could not swing for ten seconds afterwards, and one who slammed for eight and
+    // a half: he stood there with every special still cooling and his basic locked behind a
+    // cooldown that was never his. For an ordinary monster this is the same number it always
+    // was, because its only pattern is the basic.
+    if (e.stateT >= 0.45) { e.state = 'chase'; e.stateT = 0; e.cd = e.def.attack.cd; }
   }
 }
 
