@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CAMERA, FLOOR } from '../config.js';
-import { stoneFloor, brickWall, grassFloor, sandFloor, duneSky } from './textures.js';
+import { stoneFloor, brickWall, grassFloor, sandFloor, duneSky, pineSky } from './textures.js';
 
 const THEMES = {
   // Outdoor map. `bg` swaps the tiling brick wall for a painted backdrop plane, and
@@ -27,6 +27,28 @@ const THEMES = {
     fog: 0xd9c39a, hemi: [0xf6e6c4, 0x8f6f45], torch: 0xffd9a0, props: 'quarry',
     bgMake: (i) => duneSky(i + 11, { rocky: true }), bgH: 12, ground: 'sand', outdoor: true,
     sideWall: 0x8f7046, ledge: 0x7d5f37, arch: 0xb59565,
+  },
+  // Phaelan: jade and timber through the woods, amber lantern light, and silver once the
+  // trees give out. The forest and the courtyard are open sky; the shrine and the graveyard
+  // under the roots are not.
+  forest: {
+    floor: '#4e6b3f', grout: '#2c3d24', wall: '#5a6b4a', mortar: '#2f3a28',
+    fog: 0xbcd0bd, hemi: [0xd8ecdf, 0x5c7046], torch: 0xffc98a, props: 'grove',
+    bgMake: (i) => pineSky(i + 3), bgH: 12, ground: 'grass', outdoor: true,
+  },
+  shrine: {
+    floor: '#6a5540', grout: '#3a2c20', wall: '#7a5f42', mortar: '#3e2e1e',
+    fog: 0x1a140e, hemi: [0xd8b98a, 0x3a2c1c], torch: 0xffb15a, props: 'barrels',
+  },
+  graveyard: {
+    floor: '#464a3c', grout: '#1e2118', wall: '#3e4436', mortar: '#1a1e16',
+    fog: 0x0c110b, hemi: [0x8fa88a, 0x1e2a1c], torch: 0x9fe0b0, props: 'bones',
+  },
+  moonlit: {
+    floor: '#5a6274', grout: '#2a3040', wall: '#4e5668', mortar: '#252b38',
+    fog: 0x18203a, hemi: [0xc6d8ff, 0x2a3450], torch: 0xbcd8ff, props: 'grove',
+    bgMake: (i) => pineSky(i + 9, { moon: true }), bgH: 12, ground: 'grass', outdoor: true,
+    sideWall: 0x4a5268, ledge: 0x3e4658, arch: 0x6a7288,
   },
   sewer: { floor: '#4f5a55', grout: '#1f2622', wall: '#3f4a48', mortar: '#1b211f', fog: 0x0a1210, hemi: [0x7d9a93, 0x1c2a24], torch: 0xffa040, props: 'barrels' },
   crypt: { floor: '#5a5560', grout: '#221f28', wall: '#4a4452', mortar: '#1e1a24', fog: 0x0d0a12, hemi: [0x8a80a8, 0x241c30], torch: 0x9fd0ff, props: 'bones' },

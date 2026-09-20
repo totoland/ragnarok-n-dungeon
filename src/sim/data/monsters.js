@@ -133,6 +133,89 @@ export const MONSTERS = {
   },
   // The boss splits off three of these at half health. Same sculpt at monster scale, so it
   // reads instantly as "his brood" without needing a second model.
+  // ---- Phaelan: a pine forest and the spirit graveyard under its roots. Toto's brief, and
+  // the first names in this game that are his own rather than Ragnarok's standing in - the
+  // rest of the table still has to go through the rename pass before any store build.
+  famiru: {
+    name: 'Famiru', ai: 'hopper',
+    hp: 54, atk: 13, speed: 5.4, mass: 0.45,
+    hurtbox: { r: 0.34, h: 0.62 },
+    // A swarm that takes turns diving: fast, frail, and meant to be swept up in one combo.
+    attack: { range: 1.4, windup: 0.2, dur: 0.22, cd: 0.9, box: { x0: -0.2, x1: 1.4, y0: 0.1, y1: 1.7 }, knock: [3, 1.5] },
+    hop: { period: 0.3, height: 0.7 },
+    drops: [{ item: 'clip', chance: 0.025 }],
+    score: 30,
+  },
+  munari: {
+    name: 'Munari', ai: 'walker',
+    hp: 135, atk: 16, speed: 2.4, mass: 0.9,
+    hurtbox: { r: 0.45, h: 1.6 },
+    attack: { range: 1.5, windup: 0.45, dur: 0.3, cd: 1.8, box: { x0: 0.0, x1: 1.7, y0: -0.2, y1: 2.0 }, knock: [4, 1.5] },
+    drops: [{ item: 'bell', chance: 0.02 }],
+    score: 50,
+  },
+  bonku: {
+    name: 'Bonku', ai: 'hopper',
+    hp: 170, atk: 19, speed: 3.2, mass: 1.3,
+    hurtbox: { r: 0.52, h: 1.7 },
+    // Leaps the gap rather than walking it, so the wind-up is the tell and the landing is
+    // the opening.
+    attack: { range: 1.8, windup: 0.5, dur: 0.3, cd: 2.0, box: { x0: 0.0, x1: 2.0, y0: -0.3, y1: 2.1 }, knock: [6, 2.5] },
+    hop: { period: 0.72, height: 1.1 },
+    drops: [{ item: 'ring', chance: 0.03 }],
+    score: 65,
+  },
+  skelbow: {
+    name: 'Skelbow', ai: 'archer',
+    hp: 115, atk: 15, speed: 1.9, mass: 0.9,
+    hurtbox: { r: 0.5, h: 1.8 },
+    // Keeps its distance and draws with a long tell; weak the moment the gap is closed.
+    attack: { range: 8.0, keep: 5.0, windup: 0.75, dur: 0.3, cd: 2.3, shot: { speed: 12, life: 1.5, y: 1.25 }, knock: [2, 0] },
+    drops: [{ item: 'robinHat', chance: 0.04 }, { item: 'brooch', chance: 0.01 }],
+    score: 55,
+  },
+  wispra: {
+    name: 'Wispra', ai: 'walker',
+    hp: 98, atk: 17, speed: 4.6, mass: 0.5,
+    hurtbox: { r: 0.4, h: 1.5 },
+    // Drifts in and lunges. The fade-and-reappear in the brief needs its own behaviour in
+    // sim/enemies.js; this is the closing half of it, and reads as the same threat.
+    attack: { range: 1.6, windup: 0.3, dur: 0.26, cd: 1.3, box: { x0: -0.1, x1: 1.7, y0: 0.0, y1: 2.0 }, knock: [4, 1] },
+    drops: [{ item: 'brooch', chance: 0.015 }],
+    score: 60,
+  },
+  sorya: {
+    name: 'Sorya', ai: 'walker',
+    hp: 215, atk: 21, speed: 2.2, mass: 1.4,
+    hurtbox: { r: 0.5, h: 1.75 },
+    attack: { range: 1.7, windup: 0.6, dur: 0.34, cd: 2.2, box: { x0: 0.0, x1: 1.9, y0: -0.2, y1: 2.2 }, knock: [5, 2] },
+    drops: [{ item: 'amulet', chance: 0.008 }],
+    score: 85,
+  },
+  foxShade: {
+    name: 'Fox Shade', ai: 'walker',
+    hp: 95, atk: 18, speed: 5.2, mass: 0.6,
+    hurtbox: { r: 0.42, h: 1.2 },
+    // Moonraya's second phase: her own shape, thrown at the player and gone again.
+    attack: { range: 1.5, windup: 0.22, dur: 0.24, cd: 1.1, box: { x0: -0.1, x1: 1.6, y0: -0.2, y1: 1.6 }, knock: [4, 1.5] },
+    score: 45,
+  },
+  moonraya: {
+    name: 'Moonraya', ai: 'boss', boss: true,
+    hp: 1500, atk: 20, speed: 2.4, mass: 5.2,
+    hurtbox: { r: 1.0, h: 2.4 },
+    // Her four moves, in the shapes the boss AI already knows how to pick between.
+    attack: { range: 2.2, windup: 0.5, dur: 0.34, cd: 1.9, box: { x0: 0.0, x1: 2.5, y0: -0.3, y1: 2.6 }, knock: [6, 2] },
+    // Moon Dash: through the player rather than at them.
+    charge: { windup: 0.6, dur: 0.55, speed: 13.5, cd: 9.0, box: { x0: -0.6, x1: 2.1, y0: -0.4, y1: 2.6 }, knock: [9, 3] },
+    // Spirit Bell: a ring, so it answers on both sides at once.
+    slam: { windup: 0.95, dur: 0.45, cd: 8.0, box: { x0: -3.4, x1: 3.4, y0: -0.5, y1: 3.0, both: true }, knock: [5, 7], depth: 1.6 },
+    // Foxfire: three spirit flames down the lanes.
+    cast: { windup: 0.75, dur: 0.5, cd: 6.5, shot: { kind: 'foxfire', count: 3, speed: 7.5, life: 2.4, y: 1.4, lane: 1.5, dmg: 0.9 }, knock: [4, 1] },
+    // Blood moon: at 40 % she stops coming alone.
+    adds: { at: 0.4, type: 'foxShade', count: 2 },
+    score: 1000,
+  },
   baphometling: {
     name: 'Baphometling', ai: 'walker',
     hp: 95, atk: 10, speed: 3.1, mass: 0.85,

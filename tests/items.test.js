@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ITEMS, ITEM_IDS, itemMods, itemName, glowOf, DEFAULT_WEAPON, wearMods, SLOTS, auraOf, AURA_STOPS, ATTRS, ATTR_IDS, rollItem, attrText, isRolled } from '../src/sim/data/items.js';
+import { ITEMS, ITEM_IDS, itemMods, itemName, glowOf, DEFAULT_WEAPON, wearMods, SLOTS, auraOf, AURA_STOPS, ATTRS, ATTR_IDS, rollItem, attrText, isRolled, fits } from '../src/sim/data/items.js';
 import { createRng } from '../src/sim/rng.js';
 import { resolveHero, mergeMods } from '../src/sim/resolve.js';
 import { MONSTERS } from '../src/sim/data/monsters.js';
@@ -21,7 +21,7 @@ test('every item belongs to a real hero and every town boss drops one per hero',
     for (const h of Object.keys(HEROES)) {
       const id = town.loot?.[h];
       assert.ok(id && ITEMS[id], `${key} drops something for the ${h}`);
-      assert.equal(ITEMS[id].hero, h, `${key}'s ${id} is usable by the ${h} it drops for`);
+      assert.ok(fits(id, h), `${key}'s ${id} is usable by the ${h} it drops for`);
     }
   }
 });

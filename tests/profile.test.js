@@ -25,7 +25,8 @@ test('a fresh profile: every hero at level 1, only the first town open, tier 0 e
   assert.equal(isUnlocked(p, TOWN_KEYS[0]), true);
   assert.equal(isUnlocked(p, 'morroc'), false);
   assert.equal(isUnlocked(p, 'nowhere'), false);
-  assert.equal(nextTown('prontera'), 'morroc'); assert.equal(nextTown('morroc'), null);
+  assert.equal(nextTown('prontera'), 'morroc'); assert.equal(nextTown('morroc'), 'phaelan');
+  assert.equal(nextTown(TOWN_KEYS[TOWN_KEYS.length - 1]), null, 'the chain ends somewhere');
   assert.equal(prevTown('prontera'), null); assert.equal(prevTown('morroc'), 'prontera');
 });
 
@@ -79,7 +80,9 @@ test('a won run: xp banked, the town cleared, the next one unlocked once, tier c
   assert.equal(tierFor(p, 'knight', 'prontera'), NGPLUS.maxTier);
   assert.equal(p.heroes.knight.xp, xpAtLevel(4) + 500, 'xp never goes backwards');
 
-  const last = recordRun(p, finished('won', 1), { hero: 'knight', town: 'morroc' });
+  const mid = recordRun(p, finished('won', 1), { hero: 'knight', town: 'morroc' });
+  assert.equal(mid.next, 'phaelan', 'clearing Morroc opens Phaelan');
+  const last = recordRun(p, finished('won', 1), { hero: 'knight', town: TOWN_KEYS[TOWN_KEYS.length - 1] });
   assert.equal(last.next, null, 'nothing after the last town yet');
 });
 

@@ -77,10 +77,10 @@ function humanoid({ scale = 1, hip = 1.0, torsoH = 0.7, shoulderW = 0.28, legW =
   return { root, rig, base, kind: 'humanoid' };
 }
 
-function buildSkeleton({ archer = false } = {}) {
-  const bone = mat(0xd9d1c0, { roughness: 0.7 });
+function buildSkeleton({ archer = false, boneColor = 0xd9d1c0, clothColor = 0x6e4a2c } = {}) {
+  const bone = mat(boneColor, { roughness: 0.7 });
   const dark = mat(0x2a2224, { roughness: 0.9 });
-  const rust = mat(0x6e4a2c, { roughness: 0.6, metalness: 0.5 });
+  const rust = mat(clothColor, { roughness: 0.6, metalness: 0.5 });
   return humanoid({
     skin: bone, joint: dark, hip: 0.95, torsoH: 0.7, shoulderW: 0.27, legW: 0.14,
     buildTorso(t, h) {
@@ -543,10 +543,269 @@ function buildPhreeoni() {
   });
 }
 
+
+// ---------------------------------------------- Phaelan: the forest and what sleeps in it
+
+// Famiru: a bat, and the only thing in the wave that flies. Built as a blob so the hop
+// squash reads as wingbeats, with the wings handed back as `ears` - the blob update already
+// swings those with the arc of the hop, which is exactly what a wing does.
+function buildFamiru() {
+  const root = new THREE.Group();
+  const body = node(0, 0.34, 0, root);
+  const fur = mat(0x4a3550, { roughness: 0.85 });
+  const skin = mat(0x6f4f78, { roughness: 0.9 });
+  const fang = mat(0xf2eadf, { roughness: 0.5 });
+  mesh(new THREE.SphereGeometry(0.17, 12, 10), fur, 0, 0, 0, body).scale.set(1, 1.1, 0.95);
+  mesh(new THREE.SphereGeometry(0.085, 8, 8), skin, 0, -0.04, 0.16, body);                    // snout
+  const wings = [];
+  for (const side of [-1, 1]) {
+    const w = node(side * 0.14, 0.03, 0, body);
+    const web = mesh(new THREE.ConeGeometry(0.2, 0.42, 3), skin, side * 0.2, 0, -0.02, w);
+    web.rotation.z = side * HALF; web.scale.set(1, 1, 0.22);
+    mesh(new THREE.CylinderGeometry(0.014, 0.01, 0.4, 4), fur, side * 0.2, 0.02, 0, w).rotation.z = side * HALF;
+    wings.push(w);
+    const ear = mesh(new THREE.ConeGeometry(0.05, 0.16, 5), fur, side * 0.08, 0.2, 0.01, body);
+    ear.rotation.z = -side * 0.3;
+    mesh(new THREE.SphereGeometry(0.028, 6, 6), mat(0xffc93c, { emissive: 0xffc93c, emissiveIntensity: 0.7 }), side * 0.06, 0.03, 0.14, body);
+    mesh(new THREE.ConeGeometry(0.018, 0.06, 4), fang, side * 0.035, -0.1, 0.15, body).rotation.x = Math.PI;
+  }
+  return { root, body, ears: wings, kind: 'blob' };
+}
+
+// Wispra: a drifting white shade, wide at the shoulders and trailing away to nothing. A blob
+// again, because it has no legs to walk on and the squash reads as a drift.
+function buildWispra() {
+  const root = new THREE.Group();
+  const body = node(0, 0.8, 0, root);
+  const pale = mat(0xe8f0f4, { roughness: 1, emissive: 0x8fb6c8, emissiveIntensity: 0.25, transparent: true, opacity: 0.92 });
+  const veil = mat(0xcfe0e8, { roughness: 1, emissive: 0x7fa8bc, emissiveIntensity: 0.18, transparent: true, opacity: 0.7 });
+  const hood = mesh(new THREE.SphereGeometry(0.3, 14, 12), pale, 0, 0.18, 0, body);
+  hood.scale.set(1, 0.95, 1);
+  const skirt = mesh(new THREE.ConeGeometry(0.34, 0.9, 12, 1, true), veil, 0, -0.34, 0, body);
+  skirt.rotation.x = Math.PI;                       // point down: the hem tapers into the dark
+  for (const side of [-1, 1]) {
+    mesh(new THREE.SphereGeometry(0.045, 8, 8), mat(0x1b2430, { emissive: 0x2d4356, emissiveIntensity: 0.5 }), side * 0.1, 0.2, 0.26, body);
+    const arm = mesh(new THREE.CapsuleGeometry(0.05, 0.3, 4, 8), veil, side * 0.28, 0.02, 0.04, body);
+    arm.rotation.z = side * 0.5;
+  }
+  return { root, body, kind: 'blob' };
+}
+
+// Fox Shade: what Moonraya throws at the player once the moon turns. Her shape, in smoke.
+function buildFoxShade() {
+  const root = new THREE.Group();
+  const body = node(0, 0.5, 0, root);
+  const smoke = mat(0x2a2038, { roughness: 1, emissive: 0x4a2f6a, emissiveIntensity: 0.35, transparent: true, opacity: 0.86 });
+  const glow = mat(0xffd27a, { emissive: 0xffd27a, emissiveIntensity: 0.9 });
+  const torso = mesh(new THREE.CapsuleGeometry(0.18, 0.4, 6, 10), smoke, 0, 0, -0.04, body);
+  torso.rotation.x = HALF;
+  mesh(new THREE.SphereGeometry(0.17, 12, 10), smoke, 0, 0.1, 0.33, body);                     // head
+  mesh(new THREE.ConeGeometry(0.09, 0.22, 6), smoke, 0, 0.03, 0.46, body).rotation.x = HALF;   // muzzle
+  for (const side of [-1, 1]) {
+    const ear = mesh(new THREE.ConeGeometry(0.07, 0.24, 5), smoke, side * 0.11, 0.3, 0.28, body);
+    ear.rotation.z = -side * 0.24;
+    mesh(new THREE.SphereGeometry(0.038, 6, 6), glow, side * 0.08, 0.14, 0.45, body);
+    for (const fz of [0.18, -0.24]) mesh(new THREE.CylinderGeometry(0.045, 0.035, 0.42, 5), smoke, side * 0.12, -0.3, fz, body);
+  }
+  const tail = mesh(new THREE.ConeGeometry(0.13, 0.5, 8), smoke, 0, 0.16, -0.44, body);
+  tail.rotation.x = -1.1;
+  return { root, body, kind: 'blob' };
+}
+
+// Munari: a small shrine ghost in a high-collared dress, the paper seal still on her hat.
+function buildMunari() {
+  const dress = mat(0x2f3f6a, { roughness: 0.85 });
+  const trim = mat(0xe8dcc0, { roughness: 0.8 });
+  const skinM = mat(0xf0e4da, { roughness: 0.9 });
+  const hair = mat(0x1a141c, { roughness: 0.8 });
+  const seal = mat(0xf3e3a8, { roughness: 0.9, emissive: 0xb89a3a, emissiveIntensity: 0.2 });
+  return humanoid({
+    scale: 0.88, hip: 0.82, torsoH: 0.56, shoulderW: 0.2, legW: 0.1,
+    buildTorso(t, h) {
+      const gown = mesh(new THREE.CylinderGeometry(0.16, 0.3, h + 0.5, 10), dress, 0, h / 2 - 0.22, 0, t);
+      gown.castShadow = true;
+      mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.1, 10), trim, 0, h - 0.04, 0, t);          // collar
+      mesh(new THREE.BoxGeometry(0.34, 0.07, 0.24), trim, 0, h - 0.34, 0, t);                  // sash
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.2, 14, 12), skinM, 0, 0.16, 0, hd);
+      mesh(new THREE.SphereGeometry(0.22, 14, 12), hair, 0, 0.18, -0.03, hd).scale.set(1, 0.9, 1);
+      mesh(new THREE.BoxGeometry(0.3, 0.1, 0.3), hair, 0, 0.3, 0, hd);                         // fringe
+      mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.14, 8), dress, 0, 0.42, 0, hd);             // cap
+      mesh(new THREE.BoxGeometry(0.1, 0.26, 0.02), seal, 0, 0.42, 0.22, hd);                   // the seal
+      for (const side of [-1, 1]) mesh(new THREE.SphereGeometry(0.03, 6, 6), mat(0x241a22), side * 0.075, 0.16, 0.18, hd);
+    },
+    buildArm(a, side) {
+      const sleeve = mesh(new THREE.CapsuleGeometry(0.07, 0.3, 4, 8), dress, 0, -0.18, 0, a);
+      sleeve.rotation.z = side * 0.08;
+      mesh(new THREE.SphereGeometry(0.055, 8, 8), skinM, 0, -0.38, 0.02, a);
+    },
+    buildLeg(l) {
+      mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.3, 6), dress, 0, -0.16, 0, l);
+      mesh(new THREE.BoxGeometry(0.12, 0.06, 0.2), trim, 0, -0.33, 0.03, l);
+    },
+  });
+}
+
+// Bonku: stiff-armed, hopping, and always a step behind Munari.
+function buildBonku() {
+  const robe = mat(0x243b33, { roughness: 0.85 });
+  const trim = mat(0xc8b48a, { roughness: 0.8 });
+  const skinB = mat(0xb9c4b0, { roughness: 0.95 });
+  const seal = mat(0xf3e3a8, { roughness: 0.9, emissive: 0xb89a3a, emissiveIntensity: 0.25 });
+  return humanoid({
+    hip: 0.95, torsoH: 0.66, shoulderW: 0.26, legW: 0.13,
+    buildTorso(t, h) {
+      mesh(new THREE.CylinderGeometry(0.22, 0.28, h + 0.3, 10), robe, 0, h / 2 - 0.1, 0, t);
+      mesh(new THREE.BoxGeometry(0.42, 0.08, 0.3), trim, 0, h - 0.3, 0, t);
+      mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.09, 10), trim, 0, h - 0.02, 0, t);
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.22, 14, 12), skinB, 0, 0.18, 0, hd);
+      mesh(new THREE.CylinderGeometry(0.21, 0.23, 0.16, 8), robe, 0, 0.42, 0, hd);             // officer's cap
+      mesh(new THREE.BoxGeometry(0.11, 0.3, 0.02), seal, 0, 0.3, 0.21, hd);                    // the seal over his eyes
+      for (const side of [-1, 1]) mesh(new THREE.SphereGeometry(0.028, 6, 6), mat(0x5a1c22, { emissive: 0x7a2028, emissiveIntensity: 0.5 }), side * 0.08, 0.14, 0.2, hd);
+    },
+    // Both arms locked out in front: the pose is the whole silhouette.
+    buildArm(a, side) {
+      a.rotation.x = -1.35;
+      mesh(new THREE.CapsuleGeometry(0.075, 0.34, 4, 8), robe, 0, -0.2, 0, a);
+      mesh(new THREE.SphereGeometry(0.07, 8, 8), skinB, 0, -0.42, 0, a);
+      mesh(new THREE.BoxGeometry(0.02, 0.02, 0.02), trim, side * 0.02, -0.42, 0, a);
+    },
+    buildLeg(l) {
+      mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.36, 6), robe, 0, -0.19, 0, l);
+      mesh(new THREE.BoxGeometry(0.15, 0.07, 0.24), trim, 0, -0.39, 0.03, l);
+    },
+  });
+}
+
+// Sorya: the one that is still beautiful, which is the point of her.
+function buildSorya() {
+  const robe = mat(0x6d5f84, { roughness: 0.85 });
+  const under = mat(0xd8cfe0, { roughness: 0.9 });
+  const skinS = mat(0xf2e6dd, { roughness: 0.9 });
+  const hair = mat(0x15111a, { roughness: 0.75 });
+  return humanoid({
+    hip: 0.96, torsoH: 0.66, shoulderW: 0.24, legW: 0.11,
+    buildTorso(t, h) {
+      mesh(new THREE.CylinderGeometry(0.19, 0.36, h + 0.62, 12), robe, 0, h / 2 - 0.3, 0, t);
+      mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 10), under, 0, h - 0.03, 0, t);
+      mesh(new THREE.BoxGeometry(0.38, 0.09, 0.28), under, 0, h - 0.28, 0, t);
+      // The hair is the長 part of her, so it hangs off the torso and swings with it.
+      const fall = mesh(new THREE.CapsuleGeometry(0.17, 0.62, 6, 10), hair, 0, h - 0.42, -0.16, t);
+      fall.scale.set(1.1, 1, 0.55);
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.2, 14, 12), skinS, 0, 0.17, 0, hd);
+      mesh(new THREE.SphereGeometry(0.225, 14, 12), hair, 0, 0.2, -0.02, hd).scale.set(1, 0.95, 1);
+      mesh(new THREE.BoxGeometry(0.32, 0.12, 0.26), hair, 0, 0.3, 0.02, hd);
+      for (const side of [-1, 1]) {
+        mesh(new THREE.SphereGeometry(0.028, 6, 6), mat(0x241a22), side * 0.072, 0.17, 0.18, hd);
+        mesh(new THREE.CapsuleGeometry(0.05, 0.3, 4, 6), hair, side * 0.19, 0.02, 0.06, hd);   // side locks
+      }
+    },
+    buildArm(a, side) {
+      const sleeve = mesh(new THREE.ConeGeometry(0.13, 0.42, 8), robe, 0, -0.2, 0, a);
+      sleeve.rotation.x = Math.PI; sleeve.rotation.z = side * 0.06;
+      mesh(new THREE.SphereGeometry(0.055, 8, 8), skinS, 0, -0.44, 0.02, a);
+    },
+    buildLeg(l) {
+      mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.32, 6), under, 0, -0.17, 0, l);
+      mesh(new THREE.BoxGeometry(0.13, 0.06, 0.2), robe, 0, -0.35, 0.03, l);
+    },
+  });
+}
+
+// Moonraya - PLACEHOLDER. Toto is sculpting her, and this stands in so the fight can be
+// played and tuned meanwhile. When the sculpt lands it goes the way Baphomet did: exported
+// limb-segmented by tools/export_heroes.py to assets/monsters/moonraya.glb with an entry in
+// meta.json, loaded in loadMonsterAssets(), and this function replaced by the GLB build.
+function buildMoonraya() {
+  const cloth = mat(0xf2e8cf, { roughness: 0.85 });          // ivory, the body of the robe
+  const red = mat(0xa8202c, { roughness: 0.75 });            // the lining and every cord
+  const obi = mat(0x1a1518, { roughness: 0.8 });             // the wide black sash
+  const furM = mat(0xfaf7fb, { roughness: 0.95 });           // ears and the tail
+  const skinM = mat(0xf7e9df, { roughness: 0.9 });
+  const hair = mat(0xd9d4e0, { roughness: 0.7 });            // silver, past the waist
+  const gold = mat(0xd8a93f, { roughness: 0.3, metalness: 0.8, emissive: 0x5a3c08, emissiveIntensity: 0.3 });
+  return humanoid({
+    scale: 1.35, hip: 1.02, torsoH: 0.74, shoulderW: 0.3, legW: 0.14,
+    buildTorso(t, h) {
+      // The robe falls straight and wide from the sash to the floor, and trails behind.
+      mesh(new THREE.CylinderGeometry(0.24, 0.48, h + 0.78, 12), cloth, 0, h / 2 - 0.38, 0, t);
+      mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.1, 12), red, 0, h - 0.74, 0, t);          // hem line
+      // Collar: the red lining shows as a V at the chest.
+      const vL = mesh(new THREE.BoxGeometry(0.07, 0.42, 0.03), red, -0.09, h - 0.2, 0.19, t); vL.rotation.z = 0.24;
+      const vR = mesh(new THREE.BoxGeometry(0.07, 0.42, 0.03), red, 0.09, h - 0.2, 0.19, t); vR.rotation.z = -0.24;
+      mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.12, 12), cloth, 0, h - 0.02, 0, t);
+      // The black obi, and the red cord tied across it.
+      mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.26, 12), obi, 0, h - 0.36, 0, t);
+      mesh(new THREE.BoxGeometry(0.6, 0.05, 0.36), red, 0, h - 0.3, 0, t);
+      mesh(new THREE.SphereGeometry(0.06, 8, 8), red, 0, h - 0.3, 0.3, t);                    // the knot
+      // The gold crescent medallion on the front panel.
+      const disc = mesh(new THREE.TorusGeometry(0.1, 0.028, 8, 16), gold, 0, h - 0.72, 0.26, t);
+      disc.rotation.x = HALF * 0;
+      // One tail, and it is most of her silhouette from the side.
+      const tail = mesh(new THREE.CapsuleGeometry(0.22, 0.7, 8, 12), furM, 0.06, h - 0.46, -0.44, t);
+      tail.rotation.x = -0.8; tail.rotation.z = 0.25;
+      mesh(new THREE.SphereGeometry(0.2, 10, 8), furM, 0.16, h - 0.1, -0.78, t);              // the curl at the tip
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.22, 14, 12), skinM, 0, 0.18, 0, hd);
+      mesh(new THREE.SphereGeometry(0.245, 14, 12), hair, 0, 0.21, -0.03, hd).scale.set(1, 0.95, 1);
+      mesh(new THREE.BoxGeometry(0.34, 0.12, 0.26), hair, 0, 0.32, 0.04, hd);                 // fringe
+      for (const side of [-1, 1]) {
+        // Tall fox ears, white outside and pink within.
+        const ear = mesh(new THREE.ConeGeometry(0.1, 0.34, 6), furM, side * 0.15, 0.5, -0.02, hd);
+        ear.rotation.z = -side * 0.22;
+        const inner = mesh(new THREE.ConeGeometry(0.055, 0.22, 5), mat(0xe6b9bd, { roughness: 0.95 }), side * 0.15, 0.48, 0.04, hd);
+        inner.rotation.z = -side * 0.22;
+        // Amber eyes.
+        mesh(new THREE.SphereGeometry(0.034, 8, 8), mat(0xe8a72a, { emissive: 0xe8a72a, emissiveIntensity: 0.75 }), side * 0.08, 0.18, 0.2, hd);
+        // The long fall of hair down past the shoulders.
+        const lock = mesh(new THREE.CapsuleGeometry(0.075, 0.6, 5, 8), hair, side * 0.2, -0.16, 0.02, hd);
+        lock.rotation.z = side * 0.06;
+      }
+    },
+    buildArm(a, side) {
+      mesh(new THREE.BoxGeometry(0.13, 0.05, 0.13), red, 0, -0.04, 0, a);                     // the ribbon tie
+      // A wide hanging sleeve: narrow at the shoulder, open at the wrist.
+      const sleeve = mesh(new THREE.CylinderGeometry(0.1, 0.23, 0.5, 10, 1, true), cloth, 0, -0.26, 0, a);
+      sleeve.rotation.z = side * 0.06;
+      mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.06, 10), red, 0, -0.5, 0, a);           // the cuff
+      mesh(new THREE.SphereGeometry(0.055, 8, 8), skinM, 0, -0.56, 0.03, a);
+      if (side < 0) {
+        // Her left hand carries the crescent, the bell inside it, and the tassels.
+        const crescent = mesh(new THREE.TorusGeometry(0.15, 0.035, 8, 18, Math.PI * 1.45), gold, 0, -0.76, 0.03, a);
+        crescent.rotation.y = HALF;
+        mesh(new THREE.SphereGeometry(0.1, 10, 8), gold, 0, -0.78, 0.03, a);
+        for (const t of [-0.06, 0.06]) mesh(new THREE.BoxGeometry(0.025, 0.42, 0.01), red, t, -1.0, 0.03, a);
+      } else {
+        // Her right hand holds a small bell on a cord.
+        mesh(new THREE.BoxGeometry(0.012, 0.22, 0.012), red, 0, -0.68, 0.04, a);
+        mesh(new THREE.SphereGeometry(0.06, 10, 8), gold, 0, -0.82, 0.04, a);
+      }
+    },
+    buildLeg(l) {
+      // Barefoot, under a robe that reaches the floor.
+      mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.34, 6), cloth, 0, -0.18, 0, l);
+      mesh(new THREE.BoxGeometry(0.12, 0.06, 0.2), skinM, 0, -0.37, 0.04, l);
+    },
+  });
+}
+
+
 const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   pecoPeco: buildPecoPeco, ant: buildAnt, babyWolf: buildBabyWolf, sandman: buildSandman, golem: buildGolem, phreeoni: buildPhreeoni, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: () => buildBaphomet(),
   // 1.75 of the boss's 3.0 game units, which is skeleton height.
-  baphometling: () => buildBaphomet(0.58, 0.3) };
+  baphometling: () => buildBaphomet(0.58, 0.3),
+  // Phaelan. Skelbow is the archer skeleton's build in the forest's own colours, so the two
+  // read as cousins rather than as the same monster twice.
+  famiru: buildFamiru, wispra: buildWispra, foxShade: buildFoxShade,
+  munari: buildMunari, bonku: buildBonku, sorya: buildSorya,
+  skelbow: () => buildSkeleton({ archer: true, boneColor: 0xcfd6c4, clothColor: 0x3f5b3a }),
+  moonraya: buildMoonraya };
 
 // ------------------------------------------------------------------ clips
 
@@ -691,6 +950,10 @@ export function createMonsterViews(world) {
   function updateBlob(v, e, dt) {
     const { body } = v.built;
     const def = e.def;
+    // A blob body and a hopping gait used to arrive together, because every blob so far was
+    // a hopper. Phaelan has two that drift instead - a shade and a bat - so the hop is now
+    // optional, and without one they simply glide.
+    const hop = def.hop || { height: 0, period: 1 };
     let sy = 1, sxz = 1, lift = 0, lean = 0;
     if (e.dead) {
       const k = Math.min(1, e.deathT / 0.25);
@@ -706,7 +969,7 @@ export function createMonsterViews(world) {
     } else if (e.moving) {
       const ph = (e.hopT % 1);
       const arc = Math.sin(ph * Math.PI);
-      lift = def.hop.height * arc;
+      lift = hop.height * arc;
       sy = 0.86 + 0.34 * arc; sxz = 1.14 - 0.2 * arc;
       lean = 0.15;
     } else {
@@ -720,7 +983,7 @@ export function createMonsterViews(world) {
     body.scale.set(v.cur.sxz, v.cur.sy, v.cur.sxz);
     body.position.y = def.hurtbox.h * 0.5 * v.cur.sy + v.cur.lift;
     body.rotation.set(v.cur.lean, v.yaw, 0);
-    if (v.built.ears) for (const ear of v.built.ears) ear.rotation.x = -0.3 * (v.cur.lift / Math.max(0.01, def.hop.height)) - 0.1 * Math.sin(v.t * 4);
+    if (v.built.ears) for (const ear of v.built.ears) ear.rotation.x = -0.3 * (v.cur.lift / Math.max(0.01, hop.height)) - 0.1 * Math.sin(v.t * 4);
   }
 
   function dropPool() {

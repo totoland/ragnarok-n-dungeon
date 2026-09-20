@@ -157,6 +157,61 @@ export function sandFloor(base = '#d6b26f', dark = '#a8834a', seed = 17) {
 
 // A desert backdrop drawn rather than painted: sky, a low sun, far mesas and three ranks of
 // dunes, each nearer one lighter and warmer. Not tiled - the room maps it 1:1 like the forest.
+// Phaelan's backdrop, painted the same way the desert's is: on a canvas, per room, so the
+// town ships without an image file. A pine ridge in jade and slate behind a low mist, and
+// with `moon` the sun becomes the moon and the whole palette goes to silver - which is the
+// courtyard at the end, where the brief says the moon is the only light left.
+export function pineSky(seed = 3, { moon = false } = {}) {
+  const w = 1024, h = 440;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  let s = seed;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  // The camera sees the bottom of this plane and little else, the lesson the desert learned.
+  const horizon = h * 0.8;
+  ctx.fillStyle = moon ? '#1d2436' : '#3f5340'; ctx.fillRect(0, 0, w, h);
+  const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+  if (moon) { sky.addColorStop(0, '#0d1424'); sky.addColorStop(0.5, '#1b2740'); sky.addColorStop(1, '#3a4a63'); }
+  else { sky.addColorStop(0, '#7fa8b8'); sky.addColorStop(0.45, '#a8c6b6'); sky.addColorStop(0.82, '#d8d7a8'); sky.addColorStop(1, '#e6d9ab'); }
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, w, horizon + 2);
+  // The light in the sky, low enough to sit in the visible band.
+  const lx = w * (0.58 + rnd() * 0.24), ly = h * (moon ? 0.4 : 0.68);
+  const glow = ctx.createRadialGradient(lx, ly, 6, lx, ly, moon ? 150 : 120);
+  if (moon) { glow.addColorStop(0, 'rgba(226,238,255,0.95)'); glow.addColorStop(0.28, 'rgba(180,206,246,0.4)'); glow.addColorStop(1, 'rgba(150,180,230,0)'); }
+  else { glow.addColorStop(0, 'rgba(255,246,214,0.9)'); glow.addColorStop(0.25, 'rgba(240,226,160,0.4)'); glow.addColorStop(1, 'rgba(220,220,150,0)'); }
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(lx, ly, moon ? 150 : 120, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = moon ? '#eef4ff' : '#fff6d8';
+  ctx.beginPath(); ctx.arc(lx, ly, moon ? 26 : 18, 0, Math.PI * 2); ctx.fill();
+  // Three ranks of pines, palest and furthest first, so the ridge has depth at a glance.
+  const ranks = moon
+    ? [['#243049', 0.79, 46, 46], ['#1a2438', 0.86, 58, 38], ['#111a2a', 0.94, 72, 30]]
+    : [['#5b7a5e', 0.79, 46, 46], ['#3f5f46', 0.86, 58, 38], ['#294432', 0.94, 72, 30]];
+  for (const [col, yk, tall, step] of ranks) {
+    const y0 = h * yk;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(0, h);
+    for (let x = -step; x <= w + step; x += step) {
+      const t = tall * (0.6 + rnd() * 0.7);
+      const half = step * (0.42 + rnd() * 0.2);
+      ctx.lineTo(x - half, y0);
+      ctx.lineTo(x, y0 - t);          // one pine: a spike off the ridge line
+      ctx.lineTo(x + half, y0);
+    }
+    ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
+  }
+  // Mist along the roots, which is what keeps the ranks from reading as one flat cutout.
+  const mist = ctx.createLinearGradient(0, horizon - 40, 0, h);
+  mist.addColorStop(0, moon ? 'rgba(180,200,235,0)' : 'rgba(226,236,214,0)');
+  mist.addColorStop(1, moon ? 'rgba(170,192,230,0.35)' : 'rgba(230,238,216,0.45)');
+  ctx.fillStyle = mist; ctx.fillRect(0, horizon - 40, w, h - horizon + 40);
+  noise(ctx, w, h, 0.05, seed);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
 export function duneSky(seed = 5, { rocky = false } = {}) {
   const w = 1024, h = 440;
   const c = document.createElement('canvas');

@@ -175,6 +175,18 @@ export function createFx(world) {
     return g;
   }
 
+  // Foxfire: the same orb, in the colour it burns in Toto's reference - a cold blue spirit
+  // flame rather than the hell orb's ember.
+  const foxCoreMat = new THREE.MeshBasicMaterial({ color: 0xd8f4ff, toneMapped: false });
+  const foxShellMat = new THREE.MeshBasicMaterial({ color: 0x3fd0ff, transparent: true, opacity: 0.45, toneMapped: false });
+  function makeFoxfire() {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(orbCoreGeo, foxCoreMat));
+    g.add(new THREE.Mesh(orbShellGeo, foxShellMat));
+    g.add(new THREE.PointLight(0x5ac8ff, 6, 4.5, 2));
+    return g;
+  }
+
   // Desert projectiles: a fistful of sand and a thrown rock, neither an arrow.
   const sandMat = new THREE.MeshStandardMaterial({ color: 0xd9b878, roughness: 1 });
   const grainMat = new THREE.MeshStandardMaterial({ color: 0xa8864e, roughness: 1 });
@@ -197,6 +209,7 @@ export function createFx(world) {
 
   function makeArrow(kind) {
     if (kind === 'hellOrb') return makeOrb();
+    if (kind === 'foxfire') return makeFoxfire();
     if (kind === 'sandBall') return makeSandBall();
     if (kind === 'rock') return makeRock();
     const g = new THREE.Group();
@@ -534,7 +547,7 @@ export function createFx(world) {
     number(-200, 1, 0, '99', '#fff', true); number(-200, 1, 0, '99', '#fff', false, true);
     slash(-200, 0, 0, 1); ring(-200, 0, { life: 9 }); beam(-200, 0, { life: 9 });
     let id = -1;
-    for (const kind of ['arrow', 'hellOrb', 'sandBall', 'rock']) { const m = makeArrow(kind); m.position.set(-200, 1, 0); scene.add(m); projectiles.set(id--, m); }
+    for (const kind of ['arrow', 'hellOrb', 'foxfire', 'sandBall', 'rock']) { const m = makeArrow(kind); m.position.set(-200, 1, 0); scene.add(m); projectiles.set(id--, m); }
     for (const kind of ['hp', 'mp']) { const m = makePotion(kind); m.position.set(-200, 0, 0); scene.add(m); pickups.set(id--, m); }
   }
   return { update, clear, burst, number, warm };

@@ -99,6 +99,51 @@ export const MORROC = {
 // Every town the title screen can start, in unlock order: clearing one opens the next (see
 // profile.js). DUNGEON stays the default export shape for the tests and the harness; TOWNS
 // is what the shell and `--dungeon` read.
+// Phaelan: a pine forest and the spirit graveyard under its roots, after Morroc. Toto's
+// brief - an eastern timber village gone quiet, a stream, an abandoned shrine, spirit
+// lanterns, and a moonlit courtyard at the end of it. Jade green and amber through the
+// forest, silver once the moon is the only light left.
+//
+// The cursed lanterns that thin the reinforcements are a room mechanic of its own and are
+// not here yet; the rooms below are the route and the fights.
+export const PHAELAN = {
+  town: 'Phaelan', name: 'Phaelan Woods',
+  loot: { knight: 'moonveil', hunter: 'moonveil' },   // the same cape either way: it is not a weapon
+  rooms: [
+    {
+      name: 'Forest Edge', width: 18, theme: 'forest',
+      waves: [
+        [{ type: 'famiru', count: 4 }],
+        [{ type: 'famiru', count: 5 }, { type: 'munari', count: 1 }],
+      ],
+    },
+    {
+      name: 'Abandoned Shrine', width: 20, theme: 'shrine',
+      waves: [
+        [{ type: 'munari', count: 2 }, { type: 'bonku', count: 1 }],
+        [{ type: 'skelbow', count: 2 }, { type: 'munari', count: 2 }],
+        [{ type: 'bonku', count: 2 }, { type: 'skelbow', count: 2 }, { type: 'famiru', count: 3 }],
+      ],
+    },
+    {
+      name: 'Root Graveyard', width: 20, theme: 'graveyard',
+      waves: [
+        [{ type: 'munari', count: 2 }, { type: 'bonku', count: 2 }],
+        [{ type: 'wispra', count: 3 }, { type: 'skelbow', count: 2 }],
+        [{ type: 'bonku', count: 2 }, { type: 'wispra', count: 2 }, { type: 'munari', count: 2 }, { type: 'skelbow', count: 1 }],
+      ],
+    },
+    {
+      name: 'Moonlit Courtyard', width: 22, theme: 'moonlit',
+      waves: [
+        [{ type: 'sorya', count: 2 }, { type: 'wispra', count: 2 }],
+        [{ type: 'sorya', count: 2 }, { type: 'wispra', count: 3 }, { type: 'skelbow', count: 2 }],
+        [{ type: 'moonraya', count: 1 }],
+      ],
+    },
+  ],
+};
+
 // A room that never ends, for leaving on a tablet while the reports come in. Its waves are
 // the ones the real towns build up to, in a loop that climbs and starts again, so a long
 // session keeps meeting the same heavy moments instead of drifting into an easy one. Not a
@@ -121,4 +166,4 @@ export const SOAK = {
   ],
 };
 
-export const TOWNS = { prontera: DUNGEON, morroc: MORROC };
+export const TOWNS = { prontera: DUNGEON, morroc: MORROC, phaelan: PHAELAN };

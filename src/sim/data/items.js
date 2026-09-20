@@ -45,6 +45,13 @@ export const ITEMS = {
   bell: { name: 'Bell', slot: 'accessory', main: 'aspd', rarity: 'uncommon', tip: 'Main: ASPD' },
   brooch: { name: 'Brooch', slot: 'accessory', main: 'crit', rarity: 'uncommon', tip: 'Main: crit rate' },
   amulet: { name: 'Amulet', slot: 'accessory', main: 'hp', rarity: 'rare', tip: 'Main: HP' },
+  // ---- Phaelan. The first worn items in the game, so the first to need models: a cape node
+  // on the hero rig and a hat node, the same pipeline the katana went through.
+  // Moonstep - an afterimage and a moment of speed on a successful dodge - is the cape's own
+  // behaviour and still has to be written into the sim; the numbers below are what it gives
+  // just by being worn.
+  moonveil: { name: 'Moonveil', slot: 'cape', mods: { speed: 1.06, dodgeAdd: 0.05 }, tip: '+6% move speed, +5% dodge' },
+  robinHat: { name: 'Robin Hood Hat', slot: 'hat', mods: { atkAdd: 10 }, tip: '+10 ATK' },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS);
