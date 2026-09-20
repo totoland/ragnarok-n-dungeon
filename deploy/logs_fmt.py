@@ -19,6 +19,10 @@ for line in sys.stdin:
     print(f"— {at} {r.get('session')}#{r.get('n')} {r.get('reason')} env={r.get('env')} build={build} {r.get('css')}@{r.get('devicePR')}")
     print(f"   fps {p.get('fps')} p50 {p.get('p50')} p95 {p.get('p95')} worst {p.get('worst')} dpr {p.get('dpr')}/{p.get('dprMax')} "
           f"refresh {p.get('refreshHz')} pacing {p.get('pacing')} long {p.get('longShare')}%")
+    gpu = p.get('gpu') or {}
+    if gpu:
+        print(f"   gpu: programs {gpu.get('programs')} geometries {gpu.get('geometries')} "
+              f"textures {gpu.get('textures')} calls {gpu.get('calls')} tris {gpu.get('tris')}")
     if r.get('spikes'):
         print('   spikes: ' + ' | '.join(r['spikes']))
     if g:

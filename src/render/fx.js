@@ -42,17 +42,34 @@ export function createFx(world) {
 
   // ---- damage numbers
   const numbers = [];
+  // A hit lands, a number is born, and 0.8 s later it dies. Doing that with a fresh
+  // SpriteMaterial each time churns shader programs exactly when the screen is busiest,
+  // which is the one moment the frame cannot afford it. The sprites come back here instead
+  // and are handed out again with a different glyph; textTexture already caches the glyph.
+  const numberPool = [];
+  function takeNumber(tex, order) {
+    const sp = numberPool.pop() || new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false }));
+    sp.material.map = tex;
+    sp.material.opacity = 1;
+    sp.material.needsUpdate = true;
+    sp.renderOrder = order;
+    sp.visible = true;
+    return sp;
+  }
+  function freeNumber(sp) {
+    scene.remove(sp);
+    if (numberPool.length < 48) numberPool.push(sp); else sp.material.dispose();
+  }
   function number(x, y, z, text, color, big = false, crit = false) {
     // A critical is drawn the way Ragnarok draws one: red digits rimmed in gold, bigger than
     // any other number, punched in at 1.7x and settling as it rises.
     const tex = crit
       ? textTexture(text, { color: '#ff3b2a', size: 96, stroke: '#ffd85a' })
       : textTexture(text, { color, size: big ? 80 : 60 });
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+    const sp = takeNumber(tex, crit ? 11 : 10);
     const w = crit ? 3.2 : big ? 2.4 : 1.6, h = crit ? 1.6 : big ? 1.2 : 0.8;
     sp.scale.set(w, h, 1);
     sp.position.set(x + (Math.random() - 0.5) * 0.4, y, z + 0.3);
-    sp.renderOrder = crit ? 11 : 10;
     scene.add(sp);
     numbers.push({ sp, t: 0, vy: crit ? 2.0 : 2.6 + Math.random(), life: crit ? 1.0 : 0.8, w, h, pop: crit ? 0.7 : 0 });
   }
@@ -100,6 +117,11 @@ export function createFx(world) {
   const arrowMat = new THREE.MeshStandardMaterial({ color: 0x8a5a2a, roughness: 0.7 });
   const boneArrowMat = new THREE.MeshStandardMaterial({ color: 0x3a3238, roughness: 0.6 });
   const headMat = new THREE.MeshStandardMaterial({ color: 0xc9c9d4, metalness: 0.7, roughness: 0.3 });
+  // Two fletchings exist in the whole game. Building one per arrow meant a material born and
+  // buried on every shot, and a material with no users left is a shader program handed back
+  // to the driver - to be compiled again by the next arrow.
+  const fletchMat = new THREE.MeshStandardMaterial({ color: 0xe9e2c8, roughness: 0.8 });
+  const boneFletchMat = new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.8 });
   // The boss's Hellfire orbs are not arrows: a glowing core with a darker shell, so they
   // stay readable against the bright forest map as well as the dark crypt.
   const orbCoreMat = new THREE.MeshBasicMaterial({ color: 0xffb04a, toneMapped: false });
@@ -146,7 +168,7 @@ export function createFx(world) {
     const head = new THREE.Mesh(headGeo, headMat);
     head.rotation.z = -Math.PI / 2; head.position.x = 0.48;
     g.add(head);
-    const f = new THREE.Mesh(fletchGeo, new THREE.MeshStandardMaterial({ color: kind === 'boneArrow' ? 0x777 : 0xe9e2c8 }));
+    const f = new THREE.Mesh(fletchGeo, kind === 'boneArrow' ? boneFletchMat : fletchMat);
     f.position.x = -0.36;
     g.add(f);
     g.castShadow = true;
@@ -367,7 +389,7 @@ export function createFx(world) {
         const sc = 1 + n.pop * (1 - ease);
         n.sp.scale.set(n.w * sc, n.h * sc, 1);
       }
-      if (n.t >= n.life) { scene.remove(n.sp); n.sp.material.dispose(); numbers.splice(i, 1); }
+      if (n.t >= n.life) { freeNumber(n.sp); numbers.splice(i, 1); }
     }
 
     // transients
@@ -426,7 +448,7 @@ export function createFx(world) {
 
   function clear() {
     parts.length = 0;
-    for (const n of numbers) { scene.remove(n.sp); n.sp.material.dispose(); }
+    for (const n of numbers) freeNumber(n.sp);
     numbers.length = 0;
     for (const t of transients) { scene.remove(t.m); t.m.material.dispose(); }
     transients.length = 0;
