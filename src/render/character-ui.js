@@ -1,13 +1,15 @@
-// The character panel: what the profile knows about a hero, and the two things the player
-// does with it between runs - wield a weapon and spend skill points. Owns no game state: it
-// edits the profile, persists it, and calls back so the title can redraw its labels.
+// The profile panel: two tabs. Skills spends the points a level earns; Equipment is the
+// hero's inventory - a grid of slots drawn from the real models - with a turntable of the
+// hero wielding whatever is selected, and one Equip button. Owns no game state: it edits
+// the profile, persists it, and calls back so the title and a live run pick the change up.
 import { HEROES, SKILL_INFO, PASSIVE_INFO } from '../sim/data/heroes.js';
-import { ITEMS, itemName } from '../sim/data/items.js';
+import { ITEMS, itemName, DEFAULT_WEAPON } from '../sim/data/items.js';
 import { MONSTERS } from '../sim/data/monsters.js';
 import { TOWNS } from '../sim/data/dungeon.js';
 import { xpAtLevel, xpToNext } from '../sim/progress.js';
 import { heroOf, skillPointsLeft, spendSkillPoint, setEquip, saveProfile } from '../profile.js';
 import { SKILL, REFINE } from '../config.js';
+import { createPreview } from './preview.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -16,25 +18,38 @@ const el = (tag, cls, text) => {
   if (text != null) n.textContent = text;
   return n;
 };
+const SLOTS = 12;
 
 export function createCharacterUI({ input, getProfile, onChange }) {
   const root = $('character');
   const body = $('character-body');
   const title = $('character-title');
   const note = $('character-note');
+  const tabs = [...document.querySelectorAll('#character-tabs .tab')];
+  const preview = createPreview();
   let hero = 'knight';
+  let tab = 'skills';
+  let selected;          // item id picked in the inventory; null = the hero's own weapon
 
   const commit = () => { saveProfile(getProfile()); onChange?.(); };
+
+  for (const b of tabs) b.addEventListener('click', () => { tab = b.dataset.tab; render(); });
+
+  function bossOf(town) {
+    const last = town.rooms[town.rooms.length - 1];
+    return MONSTERS[last.waves?.[0]?.[0]?.type]?.name || last.name;
+  }
 
   function render() {
     const profile = getProfile();
     const h = heroOf(profile, hero);
     const def = HEROES[hero];
-    const left = skillPointsLeft(profile, hero);
     title.textContent = `Profile — ${def.name} · Lv ${h.level}`;
+    for (const b of tabs) b.classList.toggle('selected', b.dataset.tab === tab);
     body.innerHTML = '';
+    if (tab !== 'equip') preview.unmount();
 
-    // XP
+    // XP, on both tabs
     const at = xpAtLevel(h.level), need = xpToNext(h.level);
     const xp = el('div', 'cxp');
     const bar = el('div', 'cxpbar'); const fill = el('div', 'fill'); bar.appendChild(fill);
@@ -42,36 +57,13 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     xp.append(bar, el('span', 'cxptext', need ? `${(h.xp - at).toLocaleString()} / ${need.toLocaleString()} XP to level ${h.level + 1}` : 'Max level'));
     body.appendChild(xp);
 
-    // Weapon: every weapon a town drops for this class, held or not, so the player can see
-    // where the next one comes from.
-    body.appendChild(el('div', 'bgroup', 'Weapon'));
-    const chips = el('div', 'chips');
-    const bare = el('button', `chip${h.gear ? '' : ' on'}`);
-    bare.type = 'button';
-    bare.append(el('strong', null, 'Bare hands'), el('em', null, 'No weapon'));
-    bare.addEventListener('click', () => { setEquip(profile, hero, null); commit(); render(); });
-    chips.appendChild(bare);
-    for (const [key, town] of Object.entries(TOWNS)) {
-      const id = town.loot?.[hero];
-      if (!id || !ITEMS[id]) continue;
-      const held = h.items[id];
-      const chip = el('button', `chip${held ? '' : ' locked'}${h.gear?.id === id ? ' on' : ''}`);
-      chip.type = 'button';
-      const last = town.rooms[town.rooms.length - 1];
-      const boss = MONSTERS[last.waves?.[0]?.[0]?.type]?.name || last.name;
-      chip.append(
-        el('strong', null, held ? itemName({ id, plus: held.plus }) : ITEMS[id].name),
-        el('em', null, held ? ITEMS[id].tip : `Drops from ${boss} · ${town.town}`),
-      );
-      if (held && held.plus >= REFINE.glowAt) chip.classList.add('glow');
-      if (held) chip.addEventListener('click', () => { setEquip(profile, hero, id); commit(); render(); });
-      else chip.disabled = true;
-      chips.appendChild(chip);
-    }
-    body.appendChild(chips);
-    body.appendChild(el('p', 'tip', `A duplicate drop refines the weapon you hold by +1 (+${Math.round(REFINE.atk * 100)}% ATK each); from +${REFINE.glowAt} it glows and crits deal ${Math.round(REFINE.critDmg * 100)}% more.`));
+    if (tab === 'equip') renderEquipment(profile, h, def);
+    else renderSkills(profile, h, def);
+  }
 
-    // Skills
+  // ---------------------------------------------------------------- skills
+  function renderSkills(profile, h, def) {
+    const left = skillPointsLeft(profile, hero);
     const head = el('div', 'bgroup', 'Skills');
     head.append(el('span', `pts${left ? ' has' : ''}`, left ? ` · ${left} point${left === 1 ? '' : 's'} to spend` : ' · no points to spend'));
     body.appendChild(head);
@@ -101,16 +93,105 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     body.appendChild(rows);
     const pv = def.passive && PASSIVE_INFO[def.passive.id];
     if (pv) body.appendChild(el('p', 'tip', `Passive: ${pv.name} — ${pv.tip}`));
-    note.textContent = 'Tap a weapon to wield it, + to raise a skill. Both take effect at once, even mid-run. One skill point per level; points stay where you put them.';
+    note.textContent = 'One skill point per level; + raises a skill at once, even mid-run. Points stay where you put them.';
   }
 
-  function open(key) {
+  // ---------------------------------------------------------------- equipment
+  // Every entry the inventory can show: the hero's own weapon, what he holds, and what the
+  // towns still have for him (dimmed, with where it drops).
+  function entries(h) {
+    const list = [{ id: null, name: DEFAULT_WEAPON[hero], held: true, tip: 'Your own weapon. No bonuses, nothing to refine.' }];
+    for (const [key, town] of Object.entries(TOWNS)) {
+      const id = town.loot?.[hero];
+      if (!id || !ITEMS[id]) continue;
+      const held = h.items[id];
+      list.push(held
+        ? { id, name: itemName({ id, plus: held.plus }, hero), held: true, plus: held.plus, tip: ITEMS[id].tip }
+        : { id, name: ITEMS[id].name, held: false, tip: ITEMS[id].tip, source: `Drops from ${bossOf(town)} · ${town.town}`, townKey: key });
+    }
+    return list;
+  }
+
+  function slot(entry, h, { equipped = false } = {}) {
+    const b = el('button', 'slotb');
+    b.type = 'button';
+    if (!entry) { b.classList.add('empty'); b.disabled = true; return b; }
+    const url = preview.icon(hero, entry.id);
+    if (url) { const img = el('img'); img.src = url; img.alt = entry.name; img.draggable = false; b.appendChild(img); }
+    else b.appendChild(el('span', 'noicon', entry.name[0]));
+    if (!entry.held) b.classList.add('unknown');
+    if (entry.plus) b.appendChild(el('span', 'badge', `+${entry.plus}`));
+    if (equipped) b.appendChild(el('span', 'tag', 'E'));
+    b.classList.toggle('selected', entry.id === selected);
+    b.title = entry.held ? entry.name : `${entry.name} — ${entry.source}`;
+    b.addEventListener('click', () => { selected = entry.id; preview.setGear(selected); render(); });
+    return b;
+  }
+
+  function renderEquipment(profile, h, def) {
+    const list = entries(h);
+    if (selected === undefined || !list.some((e) => e.id === selected)) selected = h.gear?.id ?? null;
+    const wrap = el('div', 'equip');
+
+    // Left: the wielded slot, then the grid.
+    const inv = el('div', 'inv');
+    inv.appendChild(el('div', 'bgroup', 'Wielding'));
+    const worn = el('div', 'slots');
+    worn.appendChild(slot(list.find((e) => e.id === (h.gear?.id ?? null)), h, { equipped: true }));
+    const wornName = el('div', 'wornname', itemName(h.gear, hero));
+    const wornRow = el('div', 'wornrow'); wornRow.append(worn, wornName);
+    inv.appendChild(wornRow);
+    const held = list.filter((e) => e.held).length;
+    const head = el('div', 'bgroup', 'Inventory');
+    head.append(el('span', 'pts', ` · ${held} / ${SLOTS}`));
+    inv.appendChild(head);
+    const grid = el('div', 'slots grid');
+    for (const e of list) grid.appendChild(slot(e, h, { equipped: e.id === (h.gear?.id ?? null) }));
+    for (let i = list.length; i < SLOTS; i++) grid.appendChild(slot(null, h));
+    inv.appendChild(grid);
+
+    // Right: the turntable and what is selected.
+    const look = el('div', 'look');
+    const stage = el('div', 'stage');
+    look.appendChild(stage);
+    const e = list.find((x) => x.id === selected) || list[0];
+    const detail = el('div', 'detail');
+    detail.appendChild(el('strong', null, e.name));
+    detail.appendChild(el('div', 'stat', e.tip));
+    if (e.held && e.id) {
+      const plus = e.plus || 0;
+      const bits = [];
+      if (plus) bits.push(`+${Math.round(REFINE.atk * plus * 100)}% ATK from refining`);
+      if (plus >= REFINE.glowAt) bits.push(`glowing, +${Math.round(REFINE.critDmg * 100)}% crit damage`);
+      bits.push(plus >= REFINE.max ? 'fully refined' : `next duplicate → +${plus + 1}`);
+      detail.appendChild(el('div', 'stat', bits.join(' · ')));
+    }
+    if (!e.held) detail.appendChild(el('div', 'src', e.source));
+    const isWorn = e.id === (h.gear?.id ?? null);
+    const btn = el('button', 'equipbtn', !e.held ? 'Not yet found' : isWorn ? 'Wielding' : 'Equip');
+    btn.type = 'button';
+    btn.disabled = !e.held || isWorn;
+    btn.addEventListener('click', () => { if (setEquip(profile, hero, e.id)) { commit(); render(); } });
+    detail.appendChild(btn);
+    look.appendChild(detail);
+
+    wrap.append(inv, look);
+    body.appendChild(wrap);
+    if (preview.ready) preview.mount(stage, hero, selected);
+    else stage.appendChild(el('div', 'stagenote', 'Loading models…'));
+    note.textContent = 'Tap a slot to preview it on your hero, then Equip. A duplicate drop refines the weapon you hold by +1; from +5 it glows.';
+  }
+
+  function open(key, which) {
     if (key) hero = key;
+    if (which) tab = which;
+    selected = undefined;
     render();
     root.hidden = false;
     input.setEnabled(false);
   }
   function close() {
+    preview.unmount();
     root.hidden = true;
     input.setEnabled(true);
     onChange?.();
@@ -121,6 +202,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     e.preventDefault();
     close();
   });
+  window.addEventListener('resize', () => { if (!root.hidden && tab === 'equip') render(); });
 
-  return { open, close, render, get isOpen() { return !root.hidden; } };
+  return { open, close, render, setAssets: (a) => preview.setAssets(a), get isOpen() { return !root.hidden; } };
 }

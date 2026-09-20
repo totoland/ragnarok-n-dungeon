@@ -188,6 +188,17 @@ function findRig(root) {
   return rig;
 }
 
+// Put a clone of a hero model into its rest pose - the plinths and the profile turntable
+// clone the shared asset, which the live view may have left mid-swing.
+export function restPose(model, heroKey) {
+  const rig = findRig(model);
+  const base = {};
+  for (const k of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'cape', 'weapon', 'root']) if (rig[k]) base[k] = rig[k].position.clone();
+  if (model.userData.base) for (const k in model.userData.base) if (base[k]) base[k].copy(model.userData.base[k]);
+  applyPose(rig, base, DEFS[heroKey].rest, {}, 0);
+  for (const v of Object.values(rig.variants)) { v.rotation.copy(rig.weapon.rotation); v.position.copy(rig.weapon.position); }
+}
+
 // Show the wielded weapon and hide the rest. `gearId` is the item id (data/items.js) or
 // null for the hero's own weapon; an item with no baked model falls back to that.
 export function showWeapon(model, gearId) {

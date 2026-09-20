@@ -11,7 +11,7 @@ import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
 import { createScene, buildRoom, disposeRoom, updateScene } from './render/scene.js';
-import { loadHeroAssets, createHeroView, showWeapon } from './render/heroes.js';
+import { loadHeroAssets, createHeroView, showWeapon, restPose } from './render/heroes.js';
 import { createMonsterViews, loadMonsterAssets } from './render/monsters.js';
 import { createFx } from './render/fx.js';
 import { createHud } from './render/hud.js';
@@ -111,7 +111,7 @@ function refreshTitle() {
   if (preview) for (const [key, s] of Object.entries(preview.stands)) showWeapon(s.model, heroOf(profile, key).gear?.id ?? null);
   const cbtn = document.getElementById('title-character');
   cbtn.innerHTML = '';
-  cbtn.append(`Profile · ${itemName(me.gear)}`);
+  cbtn.append(`Profile · ${itemName(me.gear, selectedHero)}`);
   if (myPts) { const sp = document.createElement('span'); sp.className = 'pts'; sp.textContent = ` · ${myPts} skill point${myPts === 1 ? '' : 's'} to spend`; cbtn.append(sp); }
   cbtn.classList.toggle('attention', myPts > 0);
   for (const b of townButtons) {
@@ -198,6 +198,7 @@ function buildPreview() {
     rim.rotation.x = Math.PI / 2;
     const model = assets[key].clone();
     model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    restPose(model, key);                                          // a run may have left the shared asset mid-swing
     showWeapon(model, heroOf(profile, key).gear?.id ?? null);   // the plinth shows what is wielded
     stand.add(plinth, rim, model);
     stands[key] = { stand, model, rim };
@@ -237,6 +238,7 @@ function disposePreview() {
 // on "Loading" until every model the run can need is in memory.
 Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   assets = a;
+  characterUI.setAssets(a);
   hud.setLoading('Pick a hero, or press Enter for the Knight.');
   for (const b of heroButtons) { b.disabled = false; b.addEventListener('mouseenter', () => { selectedHero = b.dataset.hero; markSelected(); }); }
   markTown();

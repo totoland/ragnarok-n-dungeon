@@ -196,9 +196,9 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 #settings header h2, #character header h2 { margin: 0; font-size: 19px; letter-spacing: 0.04em; color: var(--gold); }
 #settings .x, #character .x { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--edge); background: transparent; color: var(--ink); cursor: pointer; font-size: 13px; }
 #settings .x:hover, #character .x:hover { border-color: var(--gold); color: var(--gold); }
-#settings-tabs { display: flex; gap: 6px; padding: 10px 18px 0; }
-#settings-tabs .tab { padding: 7px 14px; border: 1px solid transparent; border-bottom: none; border-radius: 7px 7px 0 0; background: transparent; color: var(--ink); opacity: 0.6; font-size: 13px; cursor: pointer; }
-#settings-tabs .tab.selected { opacity: 1; color: var(--gold); border-color: var(--edge); background: rgba(232,182,74,0.08); }
+#settings-tabs, #character-tabs { display: flex; gap: 6px; padding: 10px 18px 0; }
+#settings-tabs .tab, #character-tabs .tab { padding: 7px 14px; border: 1px solid transparent; border-bottom: none; border-radius: 7px 7px 0 0; background: transparent; color: var(--ink); opacity: 0.6; font-size: 13px; cursor: pointer; }
+#settings-tabs .tab.selected, #character-tabs .tab.selected { opacity: 1; color: var(--gold); border-color: var(--edge); background: rgba(232,182,74,0.08); }
 #settings-body, #character-body { flex: 1; overflow-y: auto; padding: 14px 18px; }
 #settings footer, #character footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 18px; border-top: 1px solid rgba(232,182,74,0.22); }
 #settings-note, #character-note { margin: 0; font-size: 11.5px; opacity: 0.65; line-height: 1.5; }
@@ -349,7 +349,7 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 @media (max-width: 720px) { #towns { flex-direction: row; gap: 8px; } .town { width: min(150px, 42vw); padding: 8px 10px; } }
 
 /* Character panel: xp, weapon chips, skill rows. Shares the settings panel chrome. */
-#character .panel { width: min(640px, 94vw); }
+#character .panel { width: min(760px, 94vw); }
 .cxp { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
 .cxpbar { flex: 1; height: 8px; border: 1px solid var(--edge); border-radius: 4px; background: rgba(0,0,0,0.5); overflow: hidden; }
 .cxpbar .fill { height: 100%; background: linear-gradient(#ffe08a, var(--gold)); }
@@ -392,3 +392,40 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 #title-character:hover { background: rgba(232,182,74,0.15); }
 #title-character.attention { animation: buffbreathe 1.6s ease-in-out infinite; }
 #title-character .pts { font-weight: 400; opacity: 0.85; }
+
+/* Equipment tab: inventory slots on the left, the turntable and the selected item on the right. */
+.equip { display: grid; grid-template-columns: 1fr 250px; gap: 18px; align-items: start; }
+.slots { display: grid; grid-template-columns: repeat(4, 68px); gap: 8px; }
+.slotb { position: relative; width: 68px; height: 68px; border: 1px solid var(--edge); border-radius: 8px; background: radial-gradient(circle at 50% 40%, rgba(60,50,80,0.55), rgba(12,10,18,0.7)); padding: 0; cursor: pointer; overflow: hidden; color: var(--ink); }
+.slotb img { width: 100%; height: 100%; display: block; }
+.slotb .noicon { display: grid; place-items: center; width: 100%; height: 100%; font-size: 22px; color: var(--gold); }
+.slotb:hover { border-color: var(--gold); }
+.slotb.selected { border-color: var(--gold); box-shadow: 0 0 12px rgba(232,182,74,0.5), inset 0 0 10px rgba(232,182,74,0.2); }
+.slotb.empty { border-style: dashed; opacity: 0.3; cursor: default; background: transparent; }
+.slotb.empty:hover { border-color: var(--edge); }
+.slotb.unknown img { opacity: 0.22; filter: grayscale(1); }
+.slotb.unknown::after { content: '?'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 24px; font-weight: 700; color: var(--gold); opacity: 0.75; }
+.slotb .badge { position: absolute; right: 4px; bottom: 2px; font-size: 11px; font-weight: 700; color: var(--gold); text-shadow: 0 1px 2px #000; }
+.slotb .tag { position: absolute; left: 4px; top: 3px; font-size: 9px; letter-spacing: 0.06em; font-weight: 700; color: #7dff9a; text-shadow: 0 1px 2px #000; }
+.wornrow { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.wornrow .slots { grid-template-columns: 68px; }
+.wornname { font-size: 14px; font-weight: 700; color: var(--gold); }
+.look { display: flex; flex-direction: column; gap: 10px; }
+.stage { position: relative; width: 250px; height: min(300px, 52vh); border: 1px solid var(--edge); border-radius: 10px; overflow: hidden; background: radial-gradient(ellipse at 50% 60%, rgba(70,58,96,0.55), rgba(8,6,12,0.9)); }
+.stage canvas { width: 100%; height: 100%; display: block; }
+.stagenote { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; opacity: 0.6; }
+.detail { display: flex; flex-direction: column; gap: 5px; }
+.detail strong { font-size: 16px; color: var(--gold); }
+.detail .stat { font-size: 12px; opacity: 0.85; line-height: 1.4; }
+.detail .src { font-size: 11.5px; opacity: 0.6; }
+.equipbtn { margin-top: 4px; padding: 9px 18px; border-radius: 8px; border: 2px solid var(--gold); background: rgba(232,182,74,0.15); color: var(--gold); font-size: 14px; font-weight: 700; cursor: pointer; }
+.equipbtn:hover { background: rgba(232,182,74,0.3); }
+.equipbtn:disabled { opacity: 0.45; cursor: default; background: transparent; border-color: var(--edge); color: var(--ink); }
+@media (max-width: 720px) {
+  .equip { grid-template-columns: 1fr; }
+  .look { flex-direction: row; align-items: flex-start; }
+  .stage { width: 150px; height: min(200px, 52vh); flex: none; }
+  .slots { grid-template-columns: repeat(4, 60px); gap: 6px; }
+  .slotb { width: 60px; height: 60px; }
+  .wornrow .slots { grid-template-columns: 60px; }
+}

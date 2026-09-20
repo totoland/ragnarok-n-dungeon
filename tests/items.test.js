@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ITEMS, ITEM_IDS, itemMods, itemName, glowOf } from '../src/sim/data/items.js';
+import { ITEMS, ITEM_IDS, itemMods, itemName, glowOf, DEFAULT_WEAPON } from '../src/sim/data/items.js';
 import { HEROES } from '../src/sim/data/heroes.js';
 import { TOWNS } from '../src/sim/data/dungeon.js';
 import { BASE_MODS } from '../src/sim/resolve.js';
@@ -32,7 +32,7 @@ test('refining: +N multiplies the ATK share, +5 and up adds crit damage; names a
   assert.equal(p5.atk, 1.15 * (1 + REFINE.atk * 5));
   assert.equal(p5.critDmg, BASE_MODS.critDmg * (1 + REFINE.critDmg));
   assert.equal(itemMods({ id: 'katana', plus: 99 }).atk, 1 + REFINE.atk * REFINE.max, 'plus clamps to the cap');
-  assert.equal(itemName(null), 'Bare hands'); assert.equal(itemName({ id: 'katana', plus: 0 }), 'Katana'); assert.equal(itemName({ id: 'katana', plus: 7 }), 'Katana +7');
+  assert.equal(itemName(null), 'Bare hands'); assert.equal(itemName(null, 'knight'), DEFAULT_WEAPON.knight); assert.equal(itemName({ id: 'katana', plus: 1 }, 'knight'), 'Katana +1'); assert.equal(itemName({ id: 'katana', plus: 0 }), 'Katana'); assert.equal(itemName({ id: 'katana', plus: 7 }), 'Katana +7');
   assert.equal(glowOf({ id: 'katana', plus: 4 }), 0); assert.ok(glowOf({ id: 'katana', plus: 5 }) > 0); assert.equal(glowOf({ id: 'katana', plus: 10 }), 1);
 });
 

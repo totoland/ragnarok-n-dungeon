@@ -26,8 +26,11 @@ export function itemMods(gear) {
   return mods;
 }
 
-export function itemName(gear) {
-  if (!gear || !ITEMS[gear.id]) return 'Bare hands';
+// What a hero holds with nothing equipped: his own starting weapon, no bonuses.
+export const DEFAULT_WEAPON = { knight: 'Knight Sword', hunter: 'Hunter Bow' };
+
+export function itemName(gear, hero) {
+  if (!gear || !ITEMS[gear.id]) return DEFAULT_WEAPON[hero] || 'Bare hands';
   return gear.plus ? `${ITEMS[gear.id].name} +${gear.plus}` : ITEMS[gear.id].name;
 }
 
