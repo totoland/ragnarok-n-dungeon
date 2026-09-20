@@ -192,30 +192,35 @@ function buildOrcLord() {
 // rigid mesh whose origin is its joint, so the same applyPose rig drives it and the boss
 // clips below need no changes.
 let bossModel = null;
+let moonModel = null;
 
 /** Injection seam for the loaded boss model. The render test uses it to supply a stand-in
  *  rig, since GLTFLoader cannot fetch a file in Node. */
 export function setBossModel(scene) { bossModel = scene; }
+export function setMoonrayaModel(scene) { moonModel = scene; }
 
 export async function loadMonsterAssets(base = 'assets/monsters/') {
-  const gltf = await new GLTFLoader().loadAsync(base + 'baphomet.glb');
-  setBossModel(gltf.scene);
+  const loader = new GLTFLoader();
+  const [baph, moon] = await Promise.all([
+    loader.loadAsync(base + 'baphomet.glb'),
+    loader.loadAsync(base + 'moonraya.glb'),
+  ]);
+  setBossModel(baph.scene);
+  setMoonrayaModel(moon.scene);
   return bossModel;
 }
 
-function buildBaphomet(scale = 1, darken = 0) {
-  if (!bossModel) throw new Error('baphomet.glb not loaded — call loadMonsterAssets() first');
-  // Clone per spawn, materials included: the view mutates emissive for the hit flash and
-  // disposes materials on death, so sharing them across a retry would corrupt the model.
-  const root = bossModel.clone(true);
+/** A GLB boss becomes a rig the same way whichever sculpt it is: clone per spawn, materials
+ *  included, because the view mutates emissive for the hit flash and would otherwise corrupt
+ *  the source model on the next retry. */
+function rigFromGlb(model, { scale = 1, darken = 0 } = {}) {
+  const root = model.clone(true);
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.material = o.material.clone();
     o.material.envMapIntensity = 0.9;
     o.castShadow = true;
     o.receiveShadow = false;
-    // Minions are the same sculpt, so they need a tonal shift or the player cannot tell at a
-    // glance which silhouette is the one with 880 HP.
     if (darken) o.material.color.multiplyScalar(1 - darken);
   });
   const rig = { root };
@@ -225,8 +230,19 @@ function buildBaphomet(scale = 1, darken = 0) {
   }
   for (const k of ['root', 'torso', 'head']) if (rig[k]) rig[k].rotation.order = 'YXZ';
   if (scale !== 1) root.scale.setScalar(scale);
-  const base = { root: rig.root.position.clone(), torso: rig.torso.position.clone() };
-  return { root, rig, base, kind: 'humanoid' };
+  return { root, rig, base: { root: rig.root.position.clone(), torso: rig.torso.position.clone() }, kind: 'humanoid' };
+}
+
+function buildBaphomet(scale = 1, darken = 0) {
+  if (!bossModel) throw new Error('baphomet.glb not loaded - call loadMonsterAssets() first');
+  // Minions are the same sculpt, so they need a tonal shift or the player cannot tell at a
+  // glance which silhouette is the one with 880 HP.
+  return rigFromGlb(bossModel, { scale, darken });
+}
+
+function buildMoonrayaGlb() {
+  if (!moonModel) throw new Error('moonraya.glb not loaded - call loadMonsterAssets() first');
+  return rigFromGlb(moonModel);
 }
 
 // Per-type rest offsets, added to every pose. The primitive monsters are modelled standing
@@ -721,81 +737,6 @@ function buildSorya() {
 // played and tuned meanwhile. When the sculpt lands it goes the way Baphomet did: exported
 // limb-segmented by tools/export_heroes.py to assets/monsters/moonraya.glb with an entry in
 // meta.json, loaded in loadMonsterAssets(), and this function replaced by the GLB build.
-function buildMoonraya() {
-  const cloth = mat(0xf2e8cf, { roughness: 0.85 });          // ivory, the body of the robe
-  const red = mat(0xa8202c, { roughness: 0.75 });            // the lining and every cord
-  const obi = mat(0x1a1518, { roughness: 0.8 });             // the wide black sash
-  const furM = mat(0xfaf7fb, { roughness: 0.95 });           // ears and the tail
-  const skinM = mat(0xf7e9df, { roughness: 0.9 });
-  const hair = mat(0xd9d4e0, { roughness: 0.7 });            // silver, past the waist
-  const gold = mat(0xd8a93f, { roughness: 0.3, metalness: 0.8, emissive: 0x5a3c08, emissiveIntensity: 0.3 });
-  return humanoid({
-    scale: 1.35, hip: 1.02, torsoH: 0.74, shoulderW: 0.3, legW: 0.14,
-    buildTorso(t, h) {
-      // The robe falls straight and wide from the sash to the floor, and trails behind.
-      mesh(new THREE.CylinderGeometry(0.24, 0.48, h + 0.78, 12), cloth, 0, h / 2 - 0.38, 0, t);
-      mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.1, 12), red, 0, h - 0.74, 0, t);          // hem line
-      // Collar: the red lining shows as a V at the chest.
-      const vL = mesh(new THREE.BoxGeometry(0.07, 0.42, 0.03), red, -0.09, h - 0.2, 0.19, t); vL.rotation.z = 0.24;
-      const vR = mesh(new THREE.BoxGeometry(0.07, 0.42, 0.03), red, 0.09, h - 0.2, 0.19, t); vR.rotation.z = -0.24;
-      mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.12, 12), cloth, 0, h - 0.02, 0, t);
-      // The black obi, and the red cord tied across it.
-      mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.26, 12), obi, 0, h - 0.36, 0, t);
-      mesh(new THREE.BoxGeometry(0.6, 0.05, 0.36), red, 0, h - 0.3, 0, t);
-      mesh(new THREE.SphereGeometry(0.06, 8, 8), red, 0, h - 0.3, 0.3, t);                    // the knot
-      // The gold crescent medallion on the front panel.
-      const disc = mesh(new THREE.TorusGeometry(0.1, 0.028, 8, 16), gold, 0, h - 0.72, 0.26, t);
-      disc.rotation.x = HALF * 0;
-      // One tail, and it is most of her silhouette from the side.
-      const tail = mesh(new THREE.CapsuleGeometry(0.22, 0.7, 8, 12), furM, 0.06, h - 0.46, -0.44, t);
-      tail.rotation.x = -0.8; tail.rotation.z = 0.25;
-      mesh(new THREE.SphereGeometry(0.2, 10, 8), furM, 0.16, h - 0.1, -0.78, t);              // the curl at the tip
-    },
-    buildHead(hd) {
-      mesh(new THREE.SphereGeometry(0.22, 14, 12), skinM, 0, 0.18, 0, hd);
-      mesh(new THREE.SphereGeometry(0.245, 14, 12), hair, 0, 0.21, -0.03, hd).scale.set(1, 0.95, 1);
-      mesh(new THREE.BoxGeometry(0.34, 0.12, 0.26), hair, 0, 0.32, 0.04, hd);                 // fringe
-      for (const side of [-1, 1]) {
-        // Tall fox ears, white outside and pink within.
-        const ear = mesh(new THREE.ConeGeometry(0.1, 0.34, 6), furM, side * 0.15, 0.5, -0.02, hd);
-        ear.rotation.z = -side * 0.22;
-        const inner = mesh(new THREE.ConeGeometry(0.055, 0.22, 5), mat(0xe6b9bd, { roughness: 0.95 }), side * 0.15, 0.48, 0.04, hd);
-        inner.rotation.z = -side * 0.22;
-        // Amber eyes.
-        mesh(new THREE.SphereGeometry(0.034, 8, 8), mat(0xe8a72a, { emissive: 0xe8a72a, emissiveIntensity: 0.75 }), side * 0.08, 0.18, 0.2, hd);
-        // The long fall of hair down past the shoulders.
-        const lock = mesh(new THREE.CapsuleGeometry(0.075, 0.6, 5, 8), hair, side * 0.2, -0.16, 0.02, hd);
-        lock.rotation.z = side * 0.06;
-      }
-    },
-    buildArm(a, side) {
-      mesh(new THREE.BoxGeometry(0.13, 0.05, 0.13), red, 0, -0.04, 0, a);                     // the ribbon tie
-      // A wide hanging sleeve: narrow at the shoulder, open at the wrist.
-      const sleeve = mesh(new THREE.CylinderGeometry(0.1, 0.23, 0.5, 10, 1, true), cloth, 0, -0.26, 0, a);
-      sleeve.rotation.z = side * 0.06;
-      mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.06, 10), red, 0, -0.5, 0, a);           // the cuff
-      mesh(new THREE.SphereGeometry(0.055, 8, 8), skinM, 0, -0.56, 0.03, a);
-      if (side < 0) {
-        // Her left hand carries the crescent, the bell inside it, and the tassels.
-        const crescent = mesh(new THREE.TorusGeometry(0.15, 0.035, 8, 18, Math.PI * 1.45), gold, 0, -0.76, 0.03, a);
-        crescent.rotation.y = HALF;
-        mesh(new THREE.SphereGeometry(0.1, 10, 8), gold, 0, -0.78, 0.03, a);
-        for (const t of [-0.06, 0.06]) mesh(new THREE.BoxGeometry(0.025, 0.42, 0.01), red, t, -1.0, 0.03, a);
-      } else {
-        // Her right hand holds a small bell on a cord.
-        mesh(new THREE.BoxGeometry(0.012, 0.22, 0.012), red, 0, -0.68, 0.04, a);
-        mesh(new THREE.SphereGeometry(0.06, 10, 8), gold, 0, -0.82, 0.04, a);
-      }
-    },
-    buildLeg(l) {
-      // Barefoot, under a robe that reaches the floor.
-      mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.34, 6), cloth, 0, -0.18, 0, l);
-      mesh(new THREE.BoxGeometry(0.12, 0.06, 0.2), skinM, 0, -0.37, 0.04, l);
-    },
-  });
-}
-
-
 const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   pecoPeco: buildPecoPeco, ant: buildAnt, babyWolf: buildBabyWolf, sandman: buildSandman, golem: buildGolem, phreeoni: buildPhreeoni, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: () => buildBaphomet(),
   // 1.75 of the boss's 3.0 game units, which is skeleton height.
@@ -805,7 +746,7 @@ const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   famiru: buildFamiru, wispra: buildWispra, foxShade: buildFoxShade,
   munari: buildMunari, bonku: buildBonku, sorya: buildSorya,
   skelbow: () => buildSkeleton({ archer: true, boneColor: 0xcfd6c4, clothColor: 0x3f5b3a }),
-  moonraya: buildMoonraya };
+  moonraya: buildMoonrayaGlb };
 
 // ------------------------------------------------------------------ clips
 

@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { createGame, update } from '../src/sim/game.js';
 import { createEnemy } from '../src/sim/enemies.js';
 import { MONSTERS } from '../src/sim/data/monsters.js';
-import { createMonsterViews, setBossModel, CLIPS_BY_TYPE } from '../src/render/monsters.js';
+import { createMonsterViews, setBossModel, setMoonrayaModel, CLIPS_BY_TYPE } from '../src/render/monsters.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from '../src/render/anim.js';
 
 const world = () => ({ scene: new THREE.Scene() });
@@ -35,6 +35,8 @@ function stubBossModel() {
   return root;
 }
 setBossModel(stubBossModel());
+// Moonraya is a sculpt too, and has the same limb names, so the same stand-in serves.
+setMoonrayaModel(stubBossModel());
 
 test('every monster type builds, walks, winds up, attacks, gets hurt, launched and dies without throwing', () => {
   const w = world();

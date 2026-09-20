@@ -14,3 +14,4 @@ rm -f assets/heroes/meta.json
 
 rm -f assets/monsters/meta.json
 "$BLENDER" -b assets/blender/baphomet/baphomet.blend -P tools/export_heroes.py -- baphomet assets/monsters 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
+"$BLENDER" -b assets/blender/moonraya/moonraya.blend -P tools/export_heroes.py -- moonraya assets/monsters 2>&1 | grep -E "^\[export_heroes\]|^    |Error"

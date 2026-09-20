@@ -108,6 +108,33 @@ def classify_baphomet(group, name, cx):
     return "torso"   # trunk, pelvis, pectoral, deltoid, lat, rib, abdomen, clavicle, fissures
 
 
+def classify_moonraya(group, name, cx):
+    """Phaelan's boss. Collection names come from assets/blender/moonraya/build_moonraya.py.
+
+    Two calls worth stating. Her hair reaches the sash, so the long fall rides the torso and
+    only the crown, fringe and side locks ride the head - parenting the whole length to the
+    head has it whipping on every nod, the same lesson the Baphomet's mane taught. And the
+    sleeves are the arms: they hang from the shoulder and are most of what an arm reads as.
+    """
+    if group.startswith("Bell"):
+        return "weapon"
+    if group.startswith("Ears"):
+        return "head"
+    if group.startswith("Tail"):
+        return "torso"
+    if group.startswith("Hair"):
+        return "torso" if name.startswith("Hair | fall") else "head"
+    if _has(name, "Sleeve"):
+        return "arm" + _side(cx)
+    if _has(name, "Thigh", "Shin", "Foot", "Toe"):
+        return "leg" + _side(cx)
+    if _has(name, "Shoulder", "Upper arm", "Forearm", "Hand"):
+        return "arm" + _side(cx)
+    if name.startswith(("Head", "Eye")):
+        return "head"
+    return "torso"   # trunk, neck, robe, obi, medallion, train
+
+
 MODELS = {
     "knight": {
         "scene": "RO Knight | Studio",
@@ -167,6 +194,25 @@ MODELS = {
             "armL": (-0.74, -0.06, 3.62), "armR": (0.74, -0.06, 3.62),
             "weapon": (-1.38, 0.08, 4.69),  # the raised hand's grip on the haft
             "legL": (-0.46, 0.02, 2.42), "legR": (0.46, 0.02, 2.42),
+        },
+    },
+    # Phaelan's boss. Pivots are the JOINT dict in assets/blender/moonraya/build_moonraya.py,
+    # which is where they were authored; do not re-measure them from the mesh. She stands
+    # between a skeleton and the Baphomet, which is what 2.6 buys.
+    "moonraya": {
+        "scene": "Moonraya | Studio",
+        "height": 2.6,                      # game units; hurtbox h is 2.4 in sim/data/monsters.js
+        "model_height": 4.24,               # Blender units, ear tips
+        "classify": classify_moonraya,
+        "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
+                   "weapon": "armL", "legL": "root", "legR": "root"},
+        "pivot": {
+            "root": (0, 0, 0),
+            "torso": (0, 0, 1.72),          # hips
+            "head": (0, 0, 2.94),           # neck
+            "armL": (-0.34, 0, 2.74), "armR": (0.34, 0, 2.74),
+            "weapon": (-0.5, 0.06, 1.98),   # her left hand, on the crescent's haft
+            "legL": (-0.16, 0, 1.72), "legR": (0.16, 0, 1.72),
         },
     },
 }

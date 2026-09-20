@@ -1,8 +1,26 @@
 # Moonraya — sculpt brief
 
-Toto is modelling her; `buildMoonraya()` in `src/render/monsters.js` is a stand-in built from
-primitives so the fight can be played and tuned meanwhile. When the sculpt lands, that
-function is deleted and the GLB takes its place.
+She is sculpted and in the game: `build_moonraya.py` beside this file builds her, the export
+is `assets/monsters/moonraya.glb`, and the primitive stand-in that stood in for her has been
+deleted. This is a base to refine, not a finished model — open `moonraya.blend` and work on
+it, or edit the script and re-run it, whichever suits the change.
+
+```
+/Applications/Blender.app/Contents/MacOS/Blender -b -P assets/blender/moonraya/build_moonraya.py
+sh tools/export_heroes.sh
+```
+
+The script rebuilds its own scene from scratch, so re-running it replaces the model rather
+than stacking a second one on the first — which also means hand edits to the .blend are lost
+on the next run. Past a certain point, stop running it and edit the .blend.
+
+## Known rough edges in the sculpt
+
+- The hands are inside the sleeves and never read; fingers would show at the cuff.
+- The robe is a smooth loft with no fold or panel break down the front.
+- The gold embroidery in the reference is not modelled at all — it wants a texture rather
+  than geometry.
+- The tail is one tube and a ball; it wants layered fur clumps to read as fur.
 
 ## What she is
 
