@@ -321,10 +321,22 @@ function syncRoom() {
   }
 }
 
+// Frame pacing. The sim is fixed at 60 Hz. On a 120 Hz screen (an iPad Pro, a gaming
+// phone) requestAnimationFrame comes twice per sim step, and drawing the same state twice
+// costs a full render for nothing and reads as judder when the pairing drifts; so once the
+// loop has measured a high refresh it draws only on frames that stepped the sim. And when
+// frames run long the resolution comes down a notch at a time (and back up when they are
+// comfortably short), which is what keeps a tablet at its native 2x from stuttering.
+let refreshEma = 1 / 60;    // measured frame interval
+let frameEma = 1 / 60;      // measured frame cost proxy: the interval while playing
+let pendingDt = 0;          // render time carried over skipped frames
+let tuneAt = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   const dtReal = Math.min(0.1, (now - last) / 1000);
   last = now;
+  refreshEma += (dtReal - refreshEma) * 0.05;
+  const hiHz = refreshEma < 0.0125;
 
   // Keyboard and touch arrive as DOM events, which fire whatever the loop is doing. A
   // gamepad has to be asked, and the only place that asked was the sim step - so on the
@@ -350,10 +362,22 @@ function frame(now) {
       for (const ev of game.events) {
         if (ev.type === 'hit') hitstop = Math.max(hitstop, ev.crit || ev.target === 'player' ? 0.07 : ev.attack === 'bash' || ev.attack === 'slash3' ? 0.06 : 0.028);
       }
+      // 120 Hz: this frame did not move the sim, so there is nothing new to draw.
+      if (hiHz && steps === 0) { pendingDt += dtReal; return; }
+    }
+    // Adaptive resolution, judged every second on the interval between drawn frames.
+    const drawn = dtReal + pendingDt;
+    frameEma += (drawn - frameEma) * 0.1;
+    if (now > tuneAt) {
+      tuneAt = now + 1000;
+      const target = 1 / 60;   // drawn frames are meant to land on the sim's 60 Hz either way
+      if (frameEma > target * 1.35 && world.dpr > 0.75) world.setDpr(world.dpr - 0.25);
+      else if (frameEma < target * 1.08 && world.dpr < world.dprMax) world.setDpr(world.dpr + 0.25);
     }
   }
 
-  renderFrame(paused ? 0 : dtReal);
+  renderFrame(paused ? 0 : dtReal + pendingDt);
+  pendingDt = 0;
   world.renderer.render(world.scene, world.camera);
 }
 requestAnimationFrame(frame);

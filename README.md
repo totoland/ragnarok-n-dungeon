@@ -314,6 +314,18 @@ with `node tools/playtest.mjs --dungeon morroc`; the pass/fail gate stays on Pro
 
 ## Deployment
 
+### Frame pacing and touch on tablets
+
+The sim is fixed at 60 Hz. On a 120 Hz screen the loop measures the refresh and draws only
+on frames that stepped the sim, so a frame is never rendered twice. When drawn frames run
+long the pixel ratio comes down a quarter step at a time (to 0.75) and climbs back when they
+are short; coarse-pointer devices start capped at 1.5× with a 1024 PCF shadow map instead of
+2048 PCFSoft (`world.setDpr`, `world.dprMax`). The touch layer treats iOS Safari's dropped
+pointerups as a fact of life: a `touchend`/`touchcancel` with no fingers left releases every
+button and the stick, a 200 ms watchdog frees any touch-pressed button with nothing on the
+glass, and `touch-action: none` covers the whole play surface so no gesture is ever handed to
+the browser mid-hold.
+
 ### Lab and production
 
 Two environments, one image. `./deploy/deploy.sh` (no argument) builds on the Pi, side-loads

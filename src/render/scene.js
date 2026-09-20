@@ -35,9 +35,14 @@ const THEMES = {
 
 export function createScene(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // A tablet at its native 2x is four times the pixels of 1x on a mobile GPU that also has
+  // to run the shadow pass; 1.5x is where an iPad stops dropping frames and still looks
+  // crisp. The loop in main.js lowers this further while frames run long (world.setDpr).
+  const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  const dprMax = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
+  renderer.setPixelRatio(dprMax);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = coarse ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.95;
 
@@ -56,7 +61,7 @@ export function createScene(canvas) {
   const key = new THREE.DirectionalLight(0xfff1dc, 1.5);
   key.position.set(-4, 9, 6);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(coarse ? 1024 : 2048, coarse ? 1024 : 2048);
   key.shadow.camera.near = 1; key.shadow.camera.far = 40;
   key.shadow.camera.left = -14; key.shadow.camera.right = 14;
   key.shadow.camera.top = 10; key.shadow.camera.bottom = -8;
@@ -67,7 +72,7 @@ export function createScene(canvas) {
   rim.position.set(6, 6, -8);
   scene.add(rim);
 
-  const world = { renderer, scene, camera, hemi, key, rim, room: null, torches: [], shake: 0, camX: 2, t: 0 };
+  const world = { renderer, scene, camera, hemi, key, rim, room: null, torches: [], shake: 0, camX: 2, t: 0, dpr: dprMax, dprMax, coarse };
 
   function resize() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -78,6 +83,13 @@ export function createScene(canvas) {
   window.addEventListener('resize', resize);
   resize();
   world.resize = resize;
+  world.setDpr = (r) => {
+    r = Math.max(0.75, Math.min(dprMax, Math.round(r * 4) / 4));
+    if (r === world.dpr) return;
+    world.dpr = r;
+    renderer.setPixelRatio(r);
+    resize();
+  };
   return world;
 }
 

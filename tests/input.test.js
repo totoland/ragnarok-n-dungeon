@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createInput, stickAxes } from '../src/input.js';
+import { attachTouch, createInput, stickAxes } from '../src/input.js';
 import { defaultSettings, bind } from '../src/settings.js';
 
 // Stand-in for `window`: collects listeners so tests can fire synthetic key events. The
@@ -181,4 +181,59 @@ test('rebinding a mouse button steals it, like every other binding', () => {
   assert.deepEqual(s.mouse.attack, [], 'attack lost the button it shared');
   t.fireDoc('mousedown', { button: 0, ...onCanvas() });
   assert.deepEqual(Object.keys(input.snapshot().pressed), ['jump']);
+});
+
+// A minimal DOM for the touch layer: elements with listeners, classes, style, dataset, and
+// a window that carries the touch events. Enough to prove the release paths.
+function fakeEl(id, extra = {}) {
+  const listeners = {};
+  const cls = new Set();
+  return {
+    id, hidden: false, style: { setProperty() {} }, dataset: extra.dataset || {},
+    classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), toggle: (c, on) => (on ? cls.add(c) : cls.delete(c)), contains: (c) => cls.has(c) },
+    addEventListener(t, fn) { (listeners[t] ||= []).push(fn); },
+    dispatch(t, ev = {}) { for (const fn of listeners[t] || []) fn({ type: t, preventDefault() {}, ...ev }); },
+    setPointerCapture() {}, getBoundingClientRect: () => ({ left: 100, top: 100, width: 150, height: 150 }),
+    querySelectorAll: () => extra.buttons || [],
+    ...extra,
+  };
+}
+function fakeTouchDom() {
+  const attack = fakeEl('b-attack', { dataset: { k: 'attack' } });
+  const touch = fakeEl('touch', { buttons: [attack] });
+  const stick = fakeEl('stick'), knob = fakeEl('stick-knob'), zone = fakeEl('stick-zone');
+  const byId = { touch, stick, 'stick-knob': knob, 'stick-zone': zone };
+  const root = { getElementById: (id) => byId[id] || null, querySelector: () => null, addEventListener() {}, hidden: false, body: { classList: { toggle() {} } } };
+  const win = fakeEl('window', { matchMedia: () => ({ matches: true }), setInterval: (fn) => { win.tick = fn; return 1; } });
+  return { attack, zone, root, win };
+}
+
+test('touch: a button whose pointerup never came still lets go when the last finger leaves the glass', () => {
+  const { attack, zone, root, win } = fakeTouchDom();
+  const input = createInput(fakeTarget(), { settings: defaultSettings() });
+  attachTouch(input, { root, win, settings: { touch: { mode: 'on', floating: false } } });
+  attack.dispatch('pointerdown', { pointerId: 7, pointerType: 'touch' });
+  zone.dispatch('pointerdown', { pointerId: 8, pointerType: 'touch', clientX: 260, clientY: 175 });
+  let snap = input.snapshot();
+  assert.equal(snap.held.attack, true, 'attack held'); assert.equal(snap.held.right, true, 'stick pushed right');
+  // iOS dropped the pointerup; a touchend with no fingers left is what arrives
+  win.dispatch('touchend', { touches: [] });
+  snap = input.snapshot();
+  assert.equal(snap.held.attack, false, 'attack released'); assert.equal(snap.held.right, false, 'stick released');
+  assert.equal(attack.classList.contains('down'), false);
+});
+
+test('touch: the watchdog frees a touch press with no finger down, and leaves a mouse press alone', () => {
+  const { attack, root, win } = fakeTouchDom();
+  const input = createInput(fakeTarget(), { settings: defaultSettings() });
+  attachTouch(input, { root, win, settings: { touch: { mode: 'on' } } });
+  attack.dispatch('pointerdown', { pointerId: 1, pointerType: 'touch' });
+  assert.equal(input.snapshot().held.attack, true);
+  win.tick();                                   // no touchstart was ever counted: nothing on the glass
+  assert.equal(input.snapshot().held.attack, false, 'lost release recovered');
+  attack.dispatch('pointerdown', { pointerId: 2, pointerType: 'mouse' });
+  win.tick();
+  assert.equal(input.snapshot().held.attack, true, 'a mouse hold is not a lost touch');
+  attack.dispatch('pointerup', { pointerId: 2 });
+  assert.equal(input.snapshot().held.attack, false);
 });

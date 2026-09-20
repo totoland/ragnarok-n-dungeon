@@ -204,6 +204,7 @@ export function createInput(target = window, opts = {}) {
 // --------------------------------------------------------------------------------------
 export function attachTouch(input, opts = {}) {
   const root = opts.root || document;
+  const win = opts.win || (typeof window !== 'undefined' ? window : null);
   const touch = root.getElementById('touch');
   if (!touch) return null;
   const stick = root.getElementById('stick');
@@ -212,18 +213,19 @@ export function attachTouch(input, opts = {}) {
   if (!stick || !knob || !zone) return null;
 
   let cfg = { ...DEFAULT_TOUCH, ...(opts.settings?.touch || {}) };
-  let sid = null, cx = 0, cy = 0;
+  let sid = null, sidType = 'touch', cx = 0, cy = 0;
 
-  const coarse = () => (typeof window !== 'undefined' && window.matchMedia
-    ? window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window
+  const coarse = () => (win && win.matchMedia
+    ? win.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in win
     : false);
   const wanted = () => (cfg.mode === 'on' ? true : cfg.mode === 'off' ? false : coarse());
 
   function layout() {
     const on = wanted();
     touch.hidden = !on;
-    document.body.classList.toggle('touch', on);
-    document.body.classList.toggle('touch-right', on && cfg.side === 'right');
+    const body = root.body || (typeof document !== 'undefined' ? document.body : null);
+    body?.classList.toggle('touch', on);
+    body?.classList.toggle('touch-right', on && cfg.side === 'right');
     touch.style.setProperty('--stick-size', `${cfg.size}px`);
     touch.style.setProperty('--touch-alpha', String(cfg.opacity));
     stick.classList.toggle('floating', !!cfg.floating);
@@ -258,6 +260,7 @@ export function attachTouch(input, opts = {}) {
   zone.addEventListener('pointerdown', (e) => {
     if (sid !== null) return;
     sid = e.pointerId;
+    sidType = e.pointerType || 'touch';
     if (cfg.floating) { cx = e.clientX; cy = e.clientY; place(cx, cy); }
     else {
       // Measured per gesture, never cached: the ring's centre moves when an overlay hides
@@ -283,28 +286,54 @@ export function attachTouch(input, opts = {}) {
   zone.addEventListener('lostpointercapture', end);
 
   const buzz = (ms) => { if (cfg.haptics && typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms); };
+  // Every button currently down, by its release function, so the layer can let go of all
+  // of them at once. iOS Safari drops the odd pointerup - a finger that slid off the glass,
+  // a second finger the system read as a gesture - and a hold-to-attack button then stays
+  // down with nothing on it. Touch events are the reliable channel there: when the last
+  // finger leaves the screen nothing can still be held, so everything releases.
+  const down = new Map();       // release fn -> pointerType
+  let touches = 0;              // fingers on the glass, from the touch events
+  const releaseAll = () => { for (const fn of [...down.keys()]) fn(); release(); };
   for (const b of touch.querySelectorAll('.tbtn')) {
     const k = b.dataset.k;
     const edge = b.dataset.edge === '1';
+    const up = () => { if (!edge) input.set(k, false); b.classList.remove('down'); down.delete(up); };
     b.addEventListener('pointerdown', (e) => {
       if (edge) input.press(k); else input.set(k, true);
       b.classList.add('down');
+      down.set(up, e.pointerType || 'touch');
       buzz(12);
       try { b.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
       e.preventDefault();
     });
-    const up = () => { if (!edge) input.set(k, false); b.classList.remove('down'); };
     b.addEventListener('pointerup', up);
     b.addEventListener('pointercancel', up);
+    b.addEventListener('lostpointercapture', up);
     b.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  if (win) {
+    const count = (e) => { touches = e.touches ? e.touches.length : 0; if (touches === 0 && e.type !== 'touchstart') releaseAll(); };
+    for (const t of ['touchstart', 'touchend', 'touchcancel']) win.addEventListener(t, count, { passive: true });
+    win.addEventListener('blur', releaseAll);
+    if (root.addEventListener) root.addEventListener('visibilitychange', () => { if (root.hidden) releaseAll(); });
+    // Hold watchdog: a touch-pressed button still down while no finger is on the glass is
+    // a lost release, whatever event went missing. Mouse presses (touch controls forced on
+    // at a desk) are left alone - a mouse is not a touch.
+    if (win.setInterval) win.setInterval(() => {
+      if (touches !== 0) return;
+      for (const [fn, type] of down) if (type === 'touch') fn();
+      if (sid !== null && sidType === 'touch') release();
+    }, 200);
   }
 
   // Rotating a phone changes which media query applies, so the parked ring has to be put
   // back on its CSS position. Never re-layout mid-drag: a mobile browser also fires resize
   // when the URL bar collapses, and that would drop the stick under the player's thumb.
   const onResize = () => { if (sid === null) layout(); };
-  window.addEventListener('resize', onResize);
-  window.addEventListener('orientationchange', () => { onResize(); setTimeout(onResize, 250); });
+  if (win) {
+    win.addEventListener('resize', onResize);
+    win.addEventListener('orientationchange', () => { onResize(); setTimeout(onResize, 250); });
+  }
   layout();
 
   return {
