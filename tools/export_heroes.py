@@ -109,30 +109,43 @@ def classify_baphomet(group, name, cx):
 
 
 def classify_moonraya(group, name, cx):
-    """Phaelan's boss. Collection names come from assets/blender/moonraya/build_moonraya.py.
+    """Phaelan's boss. Her meshes are sorted by collection, not by a parent empty, so `group`
+    here is the collection name - see model_meshes().
 
-    Two calls worth stating. Her hair reaches the sash, so the long fall rides the torso and
-    only the crown, fringe and side locks ride the head - parenting the whole length to the
-    head has it whipping on every nod, the same lesson the Baphomet's mane taught. And the
-    sleeves are the arms: they hang from the shoulder and are most of what an arm reads as.
+    Two calls worth stating. The long hair that reaches her waist rides the torso and only
+    the crown, fringe and face locks ride the head, the lesson the Baphomet's mane taught.
+    And she carries a bell in each hand: the great one on its crescent handle is the weapon
+    limb, and the little one simply rides the right arm, because the rig has one weapon slot
+    and it is parented to the left.
     """
-    if group.startswith("Bell"):
-        return "weapon"
-    if group.startswith("Ears"):
+    if group == "Face":
         return "head"
-    if group.startswith("Tail"):
+    if group == "Ears and Tail":
+        return "torso" if _has(name, "tail") else "head"
+    if group == "Hair":
+        if _has(name, "Back hair", "side flourish"):
+            return "torso"
+        return "head"
+    if group == "Bells and Ribbons":
+        if _has(name, "Great moon bell", "Left handle"):
+            return "weapon"
+        if _has(name, "Little moon bell"):
+            return "armR"
+        if _has(name, "Sleeve ribbon"):
+            return "arm" + _side(cx)
+        return "torso"                      # obi knots, bows, hanging ties
+    if group == "Garments":
+        if _has(name, "sleeve"):
+            return "arm" + _side(cx)
+        return "torso"                      # skirt, tabard, bodice, lapels, obi belt, panels
+    if group == "Embroidery":
         return "torso"
-    if group.startswith("Hair"):
-        return "torso" if name.startswith("Hair | fall") else "head"
-    if _has(name, "Sleeve"):
-        return "arm" + _side(cx)
-    if _has(name, "Thigh", "Shin", "Foot", "Toe"):
+    # Body.
+    if _has(name, "Leg", "Foot", "Toe", "Ankle"):
         return "leg" + _side(cx)
-    if _has(name, "Shoulder", "Upper arm", "Forearm", "Hand"):
+    if _has(name, "Arm", "Palm", "Finger", "Thumb"):
         return "arm" + _side(cx)
-    if name.startswith(("Head", "Eye")):
-        return "head"
-    return "torso"   # trunk, neck, robe, obi, medallion, train
+    return "torso"                          # torso, neck
 
 
 MODELS = {
@@ -196,23 +209,27 @@ MODELS = {
             "legL": (-0.46, 0.02, 2.42), "legR": (0.46, 0.02, 2.42),
         },
     },
-    # Phaelan's boss. Pivots are the JOINT dict in assets/blender/moonraya/build_moonraya.py,
-    # which is where they were authored; do not re-measure them from the mesh. She stands
-    # between a skeleton and the Baphomet, which is what 2.6 buys.
+    # Phaelan's boss, sculpted rather than scripted, so her meshes come sorted into
+    # collections with no parent empties and the pivots are measured off the model. She
+    # arrives at ~98k verts, which is three and a half times the Baphomet for one enemy that
+    # shares a room with everything else, so the export thins her.
     "moonraya": {
-        "scene": "Moonraya | Studio",
-        "height": 2.6,                      # game units; hurtbox h is 2.4 in sim/data/monsters.js
-        "model_height": 4.24,               # Blender units, ear tips
+        "scene": "Moonraya \u2022 Phaelan",
+        "height": 2.7,                      # game units; hurtbox h is 2.4 in sim/data/monsters.js
+        "model_height": 5.60,               # Blender units, ear tips
         "classify": classify_moonraya,
+        "collections": ["Body", "Face", "Hair", "Ears and Tail", "Garments",
+                        "Bells and Ribbons", "Embroidery"],
+        "decimate": 0.42,
         "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
                    "weapon": "armL", "legL": "root", "legR": "root"},
         "pivot": {
             "root": (0, 0, 0),
-            "torso": (0, 0, 1.72),          # hips
-            "head": (0, 0, 2.94),           # neck
-            "armL": (-0.34, 0, 2.74), "armR": (0.34, 0, 2.74),
-            "weapon": (-0.5, 0.06, 1.98),   # her left hand, on the crescent's haft
-            "legL": (-0.16, 0, 1.72), "legR": (0.16, 0, 1.72),
+            "torso": (0, 0, 2.55),          # hips, the bottom of the torso mesh
+            "head": (0, 0, 3.70),           # neck
+            "armL": (-0.33, -0.20, 3.58), "armR": (0.30, -0.20, 3.55),
+            "weapon": (-1.12, -0.73, 2.99), # her left palm, on the crescent handle
+            "legL": (-0.22, 0, 2.53), "legR": (0.22, 0, 2.53),
         },
     },
 }
@@ -220,9 +237,25 @@ MODELS = {
 
 # --------------------------------------------------------------------------------------
 
-def model_meshes(scene):
-    """Mesh objects under the '| model root' empty, skipping anything hidden from render."""
+def model_meshes(scene, collections=None):
+    """The meshes that make up the model, skipping anything hidden from render.
+
+    Two ways a source file can say which those are, and which group each belongs to.
+
+    The heroes and the Baphomet hang everything off a '| model root' empty and sort meshes
+    by the edit-group empty each is parented to. A file authored the other way - meshes left
+    unparented and sorted into collections instead - says so with `collections` in its
+    recipe, and then a mesh's collection is its group. Moonraya arrived that way.
+    """
     out = []
+    if collections:
+        wanted = set(collections)
+        for o in scene.objects:
+            if o.type != "MESH" or o.hide_render:
+                continue
+            if any(c.name in wanted for c in o.users_collection):
+                out.append(o)
+        return out
     for o in scene.objects:
         if o.type != "MESH" or o.hide_render:
             continue
@@ -233,6 +266,17 @@ def model_meshes(scene):
         if top is not None and "model root" in top.name:
             out.append(o)
     return out
+
+
+def mesh_group(o, collections):
+    """A mesh's group: its collection when the recipe lists collections, else its parent."""
+    if collections:
+        wanted = set(collections)
+        for c in o.users_collection:
+            if c.name in wanted:
+                return c.name
+        return "?"
+    return o.parent.name.split(" |")[0]
 
 
 def world_center(o):
@@ -271,11 +315,21 @@ def export(model_key, out_dir):
     scale = recipe["height"] / recipe["model_height"]
     classify = recipe["classify"]
 
+    cols = recipe.get("collections")
     groups = {}
-    for o in model_meshes(scene):
-        group = o.parent.name.split(" |")[0]
-        limb = classify(group, o.name, world_center(o).x)
+    for o in model_meshes(scene, cols):
+        limb = classify(mesh_group(o, cols), o.name, world_center(o).x)
         groups.setdefault(limb, []).append(o)
+
+    # A sculpted model can arrive far denser than the game wants to draw every frame, and a
+    # boss is on screen with a room full of everything else. `decimate` in the recipe thins
+    # it at export, leaving the source file untouched.
+    ratio = recipe.get("decimate")
+    if ratio:
+        for objs in groups.values():
+            for o in objs:
+                m = o.modifiers.new("__export_decimate", "DECIMATE")
+                m.ratio = ratio
 
     for limb in recipe["parent"]:
         if limb not in groups:
