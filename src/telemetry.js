@@ -21,6 +21,12 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
   const spikes = [];
   const errors = [];
   let last = performance.now(), worst = 0, env = '?', timer = 0, sent = 0;
+  // A small badge so a tester can see it is on and counting; it lives outside the HUD.
+  const badge = document.createElement('div');
+  badge.id = 'telemetry-badge';
+  badge.hidden = true;
+  document.body.appendChild(badge);
+  const showBadge = () => { badge.hidden = false; badge.textContent = `● log ${env} · ${sent} sent`; };
 
   window.addEventListener('error', (e) => { errors.push(`${e.message} @ ${(e.filename || '').split('/').pop()}:${e.lineno}`); if (errors.length > 5) errors.shift(); });
   window.addEventListener('unhandledrejection', (e) => { errors.push(`rejection: ${String(e.reason).slice(0, 120)}`); if (errors.length > 5) errors.shift(); });
@@ -57,6 +63,8 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
       ...(extra ? extra() : {}),
     };
     frames.length = 0; worst = 0;
+    showBadge();
+    badge.classList.remove('blink'); void badge.offsetWidth; badge.classList.add('blink');
     const blob = new Blob([JSON.stringify(body)], { type: 'application/json' });
     if (!(navigator.sendBeacon && navigator.sendBeacon('/__log', blob))) {
       fetch('/__log', { method: 'POST', body: blob, keepalive: true }).catch(() => {});
@@ -69,6 +77,7 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
     timer = setInterval(() => report('periodic'), PERIOD);
     document.addEventListener('visibilitychange', () => { if (document.hidden) report('hidden'); });
     window.addEventListener('pagehide', () => report('pagehide'));
+    showBadge();
     console.info(`[telemetry] on (${env}) - reporting every ${PERIOD / 1000}s to /__log`);
   }
 
@@ -78,5 +87,5 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
     if (on || env === 'lab') start();
   }).catch(() => { env = 'dev'; if (on) start(); });
 
-  return { get on() { return !!timer; }, report };
+  return { get on() { return !!timer; }, get sent() { return sent; }, report };
 }

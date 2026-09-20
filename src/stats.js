@@ -78,6 +78,7 @@ function init() {
       r ? `dpr ${r.getPixelRatio()} of max ${w.dprMax ?? '?'} (device ${window.devicePixelRatio})  canvas ${r.domElement.width}x${r.domElement.height}` : '',
       w ? `refresh ~${w.refreshHz ?? '?'} Hz  pacing ${w.pacing ?? '-'}  touch ${w.coarse ? 'yes' : 'no'}  shadows ${r?.shadowMap?.type === 1 ? 'PCF' : 'PCFSoft'}` : '',
       `${engine}  gpu ${gpu || '?'}`,
+      window.__dro?.telemetry ? `telemetry ${window.__dro.telemetry.on ? `on · ${window.__dro.telemetry.sent} sent` : 'off (add ?log=1)'}` : '',
       `css ${innerWidth}x${innerHeight}  cores ${navigator.hardwareConcurrency || '?'}${heap}`,
       navigator.userAgent,
     ].filter(Boolean).join('\n');

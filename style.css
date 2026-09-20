@@ -453,3 +453,9 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 #skills { pointer-events: auto; }
 .skill { cursor: pointer; user-select: none; }
 .skill:active { transform: translateY(1px); }
+/* Telemetry badge: only when the client is reporting home (lab, or ?log=1). */
+#telemetry-badge { position: fixed; right: calc(8px + var(--safe-r)); bottom: calc(6px + var(--safe-b)); z-index: 9998; font: 10px/1 ui-monospace, Menlo, monospace; color: #7dff9a; background: rgba(8,10,14,0.7); border: 1px solid rgba(125,255,154,0.35); border-radius: 10px; padding: 4px 8px; pointer-events: none; opacity: 0.75; }
+#telemetry-badge[hidden] { display: none; }
+#telemetry-badge.blink { animation: logblink 0.6s ease-out; }
+@keyframes logblink { 0% { background: rgba(125,255,154,0.45); } 100% { background: rgba(8,10,14,0.7); } }
+body.touch #telemetry-badge { bottom: calc(110px + var(--safe-b)); right: calc(8px + var(--safe-r)); }
