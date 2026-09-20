@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, update, EMPTY_INPUT } from '../src/sim/game.js';
-import { DUNGEON } from '../src/sim/data/dungeon.js';
+import { DUNGEON, MORROC, TOWNS } from '../src/sim/data/dungeon.js';
 import { MONSTERS } from '../src/sim/data/monsters.js';
 import { HEROES } from '../src/sim/data/heroes.js';
 import { createEnemy } from '../src/sim/enemies.js';
@@ -21,7 +21,7 @@ test('data is consistent: every hero skill and monster pattern references real t
       for (const sp of a.spawns || []) assert.ok(sp.at <= a.dur, `${id} spawn time`);
     }
   }
-  for (const room of DUNGEON.rooms) for (const wave of room.waves) for (const grp of wave) assert.ok(MONSTERS[grp.type], grp.type);
+  for (const town of Object.values(TOWNS)) for (const room of town.rooms) for (const wave of room.waves) for (const grp of wave) assert.ok(MONSTERS[grp.type], `${town.name}: ${grp.type}`);
 });
 
 test('first wave spawns after a beat and enters from off-stage', () => {
@@ -121,4 +121,34 @@ test('monsters drop potions, walking over one heals and removes it, and the pity
   g.pickups.push({ id: 1000, kind: 'hp', x: g.player.x, z: g.player.z, y: 0, vy: 0, vx: 0, t: 0 });
   update(g, EMPTY_INPUT);
   assert.equal(g.player.hp, g.player.hpMax, 'never exceeds max');
+});
+
+test('the desert town plays through every room to Phreeoni and is won', () => {
+  const g = createGame({ hero: 'knight', seed: 8, dungeon: MORROC });
+  assert.equal(g.room.name, 'Sograt Sands');
+  const seen = new Set();
+  let steps = 0;
+  const walkOut = { held: { right: true }, pressed: {} };
+  while (g.phase !== 'won' && g.phase !== 'dead' && steps < 60000) {
+    for (const e of g.enemies) if (!e.dead) { seen.add(e.type); e.hp = 0; }
+    update(g, g.phase === 'cleared' ? walkOut : { held: {}, pressed: {} });
+    g.player.hp = g.player.hpMax;                       // the test is the town, not the fight
+    steps++;
+  }
+  assert.equal(g.phase, 'won', `won (stopped in "${g.room.name}" after ${steps} steps)`);
+  assert.equal(g.roomIndex, MORROC.rooms.length - 1);
+  for (const t of ['pecoPeco', 'ant', 'babyWolf', 'sandman', 'golem', 'phreeoni']) assert.ok(seen.has(t), `${t} spawned somewhere in the town`);
+});
+
+test('the sandman throws sand and Phreeoni throws rocks, not arrows or fire', () => {
+  const g = createGame({ hero: 'knight', seed: 2, dungeon: { rooms: [{ name: 't', width: 20, waves: [] }] } });
+  const s = createEnemy(g, 'sandman', 6, 0); s.state = 'chase'; s.cd = 0; g.enemies.push(s);
+  const kinds = new Set();
+  for (let i = 0; i < 240; i++) { update(g, { held: {}, pressed: {} }); for (const pr of g.projectiles) kinds.add(pr.kind); }
+  assert.ok(kinds.has('sandBall'), `sandman shot kind (${[...kinds]})`);
+  const g2 = createGame({ hero: 'knight', seed: 2, dungeon: { rooms: [{ name: 't', width: 20, waves: [] }] } });
+  const b = createEnemy(g2, 'phreeoni', 6, 0); b.state = 'chase'; b.cd = 99; b.slamCd = 99; b.chargeCd = 99; b.castCd = 0; g2.enemies.push(b);
+  const kinds2 = new Set();
+  for (let i = 0; i < 240; i++) { update(g2, { held: {}, pressed: {} }); for (const pr of g2.projectiles) kinds2.add(pr.kind); }
+  assert.ok(kinds2.has('rock'), `phreeoni cast kind (${[...kinds2]})`);
 });

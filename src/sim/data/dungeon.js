@@ -46,3 +46,54 @@ export const DUNGEON = {
     },
   ],
 };
+
+// Town 2: the Sograt Desert outside Morroc. Five rooms like Prontera, harder from the first
+// wave, ending on Phreeoni. Room themes are the sand and the quarry; both are outdoor and
+// draw their own dune sky procedurally, so the town ships with no image at all.
+export const MORROC = {
+  name: 'Sograt Desert',
+  rooms: [
+    {
+      name: 'Sograt Sands', width: 18, theme: 'desert',
+      waves: [
+        [{ type: 'pecoPeco', count: 2 }, { type: 'ant', count: 2 }],
+        [{ type: 'ant', count: 4 }, { type: 'pecoPeco', count: 1 }],
+        [{ type: 'babyWolf', count: 2 }, { type: 'ant', count: 2 }],
+      ],
+    },
+    {
+      name: 'Ant Hell', width: 18, theme: 'desert',
+      waves: [
+        [{ type: 'ant', count: 4 }],
+        [{ type: 'ant', count: 3 }, { type: 'babyWolf', count: 2 }],
+        [{ type: 'ant', count: 5 }, { type: 'sandman', count: 1 }],
+      ],
+    },
+    {
+      name: 'Sandstorm Ridge', width: 20, theme: 'desert',
+      waves: [
+        [{ type: 'sandman', count: 2 }, { type: 'babyWolf', count: 2 }],
+        [{ type: 'pecoPeco', count: 3 }, { type: 'sandman', count: 1 }],
+        [{ type: 'sandman', count: 2 }, { type: 'babyWolf', count: 3 }, { type: 'ant', count: 2 }],
+      ],
+    },
+    {
+      name: 'Golem Quarry', width: 20, theme: 'quarry',
+      waves: [
+        [{ type: 'golem', count: 1 }, { type: 'ant', count: 2 }],
+        [{ type: 'golem', count: 2 }, { type: 'sandman', count: 1 }],
+        [{ type: 'golem', count: 2 }, { type: 'pecoPeco', count: 2 }, { type: 'sandman', count: 1 }],
+      ],
+    },
+    {
+      name: "Phreeoni's Maw", width: 20, theme: 'quarry', boss: true,
+      waves: [
+        [{ type: 'phreeoni', count: 1 }],
+      ],
+    },
+  ],
+};
+
+// Every town the title screen can start. DUNGEON stays the default export shape for the
+// tests and the harness; TOWNS is what the shell and `--dungeon` read.
+export const TOWNS = { prontera: DUNGEON, morroc: MORROC };

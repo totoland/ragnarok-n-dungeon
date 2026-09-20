@@ -230,3 +230,13 @@ times that town's boss has been beaten, and every spawn scales by it. Tier 0 wit
 byte-for-byte the game before this step existed — a run is still `(loadout, seed, inputs)`.
 The harness sweeps it: `node tools/playtest.mjs --matrix` plays tiers 0–2, and `--tier N`
 plays one; the pass/fail gate applies only to the plain run so it stays comparable.
+
+
+### Towns
+
+`src/sim/data/dungeon.js` exports every town the title screen can start — `TOWNS = { prontera,
+morroc }` — each a list of rooms of waves. Morroc is the Sograt Desert: PecoPeco, Andre,
+Baby Desert Wolf, Sandman (throws sand), Golem, and **Phreeoni** for the town boss. Its two
+themes (`desert`, `quarry`) are outdoor and draw their own dune sky on a canvas
+(`duneSky()` in textures.js), so the town ships with no image file. The harness plays it
+with `node tools/playtest.mjs --dungeon morroc`; the pass/fail gate stays on Prontera.

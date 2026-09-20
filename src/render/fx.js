@@ -104,8 +104,30 @@ export function createFx(world) {
     return g;
   }
 
+  // Desert projectiles: a fistful of sand and a thrown rock, neither an arrow.
+  const sandMat = new THREE.MeshStandardMaterial({ color: 0xd9b878, roughness: 1 });
+  const grainMat = new THREE.MeshStandardMaterial({ color: 0xa8864e, roughness: 1 });
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6f5a44, roughness: 0.95 });
+  function makeSandBall() {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), sandMat));
+    for (let i = 0; i < 5; i++) {
+      const gr = new THREE.Mesh(new THREE.SphereGeometry(0.05, 5, 4), grainMat);
+      gr.position.set(Math.cos(i * 1.3) * 0.2, Math.sin(i * 2.1) * 0.15, Math.sin(i * 1.3) * 0.2);
+      g.add(gr);
+    }
+    return g;
+  }
+  function makeRock() {
+    const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 0), rockMat);
+    m.castShadow = true;
+    return m;
+  }
+
   function makeArrow(kind) {
     if (kind === 'hellOrb') return makeOrb();
+    if (kind === 'sandBall') return makeSandBall();
+    if (kind === 'rock') return makeRock();
     const g = new THREE.Group();
     const shaft = new THREE.Mesh(arrowGeo, kind === 'boneArrow' ? boneArrowMat : arrowMat);
     shaft.rotation.z = -Math.PI / 2;

@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CAMERA, FLOOR } from '../config.js';
-import { stoneFloor, brickWall, grassFloor } from './textures.js';
+import { stoneFloor, brickWall, grassFloor, sandFloor, duneSky } from './textures.js';
 
 const THEMES = {
   // Outdoor map. `bg` swaps the tiling brick wall for a painted backdrop plane, and
@@ -13,6 +13,20 @@ const THEMES = {
     floor: '#5f7a3c', grout: '#3c4a26', wall: '#6d7a58', mortar: '#3a4430',
     fog: 0xcfdcc6, hemi: [0xdfeaff, 0x6d7a44], torch: 0xffd9a0, props: 'grove',
     bg: 'assets/maps/prontera-forest.png', bgH: 12, ground: 'grass', outdoor: true,
+  },
+  // Sograt Desert. No painted map: `bgMake` draws the dune sky on a canvas per room, so the
+  // town ships with zero image files. Warm fog, low warm hemisphere, sandstone exit arch.
+  desert: {
+    floor: '#d6b26f', grout: '#a8834a', wall: '#c9a468', mortar: '#8a6a3a',
+    fog: 0xe8d3a6, hemi: [0xfff1d0, 0xa88650], torch: 0xffd9a0, props: 'desert',
+    bgMake: (i) => duneSky(i + 5), bgH: 12, ground: 'sand', outdoor: true,
+    sideWall: 0xb08a55, ledge: 0x9c7a46, arch: 0xc8a874,
+  },
+  quarry: {
+    floor: '#c4a066', grout: '#8f6f3e', wall: '#b39058', mortar: '#7a5c32',
+    fog: 0xd9c39a, hemi: [0xf6e6c4, 0x8f6f45], torch: 0xffd9a0, props: 'quarry',
+    bgMake: (i) => duneSky(i + 11, { rocky: true }), bgH: 12, ground: 'sand', outdoor: true,
+    sideWall: 0x8f7046, ledge: 0x7d5f37, arch: 0xb59565,
   },
   sewer: { floor: '#4f5a55', grout: '#1f2622', wall: '#3f4a48', mortar: '#1b211f', fog: 0x0a1210, hemi: [0x7d9a93, 0x1c2a24], torch: 0xffa040, props: 'barrels' },
   crypt: { floor: '#5a5560', grout: '#221f28', wall: '#4a4452', mortar: '#1e1a24', fog: 0x0d0a12, hemi: [0x8a80a8, 0x241c30], torch: 0x9fd0ff, props: 'bones' },
@@ -105,7 +119,9 @@ export function buildRoom(world, roomDef, index) {
 
   const groundTex = theme.ground === 'grass'
     ? grassFloor(theme.floor, theme.grout, index + 3)
-    : stoneFloor(theme.floor, theme.grout, index + 3);
+    : theme.ground === 'sand'
+      ? sandFloor(theme.floor, theme.grout, index + 3)
+      : stoneFloor(theme.floor, theme.grout, index + 3);
   const floorMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.92, metalness: 0.02 });
   floorMat.map.repeat.set((W + pad * 2) / 2.2, depth / 2.2);
   const floor = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, 0.3, depth), floorMat);
@@ -116,10 +132,12 @@ export function buildRoom(world, roomDef, index) {
   // A painted backdrop is unlit on purpose: it already has its own light baked in, and
   // letting torches or the key light touch it makes the distance read as a nearby wall.
   // Its height is chosen so the art maps 1:1 with no stretch - see assets/maps/README.md.
-  const bgH = theme.bg ? (theme.bgH || 12) : 14;
+  const backdrop = !!(theme.bg || theme.bgMake);
+  const bgH = backdrop ? (theme.bgH || 12) : 14;
   let wallMat;
-  if (theme.bg) {
-    const tex = new THREE.TextureLoader().load(theme.bg);
+  if (backdrop) {
+    // A painted file, or a canvas the theme draws itself (the desert's dune sky).
+    const tex = theme.bg ? new THREE.TextureLoader().load(theme.bg) : theme.bgMake(index);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
     wallMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
@@ -129,10 +147,10 @@ export function buildRoom(world, roomDef, index) {
   }
   const back = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, bgH, 0.6), wallMat);
   back.position.set(W / 2, bgH / 2, zBack - 0.3);
-  back.receiveShadow = !theme.bg; back.castShadow = !theme.bg;
+  back.receiveShadow = !backdrop; back.castShadow = !backdrop;
   g.add(back);
   // dado / ledge along the wall base
-  const ledge = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: theme.outdoor ? 0x3f4a2c : 0x2b2730, roughness: 0.9 }));
+  const ledge = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: theme.ledge || (theme.outdoor ? 0x3f4a2c : 0x2b2730), roughness: 0.9 }));
   ledge.position.set(W / 2, 0.17, zBack + 0.05);
   ledge.castShadow = true; ledge.receiveShadow = true;
   g.add(ledge);
@@ -140,7 +158,7 @@ export function buildRoom(world, roomDef, index) {
   // side walls with the exit arch on the right.
   // Outdoors these must NOT clone wallMat: that material is the painted backdrop, and
   // cloning it smears the whole forest image down a 14-unit slab at each end of the room.
-  const sideMat = theme.bg
+  const sideMat = backdrop
     ? new THREE.MeshStandardMaterial({ color: theme.sideWall || 0x33522a, roughness: 0.96 })
     : wallMat.clone();
   const left = new THREE.Mesh(new THREE.BoxGeometry(0.6, 14, depth + 1), sideMat);
@@ -160,7 +178,7 @@ export function buildRoom(world, roomDef, index) {
     // this doubles as the story beat instead of a black rectangle in open daylight.
     // Built as a real arch profile - an extruded shape with a semicircular head and a hole
     // through it - because stacked boxes plus sphere "moss" read as grey slab and green balls.
-    const mossStone = new THREE.MeshStandardMaterial({ color: 0x8d9180, roughness: 0.96 });
+    const mossStone = new THREE.MeshStandardMaterial({ color: theme.arch || 0x8d9180, roughness: 0.96 });
     const halfW = 1.9, pierW = 1.42, springY = 2.1, jamb = 2.0;
 
     const profile = new THREE.Shape();
@@ -251,6 +269,53 @@ export function buildRoom(world, roomDef, index) {
       bush.scale.set(1, 0.72, 0.85);
       bush.castShadow = true; bush.receiveShadow = true;
       g.add(bush);
+    }
+  } else if (theme.props === 'desert' || theme.props === 'quarry') {
+    const sandRock = new THREE.MeshStandardMaterial({ color: theme.props === 'quarry' ? 0x8b7250 : 0xb89468, roughness: 0.93 });
+    const cactus = new THREE.MeshStandardMaterial({ color: 0x5f8a4a, roughness: 0.85 });
+    const bleach = new THREE.MeshStandardMaterial({ color: 0xe9e2cf, roughness: 0.6 });
+    const n = theme.props === 'quarry' ? 8 : 5;
+    for (let i = 0; i < n; i++) {
+      const r = (theme.props === 'quarry' ? 0.35 : 0.2) + (i % 3) * 0.16;
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), sandRock);
+      rock.position.set(1.2 + i * (W / (n + 0.4)), r * 0.55, zBack + 0.9 + (i % 3) * 0.45);
+      rock.rotation.set(i * 0.9, i * 1.7, i * 0.4);
+      rock.castShadow = true; rock.receiveShadow = true;
+      g.add(rock);
+    }
+    if (theme.props === 'desert') {
+      // saguaro cacti: a trunk and two raised arms, the one silhouette that says desert
+      for (let i = 0; i < 3; i++) {
+        const x = 3.2 + i * (W / 3.1), base = zBack + 0.8 + (i % 2) * 0.5, hgt = 1.6 + (i % 2) * 0.5;
+        const trunk = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, hgt, 4, 8), cactus);
+        trunk.position.set(x, hgt / 2 + 0.1, base);
+        trunk.castShadow = true;
+        g.add(trunk);
+        for (const side of [-1, 1]) {
+          const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.6, 4, 8), cactus);
+          arm.position.set(x + side * 0.34, hgt * 0.55 + side * 0.1, base);
+          arm.castShadow = true;
+          g.add(arm);
+          const elbow = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.34, 4, 8), cactus);
+          elbow.rotation.z = side * Math.PI / 2;
+          elbow.position.set(x + side * 0.2, hgt * 0.42 + side * 0.1, base);
+          g.add(elbow);
+        }
+      }
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), bleach);
+      skull.position.set(W * 0.7, 0.24, zBack + 1.5);
+      skull.scale.set(1.2, 0.9, 1);
+      skull.castShadow = true;
+      g.add(skull);
+    } else {
+      // quarry: cut sandstone blocks stacked where the golems were hewn
+      for (let i = 0; i < 4; i++) {
+        const block = new THREE.Mesh(new THREE.BoxGeometry(1.1 + (i % 2) * 0.4, 0.7, 0.8), sandRock);
+        block.position.set(2.5 + i * (W / 4.3), 0.35 + (i % 2) * 0.7, zBack + 1.2 + (i % 2) * 0.3);
+        block.rotation.y = i * 0.25;
+        block.castShadow = true; block.receiveShadow = true;
+        g.add(block);
+      }
     }
   } else if (theme.props === 'barrels') {
     for (let i = 0; i < 4; i++) {

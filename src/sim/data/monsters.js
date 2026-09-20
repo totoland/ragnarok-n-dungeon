@@ -66,6 +66,60 @@ export const MONSTERS = {
     adds: { at: 0.5, type: 'baphometling', count: 3 },
     score: 650,
   },
+  // ---------------------------------------------------------------- Sograt Desert (town 2)
+  // A step up from Prontera, which is meant to be easy. Blob-viewed monsters (ant, wolf) carry
+  // a `hop` even when they walk: the blob renderer bobs on it and reads hop.height.
+  pecoPeco: {
+    name: 'PecoPeco', ai: 'walker',
+    hp: 75, atk: 9, speed: 4.4, mass: 0.9,
+    hurtbox: { r: 0.5, h: 1.5 },
+    attack: { range: 1.4, windup: 0.3, dur: 0.26, cd: 1.3, box: { x0: -0.1, x1: 1.6, y0: -0.3, y1: 1.8 }, knock: [4, 1.5] },
+    score: 35,
+  },
+  ant: {
+    name: 'Andre', ai: 'walker',
+    hp: 62, atk: 8, speed: 3.6, mass: 0.7,
+    hurtbox: { r: 0.46, h: 0.72 },
+    attack: { range: 1.1, windup: 0.28, dur: 0.24, cd: 1.2, box: { x0: -0.2, x1: 1.2, y0: -0.3, y1: 1.3 }, knock: [3, 1] },
+    hop: { period: 0.28, height: 0.08 },
+    score: 25,
+  },
+  babyWolf: {
+    name: 'Baby Desert Wolf', ai: 'hopper',
+    hp: 58, atk: 10, speed: 4.8, mass: 0.6,
+    hurtbox: { r: 0.42, h: 0.8 },
+    attack: { range: 1.5, windup: 0.24, dur: 0.3, cd: 1.0, box: { x0: -0.2, x1: 1.5, y0: -0.3, y1: 1.5 }, knock: [4, 1.5] },
+    hop: { period: 0.36, height: 0.32 },
+    score: 30,
+  },
+  // Throws a fistful of sand: the archer kit with its own projectile kind.
+  sandman: {
+    name: 'Sandman', ai: 'archer',
+    hp: 120, atk: 12, speed: 1.7, mass: 1.2,
+    hurtbox: { r: 0.55, h: 1.7 },
+    attack: { range: 7, keep: 4, windup: 0.75, dur: 0.3, cd: 2.6, shot: { kind: 'sandBall', speed: 9.5, life: 1.3, y: 1.1 }, knock: [3, 1] },
+    score: 55,
+  },
+  golem: {
+    name: 'Golem', ai: 'walker',
+    hp: 280, atk: 17, speed: 1.5, mass: 2.6,
+    hurtbox: { r: 0.8, h: 2.4 },
+    attack: { range: 2.0, windup: 0.7, dur: 0.4, cd: 2.4, box: { x0: 0.0, x1: 2.3, y0: -0.4, y1: 2.6 }, knock: [6, 2.5] },
+    score: 90,
+  },
+  // Town boss. The boss kit again (bite / ground slam / rolling charge / rock volley) with
+  // the numbers turned up from Baphomet's, and Andres for a brood.
+  phreeoni: {
+    name: 'Phreeoni', ai: 'boss', boss: true,
+    hp: 1150, atk: 16, speed: 2.1, mass: 5.0,
+    hurtbox: { r: 1.1, h: 2.6 },
+    attack: { range: 2.3, windup: 0.55, dur: 0.38, cd: 2.0, box: { x0: 0.0, x1: 2.7, y0: -0.4, y1: 2.8 }, knock: [6, 2] },
+    slam: { windup: 1.0, dur: 0.5, cd: 8, box: { x0: -3.2, x1: 3.2, y0: -0.5, y1: 3, both: true }, knock: [5, 8], depth: 1.5 },
+    charge: { windup: 0.65, dur: 0.6, speed: 12.5, cd: 9.5, box: { x0: -0.5, x1: 2.0, y0: -0.4, y1: 2.8 }, knock: [9, 3] },
+    cast: { windup: 0.8, dur: 0.5, cd: 7, shot: { kind: 'rock', count: 3, speed: 8, life: 2.2, y: 1.3, lane: 1.5, dmg: 0.85 }, knock: [4, 1] },
+    adds: { at: 0.5, type: 'ant', count: 3 },
+    score: 800,
+  },
   // The boss splits off three of these at half health. Same sculpt at monster scale, so it
   // reads instantly as "his brood" without needing a second model.
   baphometling: {

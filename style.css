@@ -321,3 +321,11 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 .tbtn.active { border-color: var(--gold); box-shadow: 0 0 12px rgba(232,182,74,0.6); }
 @keyframes buffbreathe { 0%, 100% { box-shadow: 0 0 10px rgba(232,182,74,0.55), inset 0 0 8px rgba(232,182,74,0.25); } 50% { box-shadow: 0 0 16px rgba(232,182,74,0.85), inset 0 0 12px rgba(232,182,74,0.4); } }
 @media (prefers-reduced-motion: reduce) { .skill.active { animation: none; } }
+
+/* Town picker under the heroes: same language, smaller, one line of blurb. */
+#towns { display: flex; gap: 12px; margin-top: 10px; }
+.town { width: 200px; padding: 10px 14px; border: 2px solid var(--edge); background: var(--panel); color: var(--ink); border-radius: 10px; cursor: pointer; text-align: left; transition: transform 120ms, border-color 120ms; }
+.town:hover, .town.selected { border-color: var(--gold); box-shadow: 0 0 16px rgba(232,182,74,0.3); }
+.town strong { display: block; font-size: 15px; color: var(--gold); }
+.town em { font-style: normal; font-size: 11px; opacity: 0.8; }
+@media (max-width: 720px) { #towns { flex-direction: row; gap: 8px; } .town { width: min(150px, 42vw); padding: 8px 10px; } }

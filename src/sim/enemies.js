@@ -84,7 +84,7 @@ function stepAttack(g, e, dt) {
           const lane = (i - (s.count - 1) / 2) * s.lane;
           const z = Math.max(FLOOR.zMin, Math.min(FLOOR.zMax, e.z + lane));
           g.spawnProjectile({
-            owner: 'enemy', kind: 'hellOrb', x: e.x + e.facing * 0.9, z, y: s.y,
+            owner: 'enemy', kind: s.kind || 'hellOrb', x: e.x + e.facing * 0.9, z, y: s.y,
             vx: s.speed * e.facing, vy: 0, dmg: Math.round(e.def.atk * (s.dmg ?? 1)),
             knock: pat.knock, stun: 0.25, life: s.life, facing: e.facing,
           });
@@ -93,7 +93,7 @@ function stepAttack(g, e, dt) {
       }
       if (e.move === 'attack' && e.def.ai === 'archer') {
         const s = pat.shot;
-        g.spawnProjectile({ owner: 'enemy', kind: 'boneArrow', x: e.x + e.facing * 0.5, z: e.z, y: s.y, vx: s.speed * e.facing, vy: 0, dmg: e.def.atk, knock: pat.knock, stun: 0.3, life: s.life, facing: e.facing });
+        g.spawnProjectile({ owner: 'enemy', kind: s.kind || 'boneArrow', x: e.x + e.facing * 0.5, z: e.z, y: s.y, vx: s.speed * e.facing, vy: 0, dmg: e.def.atk, knock: pat.knock, stun: 0.3, life: s.life, facing: e.facing });
         e.hitDone = true;
       }
     }

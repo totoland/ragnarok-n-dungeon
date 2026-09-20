@@ -1,6 +1,7 @@
 // Boot: load hero GLBs, hero select, fixed-timestep sim loop with hit-stop, render every frame.
 // `window.__dro` is the debug handle.
 import { SIM } from './config.js';
+import { TOWNS } from './sim/data/dungeon.js';
 import { createGame, update as simUpdate } from './sim/game.js';
 import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
@@ -48,6 +49,7 @@ let assets = null;
 let game = null;
 let heroView = null;
 let selectedHero = 'knight';
+let selectedTown = 'prontera';
 let paused = false;
 let hitstop = 0;
 let roomBuilt = -1;
@@ -61,6 +63,10 @@ for (const b of heroButtons) {
   b.disabled = true;
   b.addEventListener('click', () => { selectedHero = b.dataset.hero; sfx.init(); start(); });
 }
+// town selection - a click just marks it; the hero buttons / Enter still start the run
+const townButtons = [...document.querySelectorAll('.town')];
+function markTown() { for (const b of townButtons) b.classList.toggle('selected', b.dataset.town === selectedTown); }
+for (const b of townButtons) b.addEventListener('click', () => { selectedTown = b.dataset.town; markTown(); });
 input.on('confirm', () => { if (settingsUI.isOpen) return; sfx.init(); if (!hud.el.title.hidden && assets) start(); else if (!hud.el.end.hidden) start(); });
 window.addEventListener('keydown', (e) => {
   if (hud.el.title.hidden || !assets || settingsUI.isOpen) return;
@@ -143,7 +149,7 @@ function start() {
   if (heroView) heroView.dispose();
   monsters.clear();
   fx.clear();
-  game = createGame({ hero: selectedHero, seed: (Date.now() % 100000) | 0 });
+  game = createGame({ hero: selectedHero, seed: (Date.now() % 100000) | 0, dungeon: TOWNS[selectedTown] || TOWNS.prontera });
   heroView = createHeroView(world, selectedHero, assets);
   hud.bindHero(game.player);
   hud.showTitle(false);
@@ -246,4 +252,5 @@ window.__dro = {
   tick(n = 1) { for (let i = 0; i < n; i++) simUpdate(game, input.snapshot(), SIM.dt); },
   play(n = 1) { for (let i = 0; i < n; i++) { simUpdate(game, input.snapshot(), SIM.dt); renderFrame(SIM.dt); } },
   start, hero(key) { selectedHero = key; start(); },
+  town(key) { selectedTown = key; markTown(); },
 };

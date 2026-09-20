@@ -4,12 +4,14 @@
 //   node tools/playtest.mjs hunter 7   # one hero, one seed, verbose room log
 //   node tools/playtest.mjs --tier 2    # every monster at New Game+ tier 2
 //   node tools/playtest.mjs --matrix    # tiers 0..2, no pass/fail gate
+//   node tools/playtest.mjs --dungeon morroc   # another town; reports, no gate
 //
 // The bot is deliberately simple: walk to the nearest live enemy's lane, mash attack when in
 // range, fire skills when ready, and step off-lane when something winds up nearby. A bot this
 // dumb should still clear the dungeon most of the time with hp to spare (it is a beat-em-up,
 // not a bullet hell), and must never clear it without taking any damage.
 import { createGame, update } from '../src/sim/game.js';
+import { TOWNS } from '../src/sim/data/dungeon.js';
 import { FLOOR, SIM } from '../src/config.js';
 
 function botInput(g, frame) {
@@ -94,17 +96,30 @@ function run(hero, seed, verbose = false, opts = {}) {
 // Flags first: --tier N plays one New Game+ tier, --matrix sweeps tiers 0..2 and reports each
 // on its own. Positional [hero] [seed] as before. The pass/fail gate below is only applied to
 // the plain run, so it stays comparable across commits; the matrix is for reading.
-const flags = process.argv.slice(2).filter((a) => a.startsWith('--'));
-const positional = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-const flag = (name) => { const f = flags.find((a) => a === name || a.startsWith(name + '=')); return f ? (f.includes('=') ? f.split('=')[1] : true) : null; };
+// Both `--tier=2` and `--tier 2`: a flag swallows the next token as its value unless that
+// token is itself a flag (so a bare `--matrix` stays boolean).
+const argv = process.argv.slice(2);
+const flags = {}, positional = [];
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (!a.startsWith('--')) { positional.push(a); continue; }
+  const [k, v] = a.includes('=') ? a.split(/=(.*)/s) : [a, undefined];
+  if (v !== undefined) flags[k] = v;
+  else if (argv[i + 1] !== undefined && !argv[i + 1].startsWith('--') && !['--matrix'].includes(k)) flags[k] = argv[++i];
+  else flags[k] = true;
+}
+const flag = (name) => (name in flags ? flags[name] : null);
 const [heroArg, seedArg] = positional;
 const heroes = heroArg ? [heroArg] : ['knight', 'hunter'];
 const seeds = seedArg ? [Number(seedArg)] : [1, 2, 3, 4, 5];
+const townFlag = flag('--dungeon');
+const town = townFlag ? TOWNS[townFlag] : null;
+if (townFlag && !town) { console.error(`unknown dungeon '${townFlag}' - one of: ${Object.keys(TOWNS).join(', ')}`); process.exit(2); }
 const tierFlag = flag('--tier');
 const tier = tierFlag ? Number(tierFlag) : 0;
 const rows = [];
 if (flag('--matrix')) {
-  for (const t of [0, 1, 2]) for (const h of heroes) for (const s of seeds) rows.push(run(h, s, false, { tier: t }));
+  for (const t of [0, 1, 2]) for (const h of heroes) for (const s of seeds) rows.push(run(h, s, false, { tier: t, ...(town ? { dungeon: town } : {}) }));
   console.table(rows);
   for (const t of [0, 1, 2]) {
     const r = rows.filter((x) => (x.tier || 0) === t);
@@ -113,10 +128,11 @@ if (flag('--matrix')) {
   }
   process.exit(0);
 }
-for (const h of heroes) for (const s of seeds) rows.push(run(h, s, !!seedArg, tier ? { tier } : {}));
+for (const h of heroes) for (const s of seeds) rows.push(run(h, s, !!seedArg, { ...(tier ? { tier } : {}), ...(town ? { dungeon: town } : {}) }));
 console.table(rows);
 const wins = rows.filter((r) => r.phase === 'won').length;
 console.log(`${wins}/${rows.length} runs cleared the dungeon; avg hp left ${(rows.reduce((a, r) => a + r.hp / r.hpMax, 0) / rows.length * 100).toFixed(0)}%`);
+if (town) { console.log(`(${townFlag}: no pass/fail gate - the bar below is calibrated for Prontera)`); process.exit(0); }
 const flawless = rows.filter((r) => r.phase === 'won' && r.hp === r.hpMax).length;
 if (flawless) { console.error(`${flawless} flawless runs — the dungeon is too easy`); process.exitCode = 1; }
 // The bot has no boss strategy beyond backing off, so half the runs is the bar; a kiting hunter

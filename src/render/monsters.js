@@ -349,7 +349,202 @@ export const CLIPS_BY_TYPE = {
 // clips once did to Baphomet himself.
 CLIPS_BY_TYPE.baphometling = CLIPS_BY_TYPE.baphomet;
 
-const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: () => buildBaphomet(),
+// ------------------------------------------------------------------ Sograt Desert
+
+// A bird as a humanoid: the wings hang off the arm nodes, so the walk cycle's arm swing
+// becomes a flap for free and the boss/walker clips still have something to move.
+function buildPecoPeco() {
+  const plume = mat(0xf0a63a, { roughness: 0.8 });
+  const belly = mat(0xf6d68a, { roughness: 0.85 });
+  const beak = mat(0xe07a2a, { roughness: 0.5 });
+  const leg = mat(0xd98a3a, { roughness: 0.7 });
+  const eye = mat(0x1a1016, { roughness: 0.3 });
+  return humanoid({
+    hip: 0.78, torsoH: 0.55, shoulderW: 0.3, legW: 0.17,
+    buildTorso(t, h) {
+      const body = mesh(new THREE.SphereGeometry(0.42, 14, 12), plume, 0, h * 0.45, 0, t);
+      body.scale.set(1, 0.85, 1.25);
+      const b = mesh(new THREE.SphereGeometry(0.3, 12, 10), belly, 0, h * 0.35, 0.22, t);
+      b.scale.set(1, 0.8, 0.8);
+      const tail = mesh(new THREE.ConeGeometry(0.14, 0.5, 6), plume, 0, h * 0.5, -0.55, t);
+      tail.rotation.x = -1.2;
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.27, 12, 10), plume, 0, 0.2, 0.05, hd);
+      const bk = mesh(new THREE.ConeGeometry(0.1, 0.38, 6), beak, 0, 0.16, 0.36, hd);
+      bk.rotation.x = HALF;
+      mesh(new THREE.SphereGeometry(0.06, 8, 8), eye, -0.12, 0.26, 0.22, hd);
+      mesh(new THREE.SphereGeometry(0.06, 8, 8), eye, 0.12, 0.26, 0.22, hd);
+      mesh(new THREE.ConeGeometry(0.06, 0.24, 5), plume, 0, 0.5, -0.02, hd).rotation.x = -0.4;   // crest
+    },
+    buildArm(a, side) {
+      const wing = mesh(new THREE.BoxGeometry(0.1, 0.55, 0.42), plume, side * 0.04, -0.28, -0.05, a);
+      wing.rotation.z = side * 0.25;
+    },
+    buildLeg(l) {
+      mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.5, 6), leg, 0, -0.25, 0, l);
+      mesh(new THREE.BoxGeometry(0.18, 0.05, 0.28), leg, 0, -0.52, 0.06, l);   // foot
+    },
+  });
+}
+
+// Andre: a blob-kind view so the sim's cheap walker can carry six legs without a rig.
+function buildAnt() {
+  const root = new THREE.Group();
+  const body = node(0, 0.36, 0, root);
+  const shell = mat(0x8a4a2a, { roughness: 0.55 });
+  const dark = mat(0x3a1e12, { roughness: 0.7 });
+  const abd = mesh(new THREE.SphereGeometry(0.3, 12, 10), shell, 0, 0, -0.32, body); abd.scale.set(1, 0.85, 1.3);
+  mesh(new THREE.SphereGeometry(0.2, 10, 8), shell, 0, 0.02, 0.02, body);                      // thorax
+  const head = mesh(new THREE.SphereGeometry(0.19, 10, 8), shell, 0, 0.06, 0.34, body);
+  head.scale.set(1.1, 0.9, 1);
+  for (const side of [-1, 1]) {
+    const mand = mesh(new THREE.ConeGeometry(0.05, 0.22, 5), dark, side * 0.1, -0.02, 0.52, body);
+    mand.rotation.x = HALF; mand.rotation.z = -side * 0.5;
+    const ant = mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 4), dark, side * 0.08, 0.28, 0.4, body);
+    ant.rotation.x = -0.7; ant.rotation.z = -side * 0.5;
+    mesh(new THREE.SphereGeometry(0.04, 6, 6), mat(0x120d10), side * 0.1, 0.14, 0.48, body);
+    for (let i = 0; i < 3; i++) {
+      const lg = mesh(new THREE.CylinderGeometry(0.025, 0.02, 0.5, 4), dark, side * 0.28, -0.14, 0.18 - i * 0.2, body);
+      lg.rotation.z = side * 1.15; lg.rotation.y = (i - 1) * 0.3;
+    }
+  }
+  return { root, body, kind: 'blob' };
+}
+
+// Baby Desert Wolf: a pup that bounds, so the blob squash reads as the bounce.
+function buildBabyWolf() {
+  const root = new THREE.Group();
+  const body = node(0, 0.4, 0, root);
+  const fur = mat(0xd8b884, { roughness: 0.9 });
+  const pale = mat(0xf0e2c2, { roughness: 0.9 });
+  const dark = mat(0x3b2a1e, { roughness: 0.7 });
+  const torso = mesh(new THREE.CapsuleGeometry(0.2, 0.42, 6, 10), fur, 0, 0, -0.05, body); torso.rotation.x = HALF;
+  const head = mesh(new THREE.SphereGeometry(0.2, 12, 10), fur, 0, 0.12, 0.36, body);
+  mesh(new THREE.SphereGeometry(0.11, 8, 8), pale, 0, 0.05, 0.52, body);                       // muzzle
+  mesh(new THREE.SphereGeometry(0.045, 6, 6), dark, 0, 0.08, 0.62, body);                     // nose
+  for (const side of [-1, 1]) {
+    const ear = mesh(new THREE.ConeGeometry(0.07, 0.2, 5), fur, side * 0.12, 0.32, 0.3, body);
+    ear.rotation.z = -side * 0.2;
+    mesh(new THREE.SphereGeometry(0.04, 6, 6), dark, side * 0.09, 0.18, 0.5, body);
+    for (const fz of [0.2, -0.24]) mesh(new THREE.CylinderGeometry(0.05, 0.045, 0.36, 6), fur, side * 0.13, -0.28, fz, body);
+  }
+  const tail = mesh(new THREE.CapsuleGeometry(0.05, 0.3, 4, 6), fur, 0, 0.1, -0.42, body);
+  tail.rotation.x = -0.9;
+  head.castShadow = true;
+  return { root, body, kind: 'blob' };
+}
+
+// Sandman: a hunched figure of packed sand with lit eyes. Blocks with the corners knocked off.
+function buildSandman() {
+  const sand = mat(0xc9a66a, { roughness: 1.0 });
+  const dark = mat(0x8a6a3a, { roughness: 1.0 });
+  const eye = mat(0xffe680, { emissive: 0xffc830, emissiveIntensity: 1.8 });
+  return humanoid({
+    hip: 0.9, torsoH: 0.66, shoulderW: 0.32, legW: 0.16,
+    buildTorso(t, h) {
+      mesh(new THREE.SphereGeometry(0.4, 10, 8), sand, 0, h * 0.5, 0, t).scale.set(1, 0.9, 0.8);
+      mesh(new THREE.BoxGeometry(0.72, 0.18, 0.5), dark, 0, 0.06, 0, t);
+      for (let i = 0; i < 5; i++) mesh(new THREE.SphereGeometry(0.06 + (i % 2) * 0.03, 6, 6), dark, (i - 2) * 0.13, h * 0.5 + Math.sin(i) * 0.12, 0.3, t); // crust lumps
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.26, 10, 8), sand, 0, 0.18, 0.02, hd).scale.set(1, 0.85, 1);
+      mesh(new THREE.SphereGeometry(0.055, 6, 6), eye, -0.1, 0.22, 0.22, hd);
+      mesh(new THREE.SphereGeometry(0.055, 6, 6), eye, 0.1, 0.22, 0.22, hd);
+      mesh(new THREE.BoxGeometry(0.16, 0.04, 0.06), dark, 0, 0.06, 0.24, hd);   // mouth slit
+    },
+    buildArm(a) {
+      mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.36, 6), sand, 0, -0.18, 0, a);
+      mesh(new THREE.CylinderGeometry(0.075, 0.06, 0.34, 6), sand, 0, -0.52, 0, a);
+      mesh(new THREE.SphereGeometry(0.11, 8, 6), sand, 0, -0.72, 0, a);
+    },
+    buildLeg(l) {
+      mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.5, 6), sand, 0, -0.25, 0, l);
+      mesh(new THREE.BoxGeometry(0.24, 0.1, 0.3), dark, 0, -0.52, 0.04, l);
+    },
+  });
+}
+
+// Golem: hewn sandstone, all mass in the shoulders and fists.
+function buildGolem() {
+  const stone = mat(0xa8865a, { roughness: 0.95 });
+  const dark = mat(0x6a5236, { roughness: 1.0 });
+  const core = mat(0xff8a2a, { emissive: 0xff7a1a, emissiveIntensity: 1.6 });
+  return humanoid({
+    scale: 1.25, hip: 0.95, torsoH: 0.85, shoulderW: 0.5, legW: 0.24,
+    buildTorso(t, h) {
+      mesh(new THREE.BoxGeometry(0.95, 0.5, 0.6), stone, 0, 0.25, 0, t);                  // pelvis block
+      mesh(new THREE.BoxGeometry(1.15, 0.75, 0.7), stone, 0, h - 0.3, 0, t);              // chest
+      mesh(new THREE.BoxGeometry(0.4, 0.3, 0.1), core, 0, h - 0.3, 0.36, t);              // glowing core
+      for (const side of [-1, 1]) mesh(new THREE.BoxGeometry(0.42, 0.42, 0.62), dark, side * 0.62, h - 0.05, 0, t); // shoulders
+    },
+    buildHead(hd) {
+      mesh(new THREE.BoxGeometry(0.42, 0.36, 0.4), stone, 0, 0.12, 0, hd);
+      mesh(new THREE.BoxGeometry(0.3, 0.06, 0.08), core, 0, 0.16, 0.21, hd);              // visor glow
+    },
+    buildArm(a) {
+      mesh(new THREE.BoxGeometry(0.28, 0.44, 0.28), stone, 0, -0.22, 0, a);
+      mesh(new THREE.BoxGeometry(0.3, 0.4, 0.3), dark, 0, -0.6, 0, a);
+      mesh(new THREE.BoxGeometry(0.4, 0.36, 0.4), stone, 0, -0.95, 0, a);                 // fist
+    },
+    buildLeg(l) {
+      mesh(new THREE.BoxGeometry(0.34, 0.5, 0.34), stone, 0, -0.25, 0, l);
+      mesh(new THREE.BoxGeometry(0.4, 0.45, 0.44), dark, 0, -0.72, 0.03, l);
+    },
+  });
+}
+
+// Phreeoni: the town boss. Nearly all mouth - a pale slab of flesh split by a maw the width
+// of the body, teeth on both jaws, a tongue lolling out - on stub legs, with stub arms for
+// the boss clips to swing.
+function buildPhreeoni() {
+  const flesh = mat(0xd9b8b0, { roughness: 0.75 });
+  const dark = mat(0x7a3a3e, { roughness: 0.8 });
+  const gum = mat(0xb3383f, { roughness: 0.6 });
+  const tooth = mat(0xf3eedb, { roughness: 0.45 });
+  const eye = mat(0x2a0f12, { roughness: 0.3 });
+  const iris = mat(0xffd050, { emissive: 0xffb020, emissiveIntensity: 1.5 });
+  return humanoid({
+    scale: 1.7, hip: 0.62, torsoH: 0.9, shoulderW: 0.62, legW: 0.3,
+    buildTorso(t, h) {
+      const slab = mesh(new THREE.SphereGeometry(0.75, 16, 12), flesh, 0, h * 0.5, 0, t);
+      slab.scale.set(1.05, 0.72, 0.9);
+      // the maw: a dark cavity cut across the front, gums above and below, teeth in rows
+      const maw = mesh(new THREE.BoxGeometry(1.3, 0.34, 0.5), mat(0x1a0608, { roughness: 1 }), 0, h * 0.5 - 0.02, 0.48, t);
+      maw.castShadow = false;
+      mesh(new THREE.BoxGeometry(1.34, 0.08, 0.5), gum, 0, h * 0.5 + 0.2, 0.5, t);
+      mesh(new THREE.BoxGeometry(1.34, 0.08, 0.5), gum, 0, h * 0.5 - 0.24, 0.5, t);
+      for (let i = 0; i < 7; i++) {
+        const x = -0.55 + i * 0.18;
+        mesh(new THREE.ConeGeometry(0.05, 0.14, 5), tooth, x, h * 0.5 + 0.1, 0.7, t).rotation.x = Math.PI;
+        mesh(new THREE.ConeGeometry(0.05, 0.14, 5), tooth, x + 0.09, h * 0.5 - 0.14, 0.7, t);
+      }
+      const tongue = mesh(new THREE.CapsuleGeometry(0.12, 0.5, 6, 10), gum, 0.05, h * 0.5 - 0.18, 0.62, t);
+      tongue.rotation.x = HALF + 0.35;
+      for (let i = 0; i < 6; i++) mesh(new THREE.SphereGeometry(0.06 + (i % 3) * 0.02, 6, 6), dark, -0.6 + i * 0.24, h * 0.5 + 0.42, 0.1 + (i % 2) * 0.3, t); // warts along the back
+    },
+    buildHead(hd) {
+      // no separate head to speak of: a brow ridge with the eyes, riding the top of the slab
+      mesh(new THREE.SphereGeometry(0.3, 12, 8), flesh, 0, -0.05, 0.15, hd).scale.set(1.6, 0.5, 1);
+      for (const side of [-1, 1]) {
+        mesh(new THREE.SphereGeometry(0.11, 10, 8), eye, side * 0.24, 0.04, 0.34, hd);
+        mesh(new THREE.SphereGeometry(0.05, 8, 6), iris, side * 0.24, 0.05, 0.43, hd);
+      }
+    },
+    buildArm(a, side) {
+      mesh(new THREE.CapsuleGeometry(0.13, 0.32, 6, 8), flesh, 0, -0.22, 0, a);
+      const claw = node(0, -0.45, 0, a);
+      for (let i = 0; i < 3; i++) mesh(new THREE.ConeGeometry(0.045, 0.2, 5), tooth, (i - 1) * 0.08, -0.1, 0.04, claw).rotation.x = Math.PI;
+    },
+    buildLeg(l) {
+      mesh(new THREE.CapsuleGeometry(0.17, 0.3, 6, 8), flesh, 0, -0.22, 0, l);
+      mesh(new THREE.SphereGeometry(0.2, 8, 6), dark, 0, -0.45, 0.05, l).scale.set(1.2, 0.5, 1.3);
+    },
+  });
+}
+
+const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
+  pecoPeco: buildPecoPeco, ant: buildAnt, babyWolf: buildBabyWolf, sandman: buildSandman, golem: buildGolem, phreeoni: buildPhreeoni, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: () => buildBaphomet(),
   // 1.75 of the boss's 3.0 game units, which is skeleton height.
   baphometling: () => buildBaphomet(0.58, 0.3) };
 
