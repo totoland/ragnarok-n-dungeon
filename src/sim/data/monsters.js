@@ -102,8 +102,8 @@ export const MONSTERS = {
     score: 30,
   },
   // Throws a fistful of sand: the archer kit with its own projectile kind.
-  sandman: {
-    name: 'Sandman', ai: 'archer',
+  sandWraith: {
+    name: 'Sand Wraith', ai: 'archer',
     hp: 120, atk: 12, speed: 1.7, mass: 1.2,
     hurtbox: { r: 0.55, h: 1.7 },
     attack: { range: 7, keep: 4, windup: 0.75, dur: 0.3, cd: 2.6, shot: { kind: 'sandBall', speed: 9.5, life: 1.3, y: 1.1 }, knock: [3, 1] },
@@ -120,6 +120,23 @@ export const MONSTERS = {
   },
   // Town boss. The boss kit again (bite / ground slam / rolling charge / rock volley) with
   // the numbers turned up from Baphomet's, and Andres for a brood.
+  // Morroc's boss. A pillar of packed sand that walks, with a mace of sandstone on one arm
+  // and a lance on the other. Phreeoni below is what he replaced, and stays defined the way
+  // the Orc Lord does - written, tested, and not in a town.
+  sandman: {
+    name: 'Sandman', ai: 'boss', boss: true,
+    hp: 1400, atk: 19, speed: 1.9, mass: 6.0,
+    hurtbox: { r: 1.2, h: 3.0 },
+    attack: { range: 2.6, windup: 0.6, dur: 0.36, cd: 2.0, box: { x0: 0.0, x1: 3.0, y0: -0.4, y1: 3.0 }, knock: [7, 2] },
+    // He does not run so much as pour: the whole column moves and reforms on the far side.
+    charge: { windup: 0.7, dur: 0.6, speed: 11.5, cd: 9.5, box: { x0: -0.6, x1: 2.2, y0: -0.5, y1: 3.0 }, knock: [9, 3] },
+    // The mace comes down and the floor answers on both sides.
+    slam: { windup: 1.0, dur: 0.5, cd: 8.0, box: { x0: -3.6, x1: 3.6, y0: -0.5, y1: 3.2, both: true }, knock: [6, 8], depth: 1.7 },
+    // A fistful of the desert, three lanes wide.
+    cast: { windup: 0.8, dur: 0.5, cd: 7.0, shot: { kind: 'sandBall', count: 3, speed: 8.5, life: 2.2, y: 1.6, lane: 1.5, dmg: 0.85 }, knock: [4, 1] },
+    adds: { at: 0.45, type: 'sandWraith', count: 2 },
+    score: 900,
+  },
   phreeoni: {
     name: 'Phreeoni', ai: 'boss', boss: true,
     hp: 1150, atk: 16, speed: 2.1, mass: 5.0,

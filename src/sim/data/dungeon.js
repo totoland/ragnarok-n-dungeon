@@ -49,7 +49,7 @@ export const DUNGEON = {
 };
 
 // Town 2: the Sograt Desert outside Morroc. Five rooms like Prontera, harder from the first
-// wave, ending on Phreeoni. Room themes are the sand and the quarry; both are outdoor and
+// wave, ending on the Sandman. Room themes are the sand and the quarry; both are outdoor and
 // draw their own dune sky procedurally, so the town ships with no image at all.
 export const MORROC = {
   town: 'Morroc', name: 'Sograt Desert',
@@ -68,29 +68,29 @@ export const MORROC = {
       waves: [
         [{ type: 'ant', count: 4 }],
         [{ type: 'ant', count: 3 }, { type: 'babyWolf', count: 2 }],
-        [{ type: 'ant', count: 5 }, { type: 'sandman', count: 1 }],
+        [{ type: 'ant', count: 5 }, { type: 'sandWraith', count: 1 }],
       ],
     },
     {
       name: 'Sandstorm Ridge', width: 20, theme: 'desert',
       waves: [
-        [{ type: 'sandman', count: 2 }, { type: 'babyWolf', count: 2 }],
-        [{ type: 'pecoPeco', count: 3 }, { type: 'sandman', count: 1 }],
-        [{ type: 'sandman', count: 2 }, { type: 'babyWolf', count: 3 }, { type: 'ant', count: 2 }],
+        [{ type: 'sandWraith', count: 2 }, { type: 'babyWolf', count: 2 }],
+        [{ type: 'pecoPeco', count: 3 }, { type: 'sandWraith', count: 1 }],
+        [{ type: 'sandWraith', count: 2 }, { type: 'babyWolf', count: 3 }, { type: 'ant', count: 2 }],
       ],
     },
     {
       name: 'Golem Quarry', width: 20, theme: 'quarry',
       waves: [
         [{ type: 'golem', count: 1 }, { type: 'ant', count: 2 }],
-        [{ type: 'golem', count: 2 }, { type: 'sandman', count: 1 }],
-        [{ type: 'golem', count: 2 }, { type: 'pecoPeco', count: 2 }, { type: 'sandman', count: 1 }],
+        [{ type: 'golem', count: 2 }, { type: 'sandWraith', count: 1 }],
+        [{ type: 'golem', count: 2 }, { type: 'pecoPeco', count: 2 }, { type: 'sandWraith', count: 1 }],
       ],
     },
     {
-      name: "Phreeoni's Maw", width: 20, theme: 'quarry', boss: true,
+      name: 'Colossus Hollow', width: 20, theme: 'quarry', boss: true,
       waves: [
-        [{ type: 'phreeoni', count: 1 }],
+        [{ type: 'sandman', count: 1 }],
       ],
     },
   ],
@@ -158,7 +158,7 @@ export const SOAK = {
         [{ type: 'poring', count: 4 }, { type: 'lunatic', count: 2 }],
         [{ type: 'skeleton', count: 3 }, { type: 'skelArcher', count: 2 }],
         [{ type: 'lunatic', count: 4 }, { type: 'poring', count: 3 }, { type: 'ant', count: 2 }],
-        [{ type: 'skeleton', count: 3 }, { type: 'skelArcher', count: 2 }, { type: 'sandman', count: 2 }],
+        [{ type: 'skeleton', count: 3 }, { type: 'skelArcher', count: 2 }, { type: 'sandWraith', count: 2 }],
         [{ type: 'golem', count: 2 }, { type: 'babyWolf', count: 3 }, { type: 'pecoPeco', count: 2 }],
         [{ type: 'skeleton', count: 4 }, { type: 'skelArcher', count: 3 }, { type: 'lunatic', count: 3 }, { type: 'poring', count: 2 }],
       ],

@@ -148,6 +148,26 @@ def classify_moonraya(group, name, cx):
     return "torso"                          # torso, neck
 
 
+def classify_sandman(group, name, cx):
+    """Morroc's boss, sculpted, sorted by collection like Moonraya - see model_meshes().
+
+    He has no legs: below the waist he is a column of sand, so the recipe has no leg limbs
+    and applyPose simply leaves them out. He carries two weapons and the rig has one slot,
+    so the mace is the weapon limb and the lance rides the right arm.
+    """
+    if group.endswith("Mace"):
+        return "weapon"
+    if group.endswith("Lance"):
+        return "armR"
+    if group.endswith("Face") or group.endswith("Hair"):
+        return "head"
+    # _has matches case exactly, and the hems are "Sleeve hem" while the sleeves themselves
+    # are "Short sleeve" - a hem left on the torso does not follow the arm it belongs to.
+    if _has(name, "upper arm", "sleeve", "Sleeve"):
+        return "arm" + _side(cx)
+    return "torso"          # neck, shirt, the sand body and everything drifting off it
+
+
 MODELS = {
     "knight": {
         "scene": "RO Knight | Studio",
@@ -213,6 +233,31 @@ MODELS = {
     # collections with no parent empties and the pivots are measured off the model. She
     # arrives at ~98k verts, which is three and a half times the Baphomet for one enemy that
     # shares a room with everything else, so the export thins her.
+    # Morroc's boss, and the second sculpt to arrive. No legs - he is a column of sand from
+    # the waist down - so the rig has none, and the mace and lance take an arm each.
+    "sandman": {
+        "scene": "Sandman \u2022 Desert Colossus",
+        "height": 3.4,                      # game units; hurtbox h is 3.0 in sim/data/monsters.js
+        "model_height": 6.75,               # Blender units
+        "classify": classify_sandman,
+        "collections": ["Sandman \u2022 Anatomy", "Sandman \u2022 Face", "Sandman \u2022 Hair",
+                        "Sandman \u2022 Lance", "Sandman \u2022 Mace", "Sandman \u2022 Sand Body",
+                        "Sandman \u2022 Sand Details", "Sandman \u2022 Shirt"],
+        # His head alone is 265k of the 346k he arrives with, from a remesh rather than from
+        # anything visible, so it is thinned on its own and the rest is left readable.
+        "decimate": {"Sandman \u2022 Face": 0.03, "Sandman \u2022 Shirt": 0.25,
+                     "Sandman \u2022 Sand Body": 0.3, "Sandman \u2022 Sand Details": 0.45,
+                     "Sandman \u2022 Hair": 0.35, "*": 1},
+        "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
+                   "weapon": "armL"},
+        "pivot": {
+            "root": (0, 0, 0),
+            "torso": (0, 0, 3.80),          # the waist, where the man meets the sand
+            "head": (0, 0, 5.30),           # neck
+            "armL": (-1.05, 0, 4.95), "armR": (1.05, 0, 4.95),
+            "weapon": (-2.00, 0, 4.15),     # the mace on his left arm
+        },
+    },
     "moonraya": {
         "scene": "Moonraya \u2022 Phaelan",
         "height": 2.7,                      # game units; hurtbox h is 2.4 in sim/data/monsters.js
@@ -236,6 +281,53 @@ MODELS = {
 
 
 # --------------------------------------------------------------------------------------
+
+def flatten_procedural_colour(mat):
+    """Give a procedurally-coloured material a flat base colour glTF can carry.
+
+    A stripe pattern or a sand noise lives in a node tree, and glTF has nowhere to put one,
+    so the material exports with its base colour untouched - which is white. That is how the
+    Sandman arrived in the game as a white statue: his shirt, his sand and both weapons are
+    ramps, while his skin and eyes are plain colours and came through fine.
+
+    Baking each one to a texture would be the faithful answer, but nothing else in this game
+    is textured - it is flat colours on flat shading throughout - so a single colour is the
+    right answer here and the cheap one. The author left a sensible colour sitting under each
+    link, so use that; if it is white too, average the ramp stops feeding it instead.
+    """
+    if not mat or not mat.use_nodes:
+        return
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if not bsdf:
+        return
+    inp = bsdf.inputs.get("Base Color")
+    if not inp or not inp.is_linked:
+        return
+    col = list(inp.default_value)[:3]
+    if min(col) > 0.9:                       # the fallback is white as well: read the tree
+        stops = []
+        seen = set()
+        stack = [inp.links[0].from_node]
+        while stack:
+            n = stack.pop()
+            if n.name in seen:
+                continue
+            seen.add(n.name)
+            if n.type == "VALTORGB":
+                stops.extend(list(e.color)[:3] for e in n.color_ramp.elements)
+            elif n.type == "RGB":
+                stops.append(list(n.outputs[0].default_value)[:3])
+            for i in n.inputs:
+                if i.is_linked:
+                    stack.append(i.links[0].from_node)
+                elif i.type == "RGBA" and hasattr(i, "default_value"):
+                    stops.append(list(i.default_value)[:3])
+        if stops:
+            col = [sum(c[i] for c in stops) / len(stops) for i in range(3)]
+    for link in list(inp.links):
+        mat.node_tree.links.remove(link)
+    inp.default_value = (*col, 1)
+
 
 def model_meshes(scene, collections=None):
     """The meshes that make up the model, skipping anything hidden from render.
@@ -316,20 +408,23 @@ def export(model_key, out_dir):
     classify = recipe["classify"]
 
     cols = recipe.get("collections")
+    # A sculpted model can arrive far denser than the game wants to draw every frame, and a
+    # boss shares the screen with a room full of everything else. `decimate` thins it at
+    # export and leaves the source file alone. One number thins everything equally; a dict
+    # keyed by group thins per part, with "*" as the default - which is what a model needs
+    # when the density is not spread evenly. The Sandman's head is 265k verts of the 346k he
+    # arrives with, from a remesh rather than from detail anyone can see, and thinning the
+    # whole figure hard enough to fix that would take the lance and the spikes with it.
+    dec = recipe.get("decimate")
     groups = {}
     for o in model_meshes(scene, cols):
-        limb = classify(mesh_group(o, cols), o.name, world_center(o).x)
-        groups.setdefault(limb, []).append(o)
-
-    # A sculpted model can arrive far denser than the game wants to draw every frame, and a
-    # boss is on screen with a room full of everything else. `decimate` in the recipe thins
-    # it at export, leaving the source file untouched.
-    ratio = recipe.get("decimate")
-    if ratio:
-        for objs in groups.values():
-            for o in objs:
-                m = o.modifiers.new("__export_decimate", "DECIMATE")
-                m.ratio = ratio
+        for slot in o.material_slots:
+            flatten_procedural_colour(slot.material)
+        g = mesh_group(o, cols)
+        groups.setdefault(classify(g, o.name, world_center(o).x), []).append(o)
+        ratio = dec.get(g, dec.get("*", 1)) if isinstance(dec, dict) else dec
+        if ratio and ratio < 1:
+            o.modifiers.new("__export_decimate", "DECIMATE").ratio = ratio
 
     for limb in recipe["parent"]:
         if limb not in groups:

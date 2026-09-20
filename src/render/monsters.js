@@ -193,20 +193,24 @@ function buildOrcLord() {
 // clips below need no changes.
 let bossModel = null;
 let moonModel = null;
+let sandModel = null;
 
 /** Injection seam for the loaded boss model. The render test uses it to supply a stand-in
  *  rig, since GLTFLoader cannot fetch a file in Node. */
 export function setBossModel(scene) { bossModel = scene; }
 export function setMoonrayaModel(scene) { moonModel = scene; }
+export function setSandmanModel(scene) { sandModel = scene; }
 
 export async function loadMonsterAssets(base = 'assets/monsters/') {
   const loader = new GLTFLoader();
-  const [baph, moon] = await Promise.all([
+  const [baph, moon, sand] = await Promise.all([
     loader.loadAsync(base + 'baphomet.glb'),
     loader.loadAsync(base + 'moonraya.glb'),
+    loader.loadAsync(base + 'sandman.glb'),
   ]);
   setBossModel(baph.scene);
   setMoonrayaModel(moon.scene);
+  setSandmanModel(sand.scene);
   return bossModel;
 }
 
@@ -243,6 +247,11 @@ function buildBaphomet(scale = 1, darken = 0) {
 function buildMoonrayaGlb() {
   if (!moonModel) throw new Error('moonraya.glb not loaded - call loadMonsterAssets() first');
   return rigFromGlb(moonModel);
+}
+
+function buildSandmanGlb() {
+  if (!sandModel) throw new Error('sandman.glb not loaded - call loadMonsterAssets() first');
+  return rigFromGlb(sandModel);
 }
 
 // Per-type rest offsets, added to every pose. The primitive monsters are modelled standing
@@ -451,8 +460,8 @@ function buildBabyWolf() {
   return { root, body, kind: 'blob' };
 }
 
-// Sandman: a hunched figure of packed sand with lit eyes. Blocks with the corners knocked off.
-function buildSandman() {
+// Sand Wraith: a hunched figure of packed sand with lit eyes. Blocks with the corners knocked off.
+function buildSandWraith() {
   const sand = mat(0xc9a66a, { roughness: 1.0 });
   const dark = mat(0x8a6a3a, { roughness: 1.0 });
   const eye = mat(0xffe680, { emissive: 0xffc830, emissiveIntensity: 1.8 });
@@ -738,7 +747,7 @@ function buildSorya() {
 // limb-segmented by tools/export_heroes.py to assets/monsters/moonraya.glb with an entry in
 // meta.json, loaded in loadMonsterAssets(), and this function replaced by the GLB build.
 const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
-  pecoPeco: buildPecoPeco, ant: buildAnt, babyWolf: buildBabyWolf, sandman: buildSandman, golem: buildGolem, phreeoni: buildPhreeoni, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: () => buildBaphomet(),
+  pecoPeco: buildPecoPeco, ant: buildAnt, babyWolf: buildBabyWolf, sandWraith: buildSandWraith, golem: buildGolem, phreeoni: buildPhreeoni, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: () => buildBaphomet(),
   // 1.75 of the boss's 3.0 game units, which is skeleton height.
   baphometling: () => buildBaphomet(0.58, 0.3),
   // Phaelan. Skelbow is the archer skeleton's build in the forest's own colours, so the two
@@ -746,7 +755,9 @@ const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   famiru: buildFamiru, wispra: buildWispra, foxShade: buildFoxShade,
   munari: buildMunari, bonku: buildBonku, sorya: buildSorya,
   skelbow: () => buildSkeleton({ archer: true, boneColor: 0xcfd6c4, clothColor: 0x3f5b3a }),
-  moonraya: buildMoonrayaGlb };
+  moonraya: buildMoonrayaGlb,
+  // Morroc's boss. No legs: the pose rig simply leaves out what the sculpt does not have.
+  sandman: buildSandmanGlb };
 
 // ------------------------------------------------------------------ clips
 

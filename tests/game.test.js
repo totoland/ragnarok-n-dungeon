@@ -123,7 +123,7 @@ test('monsters drop potions, walking over one heals and removes it, and the pity
   assert.equal(g.player.hp, g.player.hpMax, 'never exceeds max');
 });
 
-test('the desert town plays through every room to Phreeoni and is won', () => {
+test('the desert town plays through every room to the Sandman and is won', () => {
   const g = createGame({ hero: 'knight', seed: 8, dungeon: MORROC });
   assert.equal(g.room.name, 'Sograt Sands');
   const seen = new Set();
@@ -137,18 +137,18 @@ test('the desert town plays through every room to Phreeoni and is won', () => {
   }
   assert.equal(g.phase, 'won', `won (stopped in "${g.room.name}" after ${steps} steps)`);
   assert.equal(g.roomIndex, MORROC.rooms.length - 1);
-  for (const t of ['pecoPeco', 'ant', 'babyWolf', 'sandman', 'golem', 'phreeoni']) assert.ok(seen.has(t), `${t} spawned somewhere in the town`);
+  for (const t of ['pecoPeco', 'ant', 'babyWolf', 'sandWraith', 'golem', 'sandman']) assert.ok(seen.has(t), `${t} spawned somewhere in the town`);
 });
 
-test('the sandman throws sand and Phreeoni throws rocks, not arrows or fire', () => {
+test('the sand wraith throws sand and the Sandman throws it by the fistful, not arrows or fire', () => {
   const g = createGame({ hero: 'knight', seed: 2, dungeon: { rooms: [{ name: 't', width: 20, waves: [] }] } });
-  const s = createEnemy(g, 'sandman', 6, 0); s.state = 'chase'; s.cd = 0; g.enemies.push(s);
+  const s = createEnemy(g, 'sandWraith', 6, 0); s.state = 'chase'; s.cd = 0; g.enemies.push(s);
   const kinds = new Set();
   for (let i = 0; i < 240; i++) { update(g, { held: {}, pressed: {} }); for (const pr of g.projectiles) kinds.add(pr.kind); }
-  assert.ok(kinds.has('sandBall'), `sandman shot kind (${[...kinds]})`);
+  assert.ok(kinds.has('sandBall'), `sand wraith shot kind (${[...kinds]})`);
   const g2 = createGame({ hero: 'knight', seed: 2, dungeon: { rooms: [{ name: 't', width: 20, waves: [] }] } });
-  const b = createEnemy(g2, 'phreeoni', 6, 0); b.state = 'chase'; b.cd = 99; b.slamCd = 99; b.chargeCd = 99; b.castCd = 0; g2.enemies.push(b);
+  const b = createEnemy(g2, 'sandman', 6, 0); b.state = 'chase'; b.cd = 99; b.slamCd = 99; b.chargeCd = 99; b.castCd = 0; g2.enemies.push(b);
   const kinds2 = new Set();
   for (let i = 0; i < 240; i++) { update(g2, { held: {}, pressed: {} }); for (const pr of g2.projectiles) kinds2.add(pr.kind); }
-  assert.ok(kinds2.has('rock'), `phreeoni cast kind (${[...kinds2]})`);
+  assert.ok(kinds2.has('sandBall'), `Sandman cast kind (${[...kinds2]})`);
 });
