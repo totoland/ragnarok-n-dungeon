@@ -576,9 +576,15 @@ const CLIPS = {
 
 export function createMonsterViews(world) {
   const views = new Map();
+  // Views built ahead of their spawn. A monster is a few dozen primitives, and building
+  // five of them on the frame a wave lands cost 40-75 ms on a tablet; prebuild() lists what
+  // the next room will spawn and tick() builds one per frame while the player walks out.
+  const pool = {};
+  let queue = [];
+  const take = (type) => { const list = pool[type]; return list && list.length ? list.pop() : BUILDERS[type](); };
 
   function create(e) {
-    const built = BUILDERS[e.type]();
+    const built = take(e.type);
     const group = new THREE.Group();
     group.add(built.root);
     world.scene.add(group);
@@ -677,7 +683,34 @@ export function createMonsterViews(world) {
     if (v.built.ears) for (const ear of v.built.ears) ear.rotation.x = -0.3 * (v.cur.lift / Math.max(0.01, def.hop.height)) - 0.1 * Math.sin(v.t * 4);
   }
 
+  function dropPool() {
+    for (const list of Object.values(pool)) for (const b of list) b.root.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+    for (const k in pool) pool[k] = [];
+    queue = [];
+  }
+
   return {
+    // Queue the views a room will need - every wave, plus a boss's brood - beyond what the
+    // pool already holds. Leftovers from the room before are dropped first.
+    prebuild(roomDef, monsterDefs) {
+      dropPool();
+      const need = {};
+      for (const wave of roomDef.waves || []) for (const g of wave) {
+        need[g.type] = (need[g.type] || 0) + g.count;
+        const adds = monsterDefs?.[g.type]?.adds;
+        if (adds) need[adds.type] = (need[adds.type] || 0) + adds.count;
+      }
+      for (const [type, n] of Object.entries(need)) if (BUILDERS[type]) for (let i = 0; i < n; i++) queue.push(type);
+      return queue.length;
+    },
+    // Build one queued view. Returns true while there is more to do.
+    tick() {
+      const type = queue.shift();
+      if (!type) return false;
+      (pool[type] ||= []).push(BUILDERS[type]());
+      return queue.length > 0;
+    },
+    get pending() { return queue.length; },
     // Shader warm-up: one of every monster, far off-screen, so the renderer can compile
     // their programs at load instead of on the frame the first one walks in. Returns the
     // teardown; call it after renderer.compile().

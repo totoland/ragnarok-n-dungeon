@@ -274,3 +274,35 @@ test('touch: a new finger on an otherwise empty glass clears a hold whose releas
   win.dispatch('touchstart', touchEv([5], [5]));
   assert.equal(input.snapshot().held.attack, false, 'the stale hold is dropped before the new press');
 });
+
+// A fake navigator with gamepads, for the liveness rules.
+function withPads(pads, fn) {
+  const desc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: () => pads }, configurable: true });
+  try { return fn(); } finally { if (desc) Object.defineProperty(globalThis, 'navigator', desc); else delete globalThis.navigator; }
+}
+const fakePad = (index, buttons, timestamp) => ({ index, id: `pad${index}`, connected: true, timestamp, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: buttons.includes(i), value: buttons.includes(i) ? 1 : 0 })) });
+
+test('gamepad: the pad with the newest clock is the one read, and a frozen pad is released after the stale limit', () => {
+  const frozen = fakePad(0, [2], 1000);      // attack stuck down, clock stopped
+  const live = fakePad(1, [], 5000);
+  const pads = [frozen];
+  withPads(pads, () => {
+    const input = createInput(fakeTarget(), { settings: defaultSettings(), padStaleMs: 0 });
+    let snap = input.snapshot();
+    assert.equal(snap.held.attack, true, 'first poll: the hold is honoured');
+    snap = input.snapshot();
+    assert.equal(!!snap.held.attack, false, 'the clock never moved while a button was down: read as released');
+    assert.ok(input.trace().some(([, w]) => w.startsWith('pad stale')));
+    frozen.timestamp = 1001;                  // it moves again: back in play
+    snap = input.snapshot();
+    assert.equal(snap.held.attack, true);
+    assert.ok(input.trace().some(([, w]) => w === 'pad live again'));
+    pads.push(live);                          // a re-enumerated controller: newer clock wins
+    live.buttons[3].pressed = true;
+    snap = input.snapshot();
+    assert.equal(!!snap.held.attack, false, 'the frozen pad is no longer read');
+    assert.equal(snap.pressed.skill1, true, 'the live pad is');
+    assert.ok(input.trace().some(([, w]) => w.startsWith('pad switch #1')));
+  });
+});

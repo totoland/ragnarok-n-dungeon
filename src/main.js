@@ -99,7 +99,7 @@ const townButtons = [...document.querySelectorAll('.town')];
 const townBlurb = new Map(townButtons.map((b) => [b.dataset.town, b.querySelector('em').textContent]));
 function markTown() {
   if (!isUnlocked(profile, selectedTown)) selectedTown = 'prontera';
-  if (assets) prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0);
+  if (assets) { prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0); monsters.prebuild(TOWNS[selectedTown].rooms[0], MONSTERS); }
   for (const b of townButtons) b.classList.toggle('selected', b.dataset.town === selectedTown);
   refreshTitle();
 }
@@ -265,6 +265,7 @@ Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   characterUI.setAssets(a);
   warmUp();
   prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0);
+  monsters.prebuild(TOWNS[selectedTown].rooms[0], MONSTERS);
   hud.setLoading('Pick a hero, or press Enter for the Knight.');
   for (const b of heroButtons) { b.disabled = false; b.addEventListener('mouseenter', () => { selectedHero = b.dataset.hero; markSelected(); }); }
   markTown();
@@ -376,7 +377,7 @@ function frame(now) {
   // arrive as the first frame of input.
   if (!game || paused) input.snapshot();
 
-  if (!game) { if (preview) updatePreview(dtReal); world.renderer.render(world.scene, world.camera); return; }
+  if (!game) { if (preview) updatePreview(dtReal); monsters.tick(); world.renderer.render(world.scene, world.camera); return; }
 
   if (!paused) {
     // hit-stop: freeze the sim for a few ms after a solid hit, the belt-scroller crunch
@@ -440,8 +441,10 @@ function renderFrame(dt) {
   if (game.phase === 'cleared' && next < game.dungeon.rooms.length && prewarmed !== next) {
     prewarmed = next;
     prewarmRoom(world, game.dungeon.rooms[next], next);
+    monsters.prebuild(game.dungeon.rooms[next], MONSTERS);
     mark(`prewarm room ${game.dungeon.rooms[next].name}`);
   }
+  if (game.phase === 'cleared') monsters.tick();   // one queued monster view per frame on the walk out
   for (const ev of game.events) { const f = MARKED[ev.type]; const label = f && f(ev); if (label) mark(label); sfx.handle(ev); }
   fx.update(game, dt);
   heroView.update(game, dt);

@@ -134,10 +134,26 @@ export function createInput(target = window, opts = {}) {
   // rebindable; every face and shoulder button goes through padMap.
   const padHeld = {};
   let padPrev = {};
+  // Which pad is read, and whether it is alive. iPadOS Safari was seen handing back a
+  // Gamepad whose state had frozen mid-fight - attack pressed, every other button dead -
+  // for a minute at a time, while the controller itself was fine. Two defences: the pad
+  // with the newest timestamp is the one read (a re-enumerated controller shows up as a
+  // second entry, and the frozen one's clock stops), and a pad whose clock has not moved
+  // for `padStaleMs` while it claims a button is down is treated as released until it
+  // moves again. A real hold longer than that has to be pressed again, which is cheap.
+  const padStaleMs = opts.padStaleMs ?? 3000;
+  let padIndex = -1, padStamp = -1, padStampAt = 0, padStale = false;
+  const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const firstPad = () => {
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
-    return pads && [...pads].find((p) => p && p.connected);
+    let best = null;
+    for (const p of pads || []) if (p && p.connected && (!best || (p.timestamp || 0) > (best.timestamp || 0))) best = p;
+    return best;
   };
+  if (target.addEventListener) {
+    target.addEventListener('gamepadconnected', (e) => { note(`pad connected #${e.gamepad?.index} ${e.gamepad?.id || ''}`); padPrev = {}; padIndex = -1; });
+    target.addEventListener('gamepaddisconnected', (e) => { note(`pad disconnected #${e.gamepad?.index}`); padPrev = {}; padIndex = -1; });
+  }
   function pollPad() {
     for (const k in padHeld) padHeld[k] = false;
     const pad = firstPad();
@@ -156,6 +172,14 @@ export function createInput(target = window, opts = {}) {
       return;
     }
     if (!enabled) return;
+    if (pad.index !== padIndex) { if (padIndex !== -1) note(`pad switch #${pad.index} ${pad.id || ''}`); padIndex = pad.index; padPrev = {}; padStamp = -1; }
+    // Liveness: the clock moves on every change; a pad claiming a button while its clock
+    // stands still for too long is frozen, and its buttons are read as up until it moves.
+    const t = nowMs();
+    if (pad.timestamp !== padStamp) { padStamp = pad.timestamp; padStampAt = t; if (padStale) { padStale = false; note('pad live again'); } }
+    const anyDown = [...pad.buttons].some((b) => b?.pressed);
+    if (!padStale && anyDown && t - padStampAt > padStaleMs) { padStale = true; note(`pad stale ${Math.round(padStaleMs / 1000)}s - released`); }
+    if (padStale) { padPrev = {}; return; }
     const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
     padHeld.left = ax < -0.4 || !!pad.buttons[14]?.pressed;
     padHeld.right = ax > 0.4 || !!pad.buttons[15]?.pressed;
