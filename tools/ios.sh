@@ -60,7 +60,20 @@ check() {
           sudo xcodebuild -license accept
           xcodebuild -runFirstLaunch" ;;
   esac
-  local xv; xv=$(xcodebuild -version 2>/dev/null | head -1 | awk '{print $2}') || die "xcodebuild will not run. Try: xcodebuild -runFirstLaunch"
+  # Show what xcodebuild actually said. A freshly installed Xcode fails here for one of three
+  # reasons and they need different fixes, so swallowing its message costs an hour.
+  local xout xv
+  if ! xout=$(xcodebuild -version 2>&1); then
+    printf '\n%s\n\n' "$xout" | sed 's/^/        /' >&2
+    die "xcodebuild will not run. Its own message is above; usually one of:
+          sudo xcodebuild -license accept   the licence has not been agreed to yet
+          xcodebuild -runFirstLaunch        the build components are not installed yet
+          (or Xcode is still downloading - let the App Store finish first)"
+  fi
+  xv=$(printf '%s\n' "$xout" | head -1 | awk '{print $2}')
+  case "$xv" in
+    ''|*[!0-9.]*) die "Could not read a version out of: $(printf '%s' "$xout" | head -1)" ;;
+  esac
   [ "${xv%%.*}" -ge 16 ] || die "Xcode $xv is too old; Capacitor 8 needs Xcode 16 or newer."
   ok "Xcode $xv"
 
