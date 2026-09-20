@@ -157,22 +157,33 @@ signing() {
 
   say "Who can sign on this Mac"
   local ids; ids=$(security find-identity -v -p codesigning 2>/dev/null || true)
-  local teams; teams=$(printf '%s\n' "$ids" | sed -n 's/.*(\([A-Z0-9]\{10\}\)).*/\1/p' | sort -u)
+  local certteams; certteams=$(printf '%s\n' "$ids" | sed -n 's/.*(\([A-Z0-9]\{10\}\)).*/\1/p' | sort -u || true)
+
+  # A free account has no certificate until Xcode first builds with it, so the keychain can
+  # be empty while the Apple ID is perfectly well signed in. Xcode records the teams it knows
+  # separately, and that list is enough to name the team - the certificate follows on its own.
+  local xcteams; xcteams=$(defaults read com.apple.dt.Xcode IDEProvisioningTeams 2>/dev/null \
+    | sed -n 's/.*teamID = "\{0,1\}\([A-Z0-9]\{10\}\)"\{0,1\};.*/\1/p' | sort -u || true)
+  local teams; teams=$(printf '%s\n%s\n' "$certteams" "$xcteams" | grep -v '^$' | sort -u || true)
 
   if [ -z "$teams" ]; then
-    warn "no signing identity on this Mac yet, which is why Xcode says a team is required."
+    warn "no Apple ID signed in to Xcode here, which is what Xcode means by a missing team."
     cat <<'FIX'
 
-        Xcode cannot offer a team until an Apple ID is signed in:
-          Xcode → Settings… → Accounts → + → Apple ID → sign in
-        A free Apple ID is enough. Xcode then creates the certificate by itself, and the
-        Team appears as "<your name> (Personal Team)". Come back and run this again.
+        Add one - a free Apple ID is enough:
+          Xcode → Settings… (⌘,) → Accounts → + → Apple ID → sign in
+        Then, in the same window, select the account and click Manage Certificates… → +
+        → Apple Development. That creates the certificate straight away instead of waiting
+        for a build to ask for it. Come back and run this again.
 
 FIX
     return 1
   fi
 
-  printf '%s\n' "$ids" | sed 's/^/  /'
+  # "0 valid identities found" is still output, so judge by the team IDs, not by the text.
+  if [ -n "$certteams" ]; then printf '%s\n' "$ids" | sed 's/^/  /'; else
+    warn "an Apple ID is signed in but has no certificate yet; Xcode makes one on the first build."
+  fi
   echo
   say "Team IDs found"
   printf '%s\n' "$teams" | sed 's/^/  /'
