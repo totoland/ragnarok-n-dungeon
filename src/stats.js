@@ -44,8 +44,19 @@ function init() {
 
     const s = [...frames].sort((a, b) => a - b);
     const p50 = pct(s, 0.5), p95 = pct(s, 0.95);
-    const r = window.__dro?.world?.renderer;
+    const w = window.__dro?.world;
+    const r = w?.renderer;
     const i = r?.info;
+    // Which GPU driver answers: Chrome names the adapter, Safari says "Apple GPU" and
+    // nothing more - a difference worth seeing next to the frame numbers.
+    let gpu = '';
+    try {
+      const gl = r?.getContext();
+      const ext = gl?.getExtension('WEBGL_debug_renderer_info');
+      gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl ? gl.getParameter(gl.RENDERER) : '';
+    } catch { /* not every browser exposes it */ }
+    const ua = navigator.userAgent;
+    const engine = /CriOS/.test(ua) ? 'Chrome (iOS WebKit)' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'other';
     const heap = performance.memory
       ? ` · heap ${Math.round(performance.memory.usedJSHeapSize / 1048576)} MB` : '';
 
@@ -53,7 +64,9 @@ function init() {
       `FPS ${(1000 / p50).toFixed(0)}   frame ${p50.toFixed(1)} / ${p95.toFixed(1)} ms (p50/p95)`,
       `worst ${worst.toFixed(0)} ms since load`,
       i ? `draw ${i.render.calls}  tris ${fmt(i.render.triangles)}  tex ${i.memory.textures}  geo ${i.memory.geometries}` : 'renderer not up yet',
-      r ? `dpr ${r.getPixelRatio()} (device ${window.devicePixelRatio})  canvas ${r.domElement.width}x${r.domElement.height}` : '',
+      r ? `dpr ${r.getPixelRatio()} of max ${w.dprMax ?? '?'} (device ${window.devicePixelRatio})  canvas ${r.domElement.width}x${r.domElement.height}` : '',
+      w ? `refresh ~${w.refreshHz ?? '?'} Hz  pacing ${w.pacing ?? '-'}  touch ${w.coarse ? 'yes' : 'no'}  shadows ${r?.shadowMap?.type === 1 ? 'PCF' : 'PCFSoft'}` : '',
+      `${engine}  gpu ${gpu || '?'}`,
       `css ${innerWidth}x${innerHeight}  cores ${navigator.hardwareConcurrency || '?'}${heap}`,
       navigator.userAgent,
     ].filter(Boolean).join('\n');

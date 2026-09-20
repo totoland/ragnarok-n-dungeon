@@ -321,10 +321,12 @@ function syncRoom() {
   }
 }
 
-// Frame pacing. The sim is fixed at 60 Hz. On a 120 Hz screen (an iPad Pro, a gaming
-// phone) requestAnimationFrame comes twice per sim step, and drawing the same state twice
-// costs a full render for nothing and reads as judder when the pairing drifts; so once the
-// loop has measured a high refresh it draws only on frames that stepped the sim. And when
+// Frame pacing. The sim is fixed at 60 Hz. On a 120 Hz tablet requestAnimationFrame comes
+// twice per sim step, and on a mobile GPU drawing the same state twice costs a full render
+// for nothing; so on a coarse-pointer device that has measured a high refresh the loop
+// draws only on frames that stepped the sim. A desktop keeps every frame: its GPU has the
+// headroom, and the view layer's blending and particles do move between sim steps, which
+// is exactly why Chrome on a ProMotion Mac feels smoother than a 60 Hz cap. And when drawn
 // frames run long the resolution comes down a notch at a time (and back up when they are
 // comfortably short), which is what keeps a tablet at its native 2x from stuttering.
 let refreshEma = 1 / 60;    // measured frame interval
@@ -337,6 +339,7 @@ function frame(now) {
   last = now;
   refreshEma += (dtReal - refreshEma) * 0.05;
   const hiHz = refreshEma < 0.0125;
+  world.refreshHz = Math.round(1 / refreshEma);
 
   // Keyboard and touch arrive as DOM events, which fire whatever the loop is doing. A
   // gamepad has to be asked, and the only place that asked was the sim step - so on the
@@ -362,8 +365,9 @@ function frame(now) {
       for (const ev of game.events) {
         if (ev.type === 'hit') hitstop = Math.max(hitstop, ev.crit || ev.target === 'player' ? 0.07 : ev.attack === 'bash' || ev.attack === 'slash3' ? 0.06 : 0.028);
       }
-      // 120 Hz: this frame did not move the sim, so there is nothing new to draw.
-      if (hiHz && steps === 0) { pendingDt += dtReal; return; }
+      // 120 Hz on a tablet: this frame did not move the sim, so there is nothing new to draw.
+      world.pacing = hiHz ? (world.coarse ? 'skip-dup' : 'every-frame') : '60hz';
+      if (hiHz && world.coarse && steps === 0) { pendingDt += dtReal; return; }
     }
     // Adaptive resolution, judged every second on the interval between drawn frames.
     const drawn = dtReal + pendingDt;
