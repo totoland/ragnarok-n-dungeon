@@ -450,7 +450,7 @@ function mark(label) { world.marks.push({ at: performance.now(), label }); if (w
 // that name them, which leaves the frame itself. Time its parts, and when one runs long say
 // which part it was and what the rest cost - a fix aimed at the wrong half of a frame is
 // worse than no fix, because it looks like progress.
-const phase = { sim: 0, fx: 0, hero: 0, monsters: 0, scene: 0, hud: 0, draw: 0 };
+const phase = { sim: 0, pre: 0, fx: 0, hero: 0, monsters: 0, scene: 0, hud: 0, draw: 0 };
 function phaseMark(total) {
   let name = '', worst = 0;
   for (const k in phase) if (phase[k] > worst) { worst = phase[k]; name = k; }
@@ -462,8 +462,16 @@ function renderFrame(dt) {
   if (game.roomIndex !== roomBuilt) mark(`build room ${game.room.name}`);
   // A held attack that never lets go is the bug being chased; stamp it with what the input
   // layer sees the moment it passes six seconds, so the report can be read back.
-  if (game.player.holdAttack) { if (!heldSince) heldSince = performance.now(); else if (performance.now() - heldSince > 6000) { const raw = input.raw(); mark(`attack held 6s+ (held ${raw.held.join('/')}; pad ${raw.pad ? raw.pad.buttons.join(',') : '-'})`); heldSince = -1; } }
-  else heldSince = 0;
+  const live = game.phase !== 'won' && game.phase !== 'dead';   // a finished run freezes the last hold; that is not a stuck button
+  if (live && game.player.holdAttack) {
+    if (!heldSince) heldSince = performance.now();
+    else if (heldSince > 0 && performance.now() - heldSince > 6000) {
+      const raw = input.raw();
+      mark(`attack held 6s+ (held ${raw.held.join('/')}; pad ${raw.pad ? raw.pad.buttons.join(',') : '-'})`);
+      heldSince = -1;   // said once; -1 is the latch, and the next release resets it
+    }
+  } else heldSince = 0;
+  const preStart = performance.now();
   syncRoom();
   // The walk to the exit is the quiet moment to draw the next room's textures.
   const next = game.roomIndex + 1;
@@ -475,6 +483,7 @@ function renderFrame(dt) {
   }
   if (game.phase === 'cleared') monsters.tick();   // one queued monster view per frame on the walk out
   for (const ev of game.events) { const f = MARKED[ev.type]; const label = f && f(ev); if (label) mark(label); sfx.handle(ev); }
+  phase.pre = performance.now() - preStart;   // room sync, the next room's textures, the event drain
   let t = performance.now();
   fx.update(game, dt);              phase.fx = performance.now() - t; t = performance.now();
   heroView.update(game, dt);        phase.hero = performance.now() - t; t = performance.now();
