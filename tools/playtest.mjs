@@ -4,6 +4,7 @@
 //   node tools/playtest.mjs hunter 7   # one hero, one seed, verbose room log
 //   node tools/playtest.mjs --tier 2    # every monster at New Game+ tier 2
 //   node tools/playtest.mjs --matrix    # tiers 0..2, no pass/fail gate
+//   node tools/playtest.mjs --level 8   # the hero starts at level 8 (xp from sim/progress.js)
 //   node tools/playtest.mjs --dungeon morroc   # another town; reports, no gate
 //
 // The bot is deliberately simple: walk to the nearest live enemy's lane, mash attack when in
@@ -11,6 +12,7 @@
 // dumb should still clear the dungeon most of the time with hp to spare (it is a beat-em-up,
 // not a bullet hell), and must never clear it without taking any damage.
 import { createGame, update } from '../src/sim/game.js';
+import { xpAtLevel } from '../src/sim/progress.js';
 import { TOWNS } from '../src/sim/data/dungeon.js';
 import { FLOOR, SIM } from '../src/config.js';
 
@@ -88,7 +90,7 @@ function run(hero, seed, verbose = false, opts = {}) {
     frame++;
   }
   log.push({ room: lastRoom, name: g.dungeon.rooms[lastRoom].name, secs: ((frame - roomStart) * SIM.dt).toFixed(1), hpLost: hpAtRoom - g.player.hp });
-  const result = { hero, ...(opts.tier ? { tier: opts.tier } : {}), seed, phase: g.phase, room: g.roomIndex, secs: (frame * SIM.dt).toFixed(0), hp: g.player.hp, hpMax: g.player.hpMax, kills: g.kills, best: g.combo.best, dealt: g.stats.damageDealt, score: Math.round(g.score) };
+  const result = { hero, ...(opts.tier ? { tier: opts.tier } : {}), seed, phase: g.phase, room: g.roomIndex, secs: (frame * SIM.dt).toFixed(0), hp: g.player.hp, hpMax: g.player.hpMax, kills: g.kills, best: g.combo.best, dealt: g.stats.damageDealt, score: Math.round(g.score), lv: g.player.level, xp: g.xp - g.xpStart };
   if (verbose) { console.table(log); }
   return result;
 }
@@ -117,9 +119,11 @@ const town = townFlag ? TOWNS[townFlag] : null;
 if (townFlag && !town) { console.error(`unknown dungeon '${townFlag}' - one of: ${Object.keys(TOWNS).join(', ')}`); process.exit(2); }
 const tierFlag = flag('--tier');
 const tier = tierFlag ? Number(tierFlag) : 0;
+const levelFlag = flag('--level');
+const start = levelFlag ? { xp: xpAtLevel(Number(levelFlag)) } : {};
 const rows = [];
 if (flag('--matrix')) {
-  for (const t of [0, 1, 2]) for (const h of heroes) for (const s of seeds) rows.push(run(h, s, false, { tier: t, ...(town ? { dungeon: town } : {}) }));
+  for (const t of [0, 1, 2]) for (const h of heroes) for (const s of seeds) rows.push(run(h, s, false, { tier: t, ...start, ...(town ? { dungeon: town } : {}) }));
   console.table(rows);
   for (const t of [0, 1, 2]) {
     const r = rows.filter((x) => (x.tier || 0) === t);
@@ -128,11 +132,11 @@ if (flag('--matrix')) {
   }
   process.exit(0);
 }
-for (const h of heroes) for (const s of seeds) rows.push(run(h, s, !!seedArg, { ...(tier ? { tier } : {}), ...(town ? { dungeon: town } : {}) }));
+for (const h of heroes) for (const s of seeds) rows.push(run(h, s, !!seedArg, { ...(tier ? { tier } : {}), ...start, ...(town ? { dungeon: town } : {}) }));
 console.table(rows);
 const wins = rows.filter((r) => r.phase === 'won').length;
 console.log(`${wins}/${rows.length} runs cleared the dungeon; avg hp left ${(rows.reduce((a, r) => a + r.hp / r.hpMax, 0) / rows.length * 100).toFixed(0)}%`);
-if (town) { console.log(`(${townFlag}: no pass/fail gate - the bar below is calibrated for Prontera)`); process.exit(0); }
+if (town || levelFlag) { console.log(`(${townFlag || `level ${levelFlag}`}: no pass/fail gate - the bar below is calibrated for a fresh hero in Prontera)`); process.exit(0); }
 const flawless = rows.filter((r) => r.phase === 'won' && r.hp === r.hpMax).length;
 if (flawless) { console.error(`${flawless} flawless runs — the dungeon is too easy`); process.exitCode = 1; }
 // The bot has no boss strategy beyond backing off, so half the runs is the bar; a kiting hunter

@@ -5,16 +5,20 @@
 import { SIM, FLOOR, PLAYER, DROPS } from '../config.js';
 import { DUNGEON } from './data/dungeon.js';
 import { createRng } from './rng.js';
-import { createPlayer, updatePlayer, hurtPlayer } from './player.js';
+import { createPlayer, updatePlayer, hurtPlayer, setLevel } from './player.js';
+import { levelFromXp, xpForKill } from './progress.js';
 import { createEnemy, updateEnemy } from './enemies.js';
 import { boxHits, rollDamage, applyHit } from './combat.js';
 
-export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods, tier = 0 } = {}) {
+export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods, tier = 0, xp = 0 } = {}) {
   const g = {
     t: 0, rng: createRng(seed), seed, dungeon,
     // tier: the town's New Game+ level, fixed for the run; every spawn reads it.
     tier,
-    player: createPlayer(hero, mods),
+    // xp is the hero's lifetime total, carried in from the profile. It only ever grows, so
+    // the shell persists it by writing the number back; xpStart is what the run began with.
+    xp, xpStart: xp, mods,
+    player: createPlayer(hero, mods, levelFromXp(xp)),
     roomIndex: -1, room: null, bounds: { xMin: 0, xMax: 16 },
     waveIndex: -1, spawnQueue: [], enemies: [], projectiles: [], pickups: [],
     events: [], nextId: 1,
@@ -131,7 +135,21 @@ function onEnemyHit(g, e, dmg, crit, killed, attackId) {
     g.score += e.def.score * (1 + Math.min(2, g.combo.count / 20));
     pushEvent(g, { type: 'kill', id: e.id, monster: e.type, x: e.x, z: e.z, y: e.y, boss: e.boss, score: e.def.score });
     if (!e.boss) rollDrop(g, e);
+    gainXp(g, xpForKill(e.def, g.tier));
   }
+}
+
+// XP is flat per kill - no combo multiplier, unlike score - so a level is a count of what was
+// killed, not of how stylishly. A level-up mid-run re-resolves the hero on the spot and
+// refills him, RO style: the boss room is where it tends to happen and where it matters.
+function gainXp(g, amount) {
+  g.xp += amount;
+  const p = g.player;
+  const level = levelFromXp(g.xp);
+  if (level <= p.level) return;
+  setLevel(p, level, g.mods);
+  p.hp = p.hpMax; p.mp = p.mpMax;
+  pushEvent(g, { type: 'levelUp', level, x: p.x, z: p.z, y: p.y });
 }
 
 // The hero's passive, rolled once per landed hit off the run's rng so a proc is as

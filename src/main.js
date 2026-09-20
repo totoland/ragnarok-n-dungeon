@@ -2,11 +2,13 @@
 // `window.__dro` is the debug handle.
 import { SIM } from './config.js';
 import { TOWNS } from './sim/data/dungeon.js';
+import { MONSTERS } from './sim/data/monsters.js';
 import { createGame, update as simUpdate } from './sim/game.js';
+import { loadProfile, saveProfile, clearProfile, heroOf, isUnlocked, tierFor, prevTown, recordRun } from './profile.js';
 import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
-import { createScene, buildRoom, updateScene } from './render/scene.js';
+import { createScene, buildRoom, disposeRoom, updateScene } from './render/scene.js';
 import { loadHeroAssets, createHeroView } from './render/heroes.js';
 import { createMonsterViews, loadMonsterAssets } from './render/monsters.js';
 import { createFx } from './render/fx.js';
@@ -48,8 +50,12 @@ const monsters = createMonsterViews(world);
 let assets = null;
 let game = null;
 let heroView = null;
-let selectedHero = 'knight';
-let selectedTown = 'prontera';
+// Progress: xp and town clears per hero, in localStorage. The last pick is restored so
+// Enter at the title continues where the player left off.
+let profile = loadProfile();
+let selectedHero = profile.last.hero;
+let selectedTown = profile.last.town;
+let progress = null;   // what recordRun() said about the run that just ended
 let paused = false;
 let hitstop = 0;
 let roomBuilt = -1;
@@ -63,11 +69,53 @@ for (const b of heroButtons) {
   b.disabled = true;
   b.addEventListener('click', () => { selectedHero = b.dataset.hero; sfx.init(); start(); });
 }
-// town selection - a click just marks it; the hero buttons / Enter still start the run
+// town selection - a click just marks it; the hero buttons / Enter still start the run.
+// A locked town is disabled until the one before it has been cleared by any hero.
 const townButtons = [...document.querySelectorAll('.town')];
-function markTown() { for (const b of townButtons) b.classList.toggle('selected', b.dataset.town === selectedTown); }
-for (const b of townButtons) b.addEventListener('click', () => { selectedTown = b.dataset.town; markTown(); });
-input.on('confirm', () => { if (settingsUI.isOpen) return; sfx.init(); if (!hud.el.title.hidden && assets) start(); else if (!hud.el.end.hidden) start(); });
+const townBlurb = new Map(townButtons.map((b) => [b.dataset.town, b.querySelector('em').textContent]));
+function markTown() {
+  if (!isUnlocked(profile, selectedTown)) selectedTown = 'prontera';
+  for (const b of townButtons) b.classList.toggle('selected', b.dataset.town === selectedTown);
+  refreshTitle();
+}
+for (const b of townButtons) b.addEventListener('click', () => { if (b.disabled) return; selectedTown = b.dataset.town; markTown(); });
+
+// Everything on the title that depends on the profile or the pick: level pills on the hero
+// cards, lock / tier state on the town cards, and the one-line blurb for the selected town.
+function refreshTitle() {
+  for (const b of heroButtons) {
+    const h = heroOf(profile, b.dataset.hero);
+    b.querySelector('.lv').textContent = h.level > 1 || h.xp > 0 ? `Lv ${h.level}` : '';
+  }
+  for (const b of townButtons) {
+    const key = b.dataset.town, em = b.querySelector('em');
+    const open = isUnlocked(profile, key);
+    b.disabled = !open;
+    if (!open) { em.textContent = `Clear ${TOWNS[prevTown(key)].town} to unlock`; continue; }
+    const t = profile.heroes[selectedHero]?.towns?.[key];
+    const tier = tierFor(profile, selectedHero, key);
+    em.innerHTML = '';
+    em.append(townBlurb.get(key));
+    if (t?.clears) {
+      const span = document.createElement('span');
+      span.className = 'tier';
+      span.textContent = ` · cleared ×${t.clears}${tier ? ` · NG+${tier}` : ''}`;
+      em.append(span);
+    }
+  }
+  const town = TOWNS[selectedTown];
+  const last = town.rooms[town.rooms.length - 1];
+  const boss = MONSTERS[last.waves?.[0]?.[0]?.type]?.name || last.name;
+  const tier = tierFor(profile, selectedHero, selectedTown);
+  const sub = document.getElementById('title-sub');
+  if (sub) sub.textContent = `${town.name} — ${town.rooms.length} rooms, one ${boss}.${tier ? ` New Game+${tier}: monsters ${Math.round(tier * 35)}% tougher.` : ''}`;
+}
+input.on('confirm', () => {
+  if (settingsUI.isOpen) return;
+  sfx.init();
+  if (!hud.el.title.hidden && assets) start();
+  else if (!hud.el.end.hidden) endPrimary();
+});
 window.addEventListener('keydown', (e) => {
   if (hud.el.title.hidden || !assets || settingsUI.isOpen) return;
   const a = keyLookup[e.code];
@@ -76,7 +124,19 @@ window.addEventListener('keydown', (e) => {
 input.on('mute', () => { sfx.init(); sfx.toggleMute(); });
 input.on('pause', () => { if (!game || ended || settingsUI.isOpen) return; paused = !paused; hud.showPause(paused); });
 hud.el.retry.addEventListener('click', () => start());
+hud.el.endContinue.addEventListener('click', () => continueRun());
+hud.el.endHome.addEventListener('click', () => toTitle());
+// Enter on the end screen takes the primary button: Continue when a next town is offered,
+// otherwise the same town again.
+function endPrimary() { if (!hud.el.endContinue.hidden) continueRun(); else start(); }
+function continueRun() {
+  const next = progress?.won ? progress.next : null;
+  if (next && isUnlocked(profile, next)) selectedTown = next;
+  start();
+}
 window.addEventListener('pointerdown', () => sfx.init(), { once: true });
+markTown();
+markSelected();
 
 // Title screen: both heroes on plinths, turning slowly; the selected one steps forward.
 let preview = null;
@@ -134,6 +194,7 @@ Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   assets = a;
   hud.setLoading('Pick a hero, or press Enter for the Knight.');
   for (const b of heroButtons) { b.disabled = false; b.addEventListener('mouseenter', () => { selectedHero = b.dataset.hero; markSelected(); }); }
+  markTown();
   markSelected();
   preview = buildPreview();
 }).catch((err) => {
@@ -141,7 +202,10 @@ Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   console.error(err);
 });
 
-function markSelected() { for (const b of heroButtons) b.classList.toggle('selected', b.dataset.hero === selectedHero); }
+function markSelected() {
+  for (const b of heroButtons) b.classList.toggle('selected', b.dataset.hero === selectedHero);
+  if (!hud.el.title.hidden) refreshTitle();
+}
 
 function start() {
   if (!assets) return;
@@ -149,7 +213,16 @@ function start() {
   if (heroView) heroView.dispose();
   monsters.clear();
   fx.clear();
-  game = createGame({ hero: selectedHero, seed: (Date.now() % 100000) | 0, dungeon: TOWNS[selectedTown] || TOWNS.prontera });
+  if (!isUnlocked(profile, selectedTown)) selectedTown = 'prontera';
+  // The run is a function of the profile at its start: the hero's lifetime xp sets the
+  // level, the town's clear count sets the New Game+ tier. Nothing else crosses over.
+  game = createGame({
+    hero: selectedHero, seed: (Date.now() % 100000) | 0, dungeon: TOWNS[selectedTown] || TOWNS.prontera,
+    tier: tierFor(profile, selectedHero, selectedTown), xp: heroOf(profile, selectedHero).xp,
+  });
+  profile.last = { hero: selectedHero, town: selectedTown };
+  saveProfile(profile);
+  progress = null;
   heroView = createHeroView(world, selectedHero, assets);
   hud.bindHero(game.player);
   hud.showTitle(false);
@@ -163,6 +236,26 @@ function start() {
   hitstop = 0;
   syncRoom();
   markSelected();
+}
+
+// Back to the title from the end screen: tear the run down and put the plinths back.
+function toTitle() {
+  if (!game) return;
+  if (heroView) { heroView.dispose(); heroView = null; }
+  monsters.clear();
+  fx.clear();
+  disposeRoom(world);
+  game = null;
+  ended = false;
+  paused = false;
+  roomBuilt = -1;
+  hud.el.hud.hidden = true;
+  hud.hideEnd();
+  hud.showPause(false);
+  hud.showTitle(true);
+  markTown();
+  markSelected();
+  preview = buildPreview();
 }
 
 function syncRoom() {
@@ -222,7 +315,12 @@ function renderFrame(dt) {
   hud.update(game, dt);
   if (!ended && (game.phase === 'won' || game.phase === 'dead')) {
     ended = true;
-    setTimeout(() => hud.showEnd(game, game.phase === 'won'), game.phase === 'won' ? 1800 : 1400);
+    // Bank the run the moment it ends, not when the overlay shows: a tab closed during the
+    // victory beat still keeps its xp and its clear.
+    const g = game, won = g.phase === 'won';
+    progress = recordRun(profile, g, { hero: selectedHero, town: selectedTown });
+    saveProfile(profile);
+    setTimeout(() => { if (game === g) hud.showEnd(g, won, progress); }, won ? 1800 : 1400);
   }
   game.events.length = 0;
 }
@@ -253,4 +351,9 @@ window.__dro = {
   play(n = 1) { for (let i = 0; i < n; i++) { simUpdate(game, input.snapshot(), SIM.dt); renderFrame(SIM.dt); } },
   start, hero(key) { selectedHero = key; start(); },
   town(key) { selectedTown = key; markTown(); },
+  toTitle,
+  get profile() { return profile; },
+  // Debug: grant xp to the selected hero / wipe the profile, then redraw the title.
+  grant(xp) { profile.heroes[selectedHero].xp += xp | 0; saveProfile(profile); markTown(); markSelected(); },
+  resetProfile() { profile = clearProfile(); selectedTown = 'prontera'; markTown(); markSelected(); },
 };

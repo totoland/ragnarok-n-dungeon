@@ -231,6 +231,28 @@ byte-for-byte the game before this step existed — a run is still `(loadout, se
 The harness sweeps it: `node tools/playtest.mjs --matrix` plays tiers 0–2, and `--tier N`
 plays one; the pass/fail gate applies only to the plain run so it stays comparable.
 
+### Levels, XP and the profile
+
+[src/sim/progress.js](src/sim/progress.js) is the curve: XP to the next level is
+`LEVEL.base · L^LEVEL.exp` (config.js), every level past the first adds a flat share of the
+table's HP / SP / ATK (`levelMods(level)`, sparse, merged with gear by `mergeMods`) and one
+skill point. A kill is worth the monster's `score` (or an explicit `xp`), plus `NGPLUS.xp`
+per tier. `createGame({ xp })` takes the hero's lifetime total, sets the level from it, and
+levels up mid-run — the hero is re-resolved on the spot and refilled, RO style. One Prontera
+clear is about 2,250 XP, level 4; `node tools/playtest.mjs --level 8` starts the bot there.
+
+[src/profile.js](src/profile.js) persists progress in `localStorage` (`dro.profile.v1`) the
+way settings.js does, and stores almost nothing: `xp` and `{ clears, best }` per hero per
+town, plus the last pick. Level, skill points, a town's tier (`clears`, capped) and which
+towns are open are all derived, so a half-written save cannot leave the profile in a state
+that never existed. Progress is per hero, like an RO character; unlocking a town is
+account-wide: one clear of Prontera by anyone opens Morroc. `recordRun()` folds a finished
+run in by writing the sim's lifetime `xp` back — the run started from the stored number, so a
+loss keeps its XP and recording twice is harmless — and reports what to show on the end
+screen: XP banked, levels gained, a town unlocked, the tier the next run will be. The end
+screen then offers **Continue →** the next town, the same town again at the next tier, or
+the title. `__dro.grant(xp)` and `__dro.resetProfile()` drive it from the console.
+
 
 ### Towns
 

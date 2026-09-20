@@ -5,7 +5,7 @@
 // distance, the boss combines all of it.
 
 export const DUNGEON = {
-  name: 'Culvert of Prontera',
+  town: 'Prontera', name: 'Culvert of Prontera',
   rooms: [
     {
       name: 'Prontera Field', width: 16, theme: 'field',
@@ -51,7 +51,7 @@ export const DUNGEON = {
 // wave, ending on Phreeoni. Room themes are the sand and the quarry; both are outdoor and
 // draw their own dune sky procedurally, so the town ships with no image at all.
 export const MORROC = {
-  name: 'Sograt Desert',
+  town: 'Morroc', name: 'Sograt Desert',
   rooms: [
     {
       name: 'Sograt Sands', width: 18, theme: 'desert',
@@ -94,6 +94,7 @@ export const MORROC = {
   ],
 };
 
-// Every town the title screen can start. DUNGEON stays the default export shape for the
-// tests and the harness; TOWNS is what the shell and `--dungeon` read.
+// Every town the title screen can start, in unlock order: clearing one opens the next (see
+// profile.js). DUNGEON stays the default export shape for the tests and the harness; TOWNS
+// is what the shell and `--dungeon` read.
 export const TOWNS = { prontera: DUNGEON, morroc: MORROC };

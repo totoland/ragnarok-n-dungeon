@@ -1,22 +1,28 @@
 // DOM overlay: bars, room label, score/combo, boss bar, skill slots, GO arrow, overlays.
 import { SKILL_INFO, PASSIVE_INFO } from '../sim/data/heroes.js';
 import { MONSTERS } from '../sim/data/monsters.js';
+import { TOWNS } from '../sim/data/dungeon.js';
+import { levelFromXp, xpAtLevel, xpToNext } from '../sim/progress.js';
 
 const $ = (id) => document.getElementById(id);
 
 export function createHud() {
   const el = {
-    hud: $('hud'), heroName: $('hero-name'), hpFill: $('hp-fill'), hpText: $('hp-text'), mpFill: $('mp-fill'), mpText: $('mp-text'),
+    hud: $('hud'), heroName: $('hero-name'), heroBadge: $('hero-badge'), heroLv: $('hero-lv'), hpFill: $('hp-fill'), hpText: $('hp-text'), mpFill: $('mp-fill'), mpText: $('mp-text'),
+    xpBar: $('xp-bar'), xpFill: $('xp-fill'),
     roomName: $('room-name'), roomWave: $('room-wave'), score: $('score-value'), combo: $('combo'), comboCount: $('combo-count'),
     boss: $('boss'), bossName: $('boss-name'), bossFill: $('boss-fill'), go: $('go'), skills: $('skills'), banner: $('banner'),
-    title: $('title'), end: $('end'), endTitle: $('end-title'), endStats: $('end-stats'), retry: $('retry'), pause: $('pause'), loading: $('loading'),
+    title: $('title'), end: $('end'), endTitle: $('end-title'), endStats: $('end-stats'), endProgress: $('end-progress'),
+    retry: $('retry'), endContinue: $('end-continue'), endHome: $('end-home'), pause: $('pause'), loading: $('loading'),
     hint: $('hint'), settings: $('settings'),
   };
   let slots = [];
   let lastCombo = 0;
+  let lastXp = -1;
 
   function bindHero(player) {
     el.heroName.textContent = player.def.name;
+    lastXp = -1;
     // The passive has no slot of its own; the badge carries it as a tooltip and the title
     // screen blurb names it, and its procs announce themselves in play.
     const pv = player.def.passive && PASSIVE_INFO[player.def.passive.id];
@@ -68,6 +74,10 @@ export function createHud() {
       }
       case 'roomClear': banner(ev.last ? 'Victory' : 'Clear!'); break;
       case 'bossAdds': banner('Reinforcements', 'boss'); break;
+      case 'levelUp':
+        banner(`Level ${ev.level}`);
+        el.heroBadge.classList.remove('pop'); void el.heroBadge.offsetWidth; el.heroBadge.classList.add('pop');
+        break;
       case 'comboEnd': break;
     }
   }
@@ -80,6 +90,14 @@ export function createHud() {
     el.hpText.textContent = `${Math.ceil(p.hp)} / ${p.hpMax}`;
     el.mpFill.style.width = `${(100 * p.mp) / p.mpMax}%`;
     el.mpText.textContent = `${Math.floor(p.mp)} / ${p.mpMax}`;
+    if (game.xp !== lastXp) {
+      // Read off the sim's lifetime xp, not the player: the bar is the level's window into it.
+      lastXp = game.xp;
+      const lv = levelFromXp(game.xp), at = xpAtLevel(lv), need = xpToNext(lv);
+      el.heroLv.textContent = `Lv ${lv}`;
+      el.xpFill.style.width = `${need ? (100 * (game.xp - at)) / need : 100}%`;
+      el.xpBar.title = need ? `${(game.xp - at).toLocaleString()} / ${need.toLocaleString()} XP to level ${lv + 1}` : 'Max level';
+    }
     el.roomName.textContent = `${game.roomIndex + 1}. ${game.room.name}`;
     el.roomWave.textContent = game.phase === 'cleared' ? 'CLEARED' : game.waveIndex < 0 ? 'get ready' : `wave ${game.waveIndex + 1} / ${game.room.waves.length}`;
     el.score.textContent = Math.round(game.score).toLocaleString();
@@ -140,10 +158,31 @@ export function createHud() {
   }
 
   function showTitle(show) { el.title.hidden = !show; }
-  function showEnd(game, won) {
+  // `progress` is what profile.recordRun() returned for this run: xp banked, levels gained,
+  // whether a town opened. `next` is the key of the town Continue leads to, or null.
+  function showEnd(game, won, progress = null) {
     el.endTitle.textContent = won ? 'Dungeon cleared!' : 'You fell…';
     const mins = Math.floor(game.t / 60), secs = Math.floor(game.t % 60).toString().padStart(2, '0');
     el.endStats.textContent = `${won ? '' : `Reached room ${game.roomIndex + 1}: ${game.room.name}\n`}Score ${Math.round(game.score).toLocaleString()} · ${game.kills} kills · best combo ${game.combo.best} hits\nDamage dealt ${game.stats.damageDealt} · time ${mins}:${secs}`;
+    el.endProgress.innerHTML = '';
+    const next = progress?.won ? progress.next : null;
+    if (progress) {
+      const lv = progress.levelAfter > progress.levelBefore
+        ? `Lv ${progress.levelBefore} → ${progress.levelAfter} · +${progress.skillPoints} skill point${progress.skillPoints === 1 ? '' : 's'}`
+        : `Lv ${progress.levelAfter}`;
+      const line = document.createElement('span');
+      line.textContent = `+${progress.xpGained.toLocaleString()} XP · ${lv}`;
+      el.endProgress.appendChild(line);
+      if (progress.unlocked) {
+        const u = document.createElement('span');
+        u.className = 'unlock';
+        u.textContent = `${TOWNS[progress.unlocked].town} unlocked`;
+        el.endProgress.appendChild(u);
+      }
+    }
+    el.endContinue.hidden = !next;
+    if (next) el.endContinue.textContent = `Continue → ${TOWNS[next].town}`;
+    el.retry.textContent = won ? (progress?.tier ? `Play again · NG+${progress.tier}` : 'Play again') : 'Retry';
     el.end.hidden = false;
   }
   function hideEnd() { el.end.hidden = true; }

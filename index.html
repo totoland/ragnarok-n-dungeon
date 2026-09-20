@@ -30,10 +30,11 @@
 
     <div id="hud" hidden>
       <div id="status">
-        <div id="hero-badge"><span id="hero-name">Knight</span></div>
+        <div id="hero-badge"><span id="hero-name">Knight</span><span id="hero-lv">Lv 1</span></div>
         <div class="bars">
           <div class="bar hp"><div id="hp-fill" class="fill"></div><span id="hp-text" class="text"></span></div>
           <div class="bar mp"><div id="mp-fill" class="fill"></div><span id="mp-text" class="text"></span></div>
+          <div class="bar xp" id="xp-bar"><div id="xp-fill" class="fill"></div></div>
         </div>
       </div>
       <div id="room">
@@ -56,14 +57,14 @@
 
     <div id="title" class="overlay">
       <h1>Dungeon <span>RO</span></h1>
-      <p class="sub">Culvert of Prontera — five rooms, one Baphomet.</p>
+      <p class="sub" id="title-sub">Culvert of Prontera — five rooms, one Baphomet.</p>
       <div id="heroes">
         <button class="hero" data-hero="knight" type="button">
-          <strong>Knight</strong>
+          <strong>Knight <span class="lv"></span></strong>
           <em>Melee. Three-hit sword combo, Quicken Sword, Magnum Break, Bowling Bash. Passive: Soul Drain.</em>
         </button>
         <button class="hero" data-hero="hunter" type="button">
-          <strong>Hunter</strong>
+          <strong>Hunter <span class="lv"></span></strong>
           <em>Ranged. Arrow chain, Wind Walk, Arrow Shower, Blitz Beat. Passive: Auto Blitz.</em>
         </button>
       </div>
@@ -87,7 +88,12 @@
     <div id="end" class="overlay" hidden>
       <h1 id="end-title">Dungeon cleared</h1>
       <p id="end-stats"></p>
-      <button id="retry" type="button">Play again</button>
+      <p id="end-progress"></p>
+      <div class="row">
+        <button id="end-continue" class="primary" type="button" hidden>Continue</button>
+        <button id="retry" class="primary" type="button">Play again</button>
+        <button id="end-home" class="ghost" type="button">Title</button>
+      </div>
     </div>
 
     <div id="pause" class="overlay" hidden>

@@ -228,6 +228,13 @@ export function createFx(world) {
         if (ev.boss) { addShake(world, 1.2); ring(ev.x, ev.z, { color: 0xff6030, radius: 6, life: 1.0 }); }
         break;
       }
+      case 'levelUp': {   // a gold column climbing the hero, a ring at the feet, the words
+        number(ev.x, ev.y + 2.3, ev.z, 'LEVEL UP', '#ffe08a', true);
+        ring(ev.x, ev.z, { color: 0xffd76a, radius: 2.2, life: 0.7 });
+        burst(ev.x, ev.y + 0.2, ev.z, 46, { color: 0xffe08a, speed: 0.9, up: 5.5, life: 1.1, size: 0.3, gravity: -3 });
+        burst(ev.x, ev.y + 0.4, ev.z, 18, { color: 0xffffff, speed: 2.2, up: 3, life: 0.6, size: 0.2, gravity: 0 });
+        break;
+      }
       case 'autoBlitz':   // feathers as the bird launches; the strike itself is a normal hit
         burst(ev.x, ev.y + 1.4, ev.z, 6, { color: 0xf0e6d0, speed: 2, up: 2.5, life: 0.45, size: 0.22, gravity: 3 });
         break;

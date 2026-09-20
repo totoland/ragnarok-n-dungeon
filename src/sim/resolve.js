@@ -15,6 +15,20 @@ import { NGPLUS } from '../config.js';
 // literals in combat.js; they live here so a weapon can raise them.
 export const BASE_MODS = { hp: 1, mp: 1, atk: 1, speed: 1, atkSpeed: 1, dodge: 0, crit: 0.08, critDmg: 1.6 };
 
+// Combine modifier sets from different sources - the level's, a weapon's, a skill's - into
+// one. Multipliers multiply; the rates (dodge, crit, critDmg) are absolute and the last set
+// that names one wins, so a Katana's crit rate replaces the baseline rather than adding to
+// it. Sets are sparse: a key a set does not mention is left to the others.
+const MULT = new Set(['hp', 'mp', 'atk', 'speed', 'atkSpeed']);
+export function mergeMods(...sets) {
+  const out = {};
+  for (const s of sets) {
+    if (!s) continue;
+    for (const [k, v] of Object.entries(s)) out[k] = MULT.has(k) && k in out ? out[k] * v : v;
+  }
+  return out;
+}
+
 export function resolveHero(base, mods = {}) {
   const m = { ...BASE_MODS, ...mods };
   return {

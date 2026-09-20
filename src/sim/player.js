@@ -6,18 +6,16 @@
 import { SIM, FLOOR, PLAYER, SKILL_KEYS } from '../config.js';
 import { HEROES } from './data/heroes.js';
 import { boxHits, rollDamage, applyHit } from './combat.js';
-import { resolveHero } from './resolve.js';
+import { resolveHero, mergeMods } from './resolve.js';
+import { levelMods } from './progress.js';
 
-export function createPlayer(heroKey, mods) {
-  // mods come from whatever the shell knows about the player - level, gear, skill points -
-  // and are folded into a def-shaped object here, once. See resolve.js.
-  const def = resolveHero(HEROES[heroKey], mods);
-  return {
-    kind: 'player', hero: heroKey, def,
-    crit: def.crit, critDmg: def.critDmg,
+export function createPlayer(heroKey, mods, level = 1) {
+  const p = {
+    kind: 'player', hero: heroKey, level: 1, def: null,
+    crit: 0, critDmg: 0,
     x: 1.5, z: 0, y: 0, vx: 0, vy: 0, facing: 1, grounded: true,
-    hp: def.hp, hpMax: def.hp, mp: def.mp, mpMax: def.mp, atk: def.atk, speed: def.speed,
-    hurtbox: def.hurtbox,
+    hp: 0, hpMax: 0, mp: 0, mpMax: 0, atk: 0, speed: 0,
+    hurtbox: null,
     state: 'idle', stateT: 0,
     attack: null, attackT: 0, hitLog: [], spawned: [],
     cooldowns: {}, dashCd: 0, buf: {}, holdAttack: false,
@@ -26,8 +24,25 @@ export function createPlayer(heroKey, mods) {
     // Timed modifiers keyed by id, and the values folded from them every tick. Anything that
     // changes how fast the hero swings or how often he is hit goes through these two numbers
     // - a buff now, equipment later - so there is exactly one place they combine.
-    buffs: {}, atkSpeed: def.atkSpeed, dodge: def.dodge,
+    buffs: {}, atkSpeed: 1, dodge: 0,
   };
+  setLevel(p, level, mods);
+  p.hp = p.hpMax; p.mp = p.mpMax;
+  return p;
+}
+
+// Re-resolve the hero at a level. `mods` are whatever the shell knows beyond the level -
+// gear, skill points - and are folded with the level's share here, once, so the rest of the
+// sim keeps reading a def-shaped object (see resolve.js). Called at creation and again on a
+// level-up mid-run; it sets the maxima and leaves hp / mp to the caller.
+export function setLevel(p, level, mods) {
+  const def = resolveHero(HEROES[p.hero], mergeMods(levelMods(level), mods));
+  p.level = level;
+  p.def = def;
+  p.hpMax = def.hp; p.mpMax = def.mp; p.atk = def.atk; p.speed = def.speed;
+  p.crit = def.crit; p.critDmg = def.critDmg;
+  p.hurtbox = def.hurtbox;
+  foldBuffs(p, 0);
 }
 
 function applyBuff(p, b) {

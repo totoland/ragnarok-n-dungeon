@@ -83,7 +83,7 @@ export function createScene(canvas) {
 
 // ---------------------------------------------------------------- rooms
 
-function disposeRoom(world) {
+export function disposeRoom(world) {
   if (!world.room) return;
   world.scene.remove(world.room);
   world.room.traverse((o) => {
