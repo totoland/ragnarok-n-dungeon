@@ -254,11 +254,12 @@ function buildSandmanGlb() {
   return rigFromGlb(sandModel);
 }
 
-// Per-type rest offsets, added to every pose. The primitive monsters are modelled standing
-// upright so they need none; Baphomet is sculpted already crouched and hunched, and the boss
-// clips lean forward on top of that, which pitched him nearly horizontal on the slam.
+// Per-type rest offsets, added to every pose, for a sculpt that does not stand the way the
+// clips assume. The old Baphomet was modelled crouched and hunched and needed the lean taken
+// back out of him; the ram samurai that replaced him stands upright like everything else, so
+// he needs nothing and the offsets are gone with the sculpt they corrected.
 const EMPTY_REST = {};
-const REST = { baphomet: { tx: -0.24, hx: 0.16 }, baphometling: { tx: -0.24, hx: 0.16 } };
+const REST = {};
 
 // The shared `boss` clips swing aRx, because the Orc Lord carries his axe in the right hand.
 // Baphomet's scythe is parented to armL, so those clips swung an empty arm and the attack

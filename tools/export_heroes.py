@@ -168,6 +168,45 @@ def classify_sandman(group, name, cx):
     return "torso"          # neck, shirt, the sand body and everything drifting off it
 
 
+def classify_goat_samurai(group, name, cx):
+    """The white ram samurai, which replaced the old Baphomet sculpt. Sorted by collection
+    like the other two sculpts - see model_meshes().
+
+    The mane around his shoulders rides the torso and everything else on the head rides the
+    head, which is the same call the old Baphomet's mane needed: a ruff parented to the head
+    swings through the shoulders on every nod. His katana is in his left hand, where the
+    scythe used to be, so the clips that drive that arm still drive the arm holding the
+    weapon.
+    """
+    if group.endswith("Sword"):
+        return "weapon"
+    if group.endswith("Horns") or group.endswith("Head"):
+        return "head"
+    if group.endswith("Mane"):
+        return "torso" if _has(name, "Layered mane") else "head"
+    if group.endswith("Markings"):
+        if _has(name, "Face", "Forehead", "Sigil"):
+            return "head"
+        if _has(name, "arm", "Shoulder"):
+            return "arm" + _side(cx)
+        return "torso"                                  # the chest V
+    if group.endswith("Clothing"):
+        return "torso"
+    if group.endswith("Fur"):
+        if _has(name, "thigh fur", "fetlock"):
+            return "leg" + _side(cx)
+        if _has(name, "Arm pointed fur"):
+            return "arm" + _side(cx)
+        return "torso"                                  # the tail
+    if _has(name, "leg", "hoof"):
+        return "leg" + _side(cx)
+    if _has(name, "palm", "finger", "thumb", "Arm construction"):
+        return "arm" + _side(cx)
+    if _has(name, "Cranium", "Muzzle", "Eye root"):
+        return "head"
+    return "torso"                                      # body, neck, throat
+
+
 MODELS = {
     "knight": {
         "scene": "RO Knight | Studio",
@@ -211,28 +250,36 @@ MODELS = {
             "wingL": (0.74, 0.0, 1.95), "wingR": (0.96, 0.0, 1.95),
         },
     },
-    # Boss. Pivots are the JOINT dict from assets/blender/baphomet/build_baphomet.py, which
-    # is where the model's joints were authored - do not re-measure them from the mesh.
+    # The white ram samurai, which replaced the scripted Baphomet. Toto's sculpt, sorted
+    # into collections with no parent empties, so it groups by collection like the other
+    # two. Height stays 3.0 - the monster, its stats and its clips are unchanged, only the
+    # body is new - and `baphometling` is still this sculpt at 0.58 and darkened.
+    #
+    # The old build scripts and baphomet.blend are still beside it; this file is what ships.
     "baphomet": {
-        "scene": "Baphomet | Studio",
+        "scene": "White Ram Samurai",
         "height": 3.0,                      # game units; hurtbox h is 3.2 in sim/data/monsters.js
-        "model_height": 4.85,               # Blender units, horn tips (the scythe reaches higher)
-        "classify": classify_baphomet,
+        "model_height": 7.05,               # Blender units, horn tips
+        "classify": classify_goat_samurai,
+        "collections": ["Ram \u2022 Anatomy", "Ram \u2022 Clothing", "Ram \u2022 Construction",
+                        "Ram \u2022 Fur", "Ram \u2022 Head", "Ram \u2022 Horns",
+                        "Ram \u2022 Mane", "Ram \u2022 Markings", "Ram \u2022 Sword"],
+        # 128k as authored. The markings and the katana are small and carry the silhouette,
+        # so they are left alone; the fur and the mane are where the count actually is.
+        "decimate": {"Ram \u2022 Anatomy": 0.15, "Ram \u2022 Fur": 0.13, "Ram \u2022 Mane": 0.13,
+                     "Ram \u2022 Construction": 0.2, "Ram \u2022 Head": 0.25,
+                     "Ram \u2022 Horns": 0.22, "Ram \u2022 Clothing": 0.18, "*": 1},
         "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
                    "weapon": "armL", "legL": "root", "legR": "root"},
         "pivot": {
             "root": (0, 0, 0),
-            "torso": (0, 0.02, 2.42),       # hips
-            "head": (0, -0.10, 3.90),       # neck
-            "armL": (-0.74, -0.06, 3.62), "armR": (0.74, -0.06, 3.62),
-            "weapon": (-1.38, 0.08, 4.69),  # the raised hand's grip on the haft
-            "legL": (-0.46, 0.02, 2.42), "legR": (0.46, 0.02, 2.42),
+            "torso": (0, 0, 3.00),          # hips
+            "head": (0, 0, 4.60),           # neck
+            "armL": (-0.50, 0, 4.40), "armR": (0.46, 0, 4.38),
+            "weapon": (-1.60, 0, 3.82),     # his left palm, on the katana's grip
+            "legL": (-0.36, 0, 3.05), "legR": (0.36, 0, 3.05),
         },
     },
-    # Phaelan's boss, sculpted rather than scripted, so her meshes come sorted into
-    # collections with no parent empties and the pivots are measured off the model. She
-    # arrives at ~98k verts, which is three and a half times the Baphomet for one enemy that
-    # shares a room with everything else, so the export thins her.
     # Morroc's boss, and the second sculpt to arrive. No legs - he is a column of sand from
     # the waist down - so the rig has none, and the mace and lance take an arm each.
     "sandman": {
