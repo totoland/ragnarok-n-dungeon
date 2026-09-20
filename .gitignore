@@ -18,3 +18,5 @@ docs/telemetry.ndjson
 www/
 ios/App/Pods/
 ios/App/App/public/
+# Who signs the build: personal, and specific to one machine.
+ios/local.xcconfig

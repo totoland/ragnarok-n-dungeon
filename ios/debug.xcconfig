@@ -1,1 +1,7 @@
 CAPACITOR_DEBUG = true
+
+// Whoever signs this build says so in ios/local.xcconfig, which is not tracked:
+//   DEVELOPMENT_TEAM = ABCDE12345
+// `./tools/ios.sh signing` writes it. The ? makes the include optional, so a checkout
+// without one still opens and builds for the simulator.
+#include? "local.xcconfig"

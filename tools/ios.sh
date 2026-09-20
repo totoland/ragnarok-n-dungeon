@@ -15,6 +15,7 @@
 #   ./tools/ios.sh open         open Xcode on the project
 #   ./tools/ios.sh devices      list iPhones and iPads this Mac can build to
 #   ./tools/ios.sh dress        re-apply the icon, launch screen and Info.plist settings
+#   ./tools/ios.sh signing      show who can sign here, and write the team into the project
 #
 # Telemetry from the device: the game reports frame times, the input trace and the raw
 # gamepad state every 10 s, which is the only way to see what a controller did on a tablet
@@ -122,6 +123,14 @@ dress_project() {
     ok "launch screen on #07060a"
   fi
 
+  # A regenerated project gets Capacitor's stock xcconfig back; put the optional include for
+  # the untracked signing file in again, or the team has to be picked by hand a second time.
+  local xc="$ROOT/ios/debug.xcconfig"
+  if [ -f "$xc" ] && ! grep -q 'local.xcconfig' "$xc"; then
+    printf '\n#include? "local.xcconfig"\n' >> "$xc"
+    ok "signing include restored"
+  fi
+
   # A full-screen game: nothing of the system sits over the HUD.
   local pb=/usr/libexec/PlistBuddy plist="$IOS_APP/Info.plist"
   if [ -f "$plist" ]; then
@@ -130,6 +139,49 @@ dress_project() {
       || "$pb" -c "Set :UIStatusBarHidden true" "$plist" >/dev/null 2>&1 || true
     ok "status bar hidden"
   fi
+}
+
+# Xcode's own answer to "requires a development team" is a dropdown four clicks in, and it
+# is empty until an Apple ID has been added to Xcode, which the message does not say. Read
+# the signing identities out of the keychain instead and write the choice to a file.
+signing() {
+  local want="${1:-}"
+  local plist="$IOS_APP/Info.plist"
+
+  if [ -n "$want" ]; then
+    printf 'DEVELOPMENT_TEAM = %s\n' "$want" > "$ROOT/ios/local.xcconfig"
+    ok "team $want written to ios/local.xcconfig (not tracked)"
+    echo "     Close and reopen the project, or press Run: Xcode picks it up from the xcconfig."
+    return
+  fi
+
+  say "Who can sign on this Mac"
+  local ids; ids=$(security find-identity -v -p codesigning 2>/dev/null || true)
+  local teams; teams=$(printf '%s\n' "$ids" | sed -n 's/.*(\([A-Z0-9]\{10\}\)).*/\1/p' | sort -u)
+
+  if [ -z "$teams" ]; then
+    warn "no signing identity on this Mac yet, which is why Xcode says a team is required."
+    cat <<'FIX'
+
+        Xcode cannot offer a team until an Apple ID is signed in:
+          Xcode → Settings… → Accounts → + → Apple ID → sign in
+        A free Apple ID is enough. Xcode then creates the certificate by itself, and the
+        Team appears as "<your name> (Personal Team)". Come back and run this again.
+
+FIX
+    return 1
+  fi
+
+  printf '%s\n' "$ids" | sed 's/^/  /'
+  echo
+  say "Team IDs found"
+  printf '%s\n' "$teams" | sed 's/^/  /'
+  echo
+  if [ -f "$ROOT/ios/local.xcconfig" ]; then
+    ok "this project already signs as $(sed -n 's/.*DEVELOPMENT_TEAM *= *//p' "$ROOT/ios/local.xcconfig")"
+  fi
+  local first; first=$(printf '%s\n' "$teams" | head -1)
+  echo "  To use the first one:  $0 signing $first"
 }
 
 setup() {
@@ -193,6 +245,7 @@ case "${1:-all}" in
   open)    open_xcode ;;
   devices) devices ;;
   dress)   say "Applying the game's icon, launch screen and Info.plist settings"; dress_project ;;
+  signing) signing "${2:-}" ;;
   all)     check; setup; build; open_xcode ;;
   *)       die "Unknown command '$1'. Try: check | setup | build | open | devices" ;;
 esac
