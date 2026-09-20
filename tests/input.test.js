@@ -204,20 +204,23 @@ function fakeTouchDom() {
   const stick = fakeEl('stick'), knob = fakeEl('stick-knob'), zone = fakeEl('stick-zone');
   const byId = { touch, stick, 'stick-knob': knob, 'stick-zone': zone };
   const root = { getElementById: (id) => byId[id] || null, querySelector: () => null, addEventListener() {}, hidden: false, body: { classList: { toggle() {} } } };
-  const win = fakeEl('window', { matchMedia: () => ({ matches: true }), setInterval: (fn) => { win.tick = fn; return 1; } });
+  const win = fakeEl('window', { matchMedia: () => ({ matches: true }), setInterval: (fn) => { win.tick = fn; return 1; }, ontouchstart: null });
   return { attack, zone, root, win };
 }
+const touchEv = (ids, changed = ids) => ({ touches: ids.map((identifier) => ({ identifier })), changedTouches: changed.map((identifier) => ({ identifier, clientX: 260, clientY: 175 })) });
 
 test('touch: a button whose pointerup never came still lets go when the last finger leaves the glass', () => {
   const { attack, zone, root, win } = fakeTouchDom();
   const input = createInput(fakeTarget(), { settings: defaultSettings() });
   attachTouch(input, { root, win, settings: { touch: { mode: 'on', floating: false } } });
-  attack.dispatch('pointerdown', { pointerId: 7, pointerType: 'touch' });
-  zone.dispatch('pointerdown', { pointerId: 8, pointerType: 'touch', clientX: 260, clientY: 175 });
+  win.dispatch('touchstart', touchEv([7]));
+  attack.dispatch('touchstart', touchEv([7]));
+  win.dispatch('touchstart', touchEv([7, 8], [8]));
+  zone.dispatch('touchstart', touchEv([7, 8], [8]));
   let snap = input.snapshot();
   assert.equal(snap.held.attack, true, 'attack held'); assert.equal(snap.held.right, true, 'stick pushed right');
-  // iOS dropped the pointerup; a touchend with no fingers left is what arrives
-  win.dispatch('touchend', { touches: [] });
+  // the buttons' own touchends went missing; a window touchend with no fingers left still arrives
+  win.dispatch('touchend', touchEv([], [7, 8]));
   snap = input.snapshot();
   assert.equal(snap.held.attack, false, 'attack released'); assert.equal(snap.held.right, false, 'stick released');
   assert.equal(attack.classList.contains('down'), false);
@@ -227,13 +230,47 @@ test('touch: the watchdog frees a touch press with no finger down, and leaves a 
   const { attack, root, win } = fakeTouchDom();
   const input = createInput(fakeTarget(), { settings: defaultSettings() });
   attachTouch(input, { root, win, settings: { touch: { mode: 'on' } } });
-  attack.dispatch('pointerdown', { pointerId: 1, pointerType: 'touch' });
+  attack.dispatch('touchstart', touchEv([1]));  // the window never counted this finger: nothing on the glass
   assert.equal(input.snapshot().held.attack, true);
-  win.tick();                                   // no touchstart was ever counted: nothing on the glass
+  win.tick();
   assert.equal(input.snapshot().held.attack, false, 'lost release recovered');
   attack.dispatch('pointerdown', { pointerId: 2, pointerType: 'mouse' });
   win.tick();
   assert.equal(input.snapshot().held.attack, true, 'a mouse hold is not a lost touch');
   attack.dispatch('pointerup', { pointerId: 2 });
   assert.equal(input.snapshot().held.attack, false);
+});
+
+test('touch events drive a button and the stick by touch identifier; synthesised pointer events are ignored', () => {
+  const { attack, zone, root, win } = fakeTouchDom();
+  const input = createInput(fakeTarget(), { settings: defaultSettings() });
+  attachTouch(input, { root, win, settings: { touch: { mode: 'on', floating: false } } });
+  win.dispatch('touchstart', touchEv([1]));
+  attack.dispatch('touchstart', touchEv([1]));
+  attack.dispatch('pointerdown', { pointerId: 3, pointerType: 'touch' });   // Safari's synthesised twin: ignored
+  assert.equal(input.snapshot().held.attack, true);
+  win.dispatch('touchstart', touchEv([1, 2], [2]));
+  zone.dispatch('touchstart', touchEv([1, 2], [2]));
+  assert.equal(input.snapshot().held.right, true, 'second finger drives the stick');
+  attack.dispatch('pointerup', { pointerId: 3, pointerType: 'touch' });     // ignored too
+  assert.equal(input.snapshot().held.attack, true, 'a synthesised pointerup does not release a touch hold');
+  attack.dispatch('touchend', touchEv([2], [1]));
+  win.dispatch('touchend', touchEv([2], [1]));
+  let snap = input.snapshot();
+  assert.equal(snap.held.attack, false, 'its own touchend releases it'); assert.equal(snap.held.right, true, 'the stick finger is untouched');
+  zone.dispatch('touchend', touchEv([], [2]));
+  win.dispatch('touchend', touchEv([], [2]));
+  assert.equal(input.snapshot().held.right, false);
+});
+
+test('touch: a new finger on an otherwise empty glass clears a hold whose release was lost', () => {
+  const { attack, root, win } = fakeTouchDom();
+  const input = createInput(fakeTarget(), { settings: defaultSettings() });
+  attachTouch(input, { root, win, settings: { touch: { mode: 'on' } } });
+  win.dispatch('touchstart', touchEv([1]));
+  attack.dispatch('touchstart', touchEv([1]));
+  assert.equal(input.snapshot().held.attack, true);
+  // the release for finger 1 never arrives; later a fresh finger 5 lands somewhere else
+  win.dispatch('touchstart', touchEv([5], [5]));
+  assert.equal(input.snapshot().held.attack, false, 'the stale hold is dropped before the new press');
 });

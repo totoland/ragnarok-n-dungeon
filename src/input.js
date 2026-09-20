@@ -214,6 +214,13 @@ export function attachTouch(input, opts = {}) {
 
   let cfg = { ...DEFAULT_TOUCH, ...(opts.settings?.touch || {}) };
   let sid = null, sidType = 'touch', cx = 0, cy = 0;
+  // On a touch screen the buttons and the stick are driven by Touch Events, not the pointer
+  // events synthesised from them: a touch always reports back to the element it began on,
+  // which is the capture pointer events promise and iOS Safari does not always keep - a
+  // pointerup lost mid-fight is a button that never lets go. Pointer events still serve a
+  // mouse or a pen, and are ignored for touch-type pointers when Touch Events are in play.
+  const useTouch = !!(win && 'ontouchstart' in win);
+  const synthetic = (e) => useTouch && e.pointerType === 'touch';
 
   const coarse = () => (win && win.matchMedia
     ? win.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in win
@@ -257,11 +264,10 @@ export function attachTouch(input, opts = {}) {
     stick.style.opacity = '';
   }
 
-  zone.addEventListener('pointerdown', (e) => {
-    if (sid !== null) return;
-    sid = e.pointerId;
-    sidType = e.pointerType || 'touch';
-    if (cfg.floating) { cx = e.clientX; cy = e.clientY; place(cx, cy); }
+  function beginStick(id, type, x, y) {
+    sid = id;
+    sidType = type;
+    if (cfg.floating) { cx = x; cy = y; place(cx, cy); }
     else {
       // Measured per gesture, never cached: the ring's centre moves when an overlay hides
       // the touch layer, when the phone rotates, and when a media query repositions it.
@@ -269,21 +275,40 @@ export function attachTouch(input, opts = {}) {
       // display:none, which reads as (0,0) and makes every drag look like "down".
       const r = stick.getBoundingClientRect();
       if (r.width) { cx = r.left + r.width / 2; cy = r.top + r.height / 2; }
-      else { cx = e.clientX; cy = e.clientY; }
+      else { cx = x; cy = y; }
     }
+    apply(x - cx, y - cy);
+  }
+  zone.addEventListener('pointerdown', (e) => {
+    if (sid !== null || synthetic(e)) return;
+    beginStick(e.pointerId, e.pointerType || 'mouse', e.clientX, e.clientY);
     try { zone.setPointerCapture(sid); } catch { /* synthetic pointer */ }
-    apply(e.clientX - cx, e.clientY - cy);
     e.preventDefault();
   });
   zone.addEventListener('pointermove', (e) => {
-    if (e.pointerId !== sid) return;
+    if (e.pointerId !== sid || synthetic(e)) return;
     apply(e.clientX - cx, e.clientY - cy);
     e.preventDefault();
   });
-  const end = (e) => { if (e.pointerId === sid) release(); };
+  const end = (e) => { if (e.pointerId === sid && !synthetic(e)) release(); };
   zone.addEventListener('pointerup', end);
   zone.addEventListener('pointercancel', end);
   zone.addEventListener('lostpointercapture', end);
+  if (useTouch) {
+    zone.addEventListener('touchstart', (e) => {
+      const t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      if (sid === null) beginStick(t.identifier, 'touch', t.clientX, t.clientY);
+      e.preventDefault();
+    }, { passive: false });
+    zone.addEventListener('touchmove', (e) => {
+      if (sid === null) return;
+      for (const t of e.changedTouches) if (t.identifier === sid) { apply(t.clientX - cx, t.clientY - cy); e.preventDefault(); }
+    }, { passive: false });
+    const tend = (e) => { for (const t of e.changedTouches) if (t.identifier === sid) release(); };
+    zone.addEventListener('touchend', tend);
+    zone.addEventListener('touchcancel', tend);
+  }
 
   const buzz = (ms) => { if (cfg.haptics && typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms); };
   // Every button currently down, by its release function, so the layer can let go of all
@@ -297,23 +322,44 @@ export function attachTouch(input, opts = {}) {
   for (const b of touch.querySelectorAll('.tbtn')) {
     const k = b.dataset.k;
     const edge = b.dataset.edge === '1';
-    const up = () => { if (!edge) input.set(k, false); b.classList.remove('down'); down.delete(up); };
-    b.addEventListener('pointerdown', (e) => {
+    let tid = null;   // the touch identifier holding this button, when Touch Events drive it
+    const up = () => { if (!edge) input.set(k, false); b.classList.remove('down'); down.delete(up); tid = null; };
+    const start = (type) => {
       if (edge) input.press(k); else input.set(k, true);
       b.classList.add('down');
-      down.set(up, e.pointerType || 'touch');
+      down.set(up, type);
       buzz(12);
+    };
+    b.addEventListener('pointerdown', (e) => {
+      if (synthetic(e)) return;
+      start(e.pointerType || 'mouse');
       try { b.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
       e.preventDefault();
     });
-    b.addEventListener('pointerup', up);
-    b.addEventListener('pointercancel', up);
-    b.addEventListener('lostpointercapture', up);
+    const pup = (e) => { if (!synthetic(e)) up(); };
+    b.addEventListener('pointerup', pup);
+    b.addEventListener('pointercancel', pup);
+    b.addEventListener('lostpointercapture', pup);
+    if (useTouch) {
+      b.addEventListener('touchstart', (e) => {
+        const t = e.changedTouches && e.changedTouches[0];
+        if (t && tid === null) { tid = t.identifier; start('touch'); }
+        e.preventDefault();
+      }, { passive: false });
+      const tend = (e) => { for (const t of e.changedTouches) if (t.identifier === tid) up(); };
+      b.addEventListener('touchend', tend);
+      b.addEventListener('touchcancel', tend);
+    }
     b.addEventListener('contextmenu', (e) => e.preventDefault());
   }
   if (win) {
     const count = (e) => { touches = e.touches ? e.touches.length : 0; if (touches === 0 && e.type !== 'touchstart') releaseAll(); };
     for (const t of ['touchstart', 'touchend', 'touchcancel']) win.addEventListener(t, count, { passive: true });
+    // A finger arriving on a glass the browser says is otherwise empty means every hold we
+    // still think is down lost its release somewhere; let go before the new press lands.
+    win.addEventListener('touchstart', (e) => {
+      if (e.touches && e.changedTouches && e.touches.length === e.changedTouches.length && (down.size || sid !== null)) releaseAll();
+    }, { capture: true, passive: true });
     win.addEventListener('blur', releaseAll);
     if (root.addEventListener) root.addEventListener('visibilitychange', () => { if (root.hidden) releaseAll(); });
     // Hold watchdog: a touch-pressed button still down while no finger is on the glass is

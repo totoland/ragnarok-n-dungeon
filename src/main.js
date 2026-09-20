@@ -10,7 +10,7 @@ import { itemName } from './sim/data/items.js';
 import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
-import { createScene, buildRoom, disposeRoom, updateScene } from './render/scene.js';
+import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom } from './render/scene.js';
 import { loadHeroAssets, createHeroView, showWeapon, restPose } from './render/heroes.js';
 import { auraTick, stripAura } from './render/aura.js';
 import { createMonsterViews, loadMonsterAssets } from './render/monsters.js';
@@ -80,6 +80,7 @@ const pickedTier = () => Math.min(tierFor(profile, selectedHero, selectedTown), 
 let paused = false;
 let hitstop = 0;
 let roomBuilt = -1;
+let prewarmed = -1;   // room index whose textures are already drawn and uploaded
 let acc = 0;
 let last = performance.now();
 let ended = false;
@@ -96,6 +97,7 @@ const townButtons = [...document.querySelectorAll('.town')];
 const townBlurb = new Map(townButtons.map((b) => [b.dataset.town, b.querySelector('em').textContent]));
 function markTown() {
   if (!isUnlocked(profile, selectedTown)) selectedTown = 'prontera';
+  if (assets) prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0);
   for (const b of townButtons) b.classList.toggle('selected', b.dataset.town === selectedTown);
   refreshTitle();
 }
@@ -260,6 +262,7 @@ Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   assets = a;
   characterUI.setAssets(a);
   warmUp();
+  prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0);
   hud.setLoading('Pick a hero, or press Enter for the Knight.');
   for (const b of heroButtons) { b.disabled = false; b.addEventListener('mouseenter', () => { selectedHero = b.dataset.hero; markSelected(); }); }
   markTown();
@@ -303,6 +306,7 @@ function start() {
   paused = false;
   ended = false;
   roomBuilt = -1;
+  prewarmed = -1;
   acc = 0;
   hitstop = 0;
   syncRoom();
@@ -424,6 +428,13 @@ function mark(label) { world.marks.push({ at: performance.now(), label }); if (w
 function renderFrame(dt) {
   if (game.roomIndex !== roomBuilt) mark(`build room ${game.room.name}`);
   syncRoom();
+  // The walk to the exit is the quiet moment to draw the next room's textures.
+  const next = game.roomIndex + 1;
+  if (game.phase === 'cleared' && next < game.dungeon.rooms.length && prewarmed !== next) {
+    prewarmed = next;
+    prewarmRoom(world, game.dungeon.rooms[next], next);
+    mark(`prewarm room ${game.dungeon.rooms[next].name}`);
+  }
   for (const ev of game.events) { const f = MARKED[ev.type]; const label = f && f(ev); if (label) mark(label); sfx.handle(ev); }
   fx.update(game, dt);
   heroView.update(game, dt);

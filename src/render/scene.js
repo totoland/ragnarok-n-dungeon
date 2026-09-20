@@ -95,6 +95,47 @@ export function createScene(canvas) {
 
 // ---------------------------------------------------------------- rooms
 
+// Room textures are procedural canvases (a floor, a wall, a dune sky) or one painted
+// backdrop, and drawing them is most of a room build - the 70-80 ms frame on entering a
+// room on a tablet. They are cached by theme and room index and uploaded ahead of time by
+// prewarmRoom(), which the shell calls while the player walks to the exit of the room
+// before. disposeRoom() leaves cached textures alone; the cache evicts its oldest itself.
+const texCache = new Map();
+function cachedTex(key, make) {
+  let t = texCache.get(key);
+  if (!t) {
+    t = make();
+    t.userData.cached = true;
+    texCache.set(key, t);
+    if (texCache.size > 18) { const [k0, t0] = texCache.entries().next().value; texCache.delete(k0); t0.dispose(); }
+  }
+  return t;
+}
+function roomTextures(theme, themeKey, index) {
+  const ground = cachedTex(`ground:${themeKey}:${index}`, () => (theme.ground === 'grass'
+    ? grassFloor(theme.floor, theme.grout, index + 3)
+    : theme.ground === 'sand'
+      ? sandFloor(theme.floor, theme.grout, index + 3)
+      : stoneFloor(theme.floor, theme.grout, index + 3)));
+  const sky = (t) => { t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t; };
+  const bg = theme.bg
+    ? cachedTex(`bg:${theme.bg}`, () => { const t = new THREE.TextureLoader().load(theme.bg, () => { if (t.userData.warm) t.userData.warm.initTexture(t); }); return sky(t); })
+    : theme.bgMake ? cachedTex(`sky:${themeKey}:${index}`, () => sky(theme.bgMake(index))) : null;
+  const wall = bg ? null : cachedTex(`wall:${themeKey}:${index}`, () => brickWall(theme.wall, theme.mortar, index + 7));
+  return { ground, bg, wall };
+}
+
+// Draw and upload a room's textures now, so building it later costs geometry alone.
+export function prewarmRoom(world, roomDef, index) {
+  const theme = THEMES[roomDef.theme] || THEMES.sewer;
+  const { ground, bg, wall } = roomTextures(theme, roomDef.theme, index);
+  for (const t of [ground, bg, wall]) {
+    if (!t) continue;
+    t.userData.warm = world.renderer;
+    if (t.image && (t.image.width || t.image.complete)) { try { world.renderer.initTexture(t); } catch { /* not uploadable yet */ } }
+  }
+}
+
 export function disposeRoom(world) {
   if (!world.room) return;
   world.scene.remove(world.room);
@@ -106,7 +147,7 @@ export function disposeRoom(world) {
       // would otherwise hold its texture forever, and the only symptom is memory creeping up
       // once there are enough maps to notice - the worst kind of bug to go looking for later.
       for (const m of mats) {
-        for (const k in m) { const t = m[k]; if (t && t.isTexture) t.dispose(); }
+        for (const k in m) { const t = m[k]; if (t && t.isTexture && !t.userData.cached) t.dispose(); }
         m.dispose();
       }
     }
@@ -129,12 +170,8 @@ export function buildRoom(world, roomDef, index) {
   world.hemi.color.set(theme.hemi[0]);
   world.hemi.groundColor.set(theme.hemi[1]);
 
-  const groundTex = theme.ground === 'grass'
-    ? grassFloor(theme.floor, theme.grout, index + 3)
-    : theme.ground === 'sand'
-      ? sandFloor(theme.floor, theme.grout, index + 3)
-      : stoneFloor(theme.floor, theme.grout, index + 3);
-  const floorMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.92, metalness: 0.02 });
+  const tex = roomTextures(theme, roomDef.theme, index);
+  const floorMat = new THREE.MeshStandardMaterial({ map: tex.ground, roughness: 0.92, metalness: 0.02 });
   floorMat.map.repeat.set((W + pad * 2) / 2.2, depth / 2.2);
   const floor = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, 0.3, depth), floorMat);
   floor.position.set(W / 2, -0.15, (FLOOR.zMin + FLOOR.zMax) / 2 - 0.4);
@@ -149,12 +186,9 @@ export function buildRoom(world, roomDef, index) {
   let wallMat;
   if (backdrop) {
     // A painted file, or a canvas the theme draws itself (the desert's dune sky).
-    const tex = theme.bg ? new THREE.TextureLoader().load(theme.bg) : theme.bgMake(index);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-    wallMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+    wallMat = new THREE.MeshBasicMaterial({ map: tex.bg, toneMapped: false });
   } else {
-    wallMat = new THREE.MeshStandardMaterial({ map: brickWall(theme.wall, theme.mortar, index + 7), roughness: 0.95 });
+    wallMat = new THREE.MeshStandardMaterial({ map: tex.wall, roughness: 0.95 });
     wallMat.map.repeat.set((W + pad * 2) / 4, 14 / 4);
   }
   const back = new THREE.Mesh(new THREE.BoxGeometry(W + pad * 2, bgH, 0.6), wallMat);
