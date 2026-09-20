@@ -144,6 +144,23 @@ dress_project() {
 # Xcode's own answer to "requires a development team" is a dropdown four clicks in, and it
 # is empty until an Apple ID has been added to Xcode, which the message does not say. Read
 # the signing identities out of the keychain instead and write the choice to a file.
+# Ask Xcode what it actually resolves, rather than trusting that a file was written. The
+# xcconfig feeds the Debug configuration, which is what Run builds; an archive uses Release
+# and is set separately when that day comes.
+verify_team() {
+  case "$(xcode-select -p 2>/dev/null)" in *Xcode*) : ;; *) return 0 ;; esac
+  local eff
+  eff=$(xcodebuild -project "$ROOT/ios/App/App.xcodeproj" -target App -configuration Debug \
+    -showBuildSettings 2>/dev/null | sed -n 's/^ *DEVELOPMENT_TEAM = //p' | head -1 | tr -d ' ' || true)
+  if [ -n "$eff" ]; then
+    ok "Xcode resolves the team to $eff for a Debug build, so Run will sign"
+  else
+    warn "Xcode still resolves no team for a Debug build."
+    echo "        If ios/local.xcconfig exists and holds a team, close the project in Xcode"
+    echo "        and open it again - it reads the xcconfig when the project loads."
+  fi
+}
+
 signing() {
   local want="${1:-}"
   local plist="$IOS_APP/Info.plist"
@@ -151,7 +168,7 @@ signing() {
   if [ -n "$want" ]; then
     printf 'DEVELOPMENT_TEAM = %s\n' "$want" > "$ROOT/ios/local.xcconfig"
     ok "team $want written to ios/local.xcconfig (not tracked)"
-    echo "     Close and reopen the project, or press Run: Xcode picks it up from the xcconfig."
+    verify_team
     return
   fi
 
@@ -191,7 +208,9 @@ FIX
   if [ -f "$ROOT/ios/local.xcconfig" ]; then
     ok "this project already signs as $(sed -n 's/.*DEVELOPMENT_TEAM *= *//p' "$ROOT/ios/local.xcconfig")"
   fi
+  verify_team
   local first; first=$(printf '%s\n' "$teams" | head -1)
+  echo
   echo "  To use the first one:  $0 signing $first"
 }
 
