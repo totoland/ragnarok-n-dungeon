@@ -8,7 +8,7 @@ import { createRng } from './rng.js';
 import { createPlayer, updatePlayer, hurtPlayer, setLevel } from './player.js';
 import { levelFromXp, xpForKill } from './progress.js';
 import { mergeMods } from './resolve.js';
-import { itemMods } from './data/items.js';
+import { itemMods, wearMods } from './data/items.js';
 import { createEnemy, updateEnemy } from './enemies.js';
 import { boxHits, rollDamage, applyHit } from './combat.js';
 
@@ -16,14 +16,15 @@ import { boxHits, rollDamage, applyHit } from './combat.js';
 //   tier    the town's New Game+ level; every spawn reads it
 //   xp      the hero's lifetime total - sets the level, grows per kill, written back by the shell
 //   gear    { id, plus } the wielded weapon (data/items.js), folded into the hero's mods
+//   wear    { cape, hat, accessory } the worn slots, each { id, plus } or null, folded the same
 //   skills  { skillId: level } spent skill points
 //   drop    { item, chance } what the town boss may drop this run; null for nothing
 //   mods    extra modifiers on top (tests, the harness); merged after the weapon's
-export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods, tier = 0, xp = 0, gear = null, skills = {}, drop = null } = {}) {
-  const all = mergeMods(itemMods(gear), mods);
+export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods, tier = 0, xp = 0, gear = null, wear = null, skills = {}, drop = null } = {}) {
+  const all = mergeMods(itemMods(gear), ...wearMods(wear), mods);
   const g = {
     t: 0, rng: createRng(seed), seed, dungeon,
-    tier, xp, xpStart: xp, mods: all, extMods: mods, gear, drop,
+    tier, xp, xpStart: xp, mods: all, extMods: mods, gear, wear, drop,
     loot: [],             // item ids the boss dropped this run; the shell banks them at the end
     player: createPlayer(hero, all, levelFromXp(xp), skills),
     roomIndex: -1, room: null, bounds: { xMin: 0, xMax: 16 },
@@ -38,6 +39,7 @@ export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods,
   g.queueSpawn = (type, side, delay) => g.spawnQueue.push({ type, side, t: delay });
   g.onEnemyHit = (e, dmg, crit, killed, attackId) => onEnemyHit(g, e, dmg, crit, killed, attackId);
   g.player.gear = gear;
+  g.player.wear = wear;
   loadRoom(g, 0);
   return g;
 }
@@ -142,7 +144,7 @@ function onEnemyHit(g, e, dmg, crit, killed, attackId) {
     g.kills++;
     g.score += e.def.score * (1 + Math.min(2, g.combo.count / 20));
     pushEvent(g, { type: 'kill', id: e.id, monster: e.type, x: e.x, z: e.z, y: e.y, boss: e.boss, score: e.def.score });
-    if (!e.boss) rollDrop(g, e);
+    if (!e.boss) { rollDrop(g, e); rollItemDrops(g, e); }
     else if (g.drop && g.rng.chance(g.drop.chance)) {
       // The boss's weapon. Not a pickup: the room clears and the run ends on the next tick,
       // so it goes straight to the loot list and the renderer stages the moment.
@@ -153,21 +155,23 @@ function onEnemyHit(g, e, dmg, crit, killed, attackId) {
   }
 }
 
-// Swap the wielded weapon mid-run: the loadout is re-merged and the hero re-resolved at his
-// level, keeping the same fraction of HP and SP. This is the shell reaching into a run
-// (profile panel from the pause menu); a run that does it is no longer (loadout, seed,
+// Change the loadout mid-run: weapon and worn slots are re-merged and the hero re-resolved
+// at his level, keeping the same fraction of HP and SP. This is the shell reaching into a
+// run (profile panel from the pause menu); a run that does it is no longer (loadout, seed,
 // inputs), which is fine for a player and is why the harness never calls it.
-export function setGear(g, gear) {
+const gearKey = (gear, wear) => JSON.stringify([gear?.id ?? null, gear?.plus ?? 0, wear || null]);
+export function setGear(g, gear, wear = g.wear) {
   const p = g.player;
-  const same = (g.gear?.id ?? null) === (gear?.id ?? null) && (g.gear?.plus ?? 0) === (gear?.plus ?? 0);
-  if (same) return;
+  if (gearKey(g.gear, g.wear) === gearKey(gear, wear)) return;
   g.gear = gear;
-  g.mods = mergeMods(itemMods(gear), g.extMods);
+  g.wear = wear;
+  g.mods = mergeMods(itemMods(gear), ...wearMods(wear), g.extMods);
   const hpF = p.hp / p.hpMax, mpF = p.mp / p.mpMax;
   setLevel(p, p.level, g.mods);
   p.hp = Math.max(1, Math.round(hpF * p.hpMax));
   p.mp = Math.round(mpF * p.mpMax);
   p.gear = gear;
+  p.wear = wear;
   pushEvent(g, { type: 'equip', item: gear?.id ?? null, plus: gear?.plus ?? 0 });
 }
 
@@ -219,6 +223,17 @@ function resolvePending(g, dt) {
     const dir = Math.sign(e.x - p.x) || p.facing;
     const killed = applyHit(e, dmg, hit.knock, hit.stun, dir, e.mass);
     onEnemyHit(g, e, dmg, crit, killed, 'autoBlitz');
+  }
+}
+
+// A monster's own drop table (data/monsters.js `drops: [{ item, chance }]`): each entry is
+// rolled on its own, and a hit goes straight to the loot list with a small moment on the
+// floor, like the boss's weapon. The shell keeps only what the hero can use.
+function rollItemDrops(g, e) {
+  for (const d of e.def.drops || []) {
+    if (!g.rng.chance(d.chance)) continue;
+    g.loot.push(d.item);
+    pushEvent(g, { type: 'itemDrop', item: d.item, monster: e.type, x: e.x, z: e.z, y: e.y });
   }
 }
 

@@ -12,7 +12,7 @@
 // through the culvert just to see the desert.
 import { HEROES } from './sim/data/heroes.js';
 import { TOWNS } from './sim/data/dungeon.js';
-import { ITEMS } from './sim/data/items.js';
+import { ITEMS, SLOTS, slotOf, fits } from './sim/data/items.js';
 import { NGPLUS, DROPS, REFINE, SKILL } from './config.js';
 import { levelFromXp, skillPointsAt } from './sim/progress.js';
 
@@ -21,12 +21,14 @@ export const HERO_KEYS = Object.keys(HEROES);
 export const TOWN_KEYS = Object.keys(TOWNS);       // unlock order
 
 const townRow = () => ({ clears: 0, best: 0 });
-// items: { itemId: { plus } } - one of each, refined by duplicates. equip: the wielded item
-// id or null. skills: { skillId: level } for the points spent.
+// items: { itemId: { plus } } - one of each, refined by duplicates. equip: what is worn in
+// each slot, an item id or null (a null weapon is the hero's own). skills: { skillId: level }
+// for the points spent.
+const emptyEquip = () => Object.fromEntries(SLOTS.map((s) => [s, null]));
 const heroRow = (hero) => ({
   xp: 0,
   towns: Object.fromEntries(TOWN_KEYS.map((t) => [t, townRow()])),
-  items: {}, equip: null,
+  items: {}, equip: emptyEquip(),
   skills: Object.fromEntries((HEROES[hero]?.skills || []).map((id) => [id, 0])),
 });
 
@@ -54,13 +56,20 @@ export function normalize(raw) {
       row.towns[t].clears = int(ts.clears);
       row.towns[t].best = int(ts.best);
     }
-    // Only this hero's weapons, each at a legal refine; the wielded one must be held.
+    // Only items this hero can use, each at a legal refine; anything worn must be held and
+    // sit in its own slot. `equip` used to be the weapon id alone; that shape still loads.
     if (src.items && typeof src.items === 'object') {
       for (const [id, it] of Object.entries(src.items)) {
-        if (ITEMS[id]?.hero === h && it && typeof it === 'object') row.items[id] = { plus: int(it.plus, REFINE.max) };
+        if (fits(id, h) && it && typeof it === 'object') row.items[id] = { plus: int(it.plus, REFINE.max) };
       }
     }
-    if (typeof src.equip === 'string' && row.items[src.equip]) row.equip = src.equip;
+    const eq = typeof src.equip === 'string' ? { weapon: src.equip } : src.equip;
+    if (eq && typeof eq === 'object') {
+      for (const slot of SLOTS) {
+        const id = eq[slot];
+        if (typeof id === 'string' && row.items[id] && slotOf(id) === slot) row.equip[slot] = id;
+      }
+    }
     // Skill levels clamp per skill; points spent beyond what the level grants (a curve or
     // cap change) refund everything rather than guess which to keep.
     if (src.skills && typeof src.skills === 'object') {
@@ -102,14 +111,17 @@ export function clearProfile(given) {
 
 // ---------------------------------------------------------------- derived views
 
-// Everything the shell wants to say about a hero, computed from the stored row.
+// Everything the shell wants to say about a hero, computed from the stored row. `gear` is
+// the wielded weapon ({ id, plus } or null), `wear` the other slots the same way.
 export function heroOf(profile, hero) {
   const row = profile.heroes[hero] || heroRow(hero);
   const level = levelFromXp(row.xp);
+  const worn = (slot) => (row.equip[slot] && row.items[row.equip[slot]] ? { id: row.equip[slot], plus: row.items[row.equip[slot]].plus } : null);
   return {
     xp: row.xp, level, skillPoints: skillPointsAt(level), towns: row.towns,
-    items: row.items, skills: row.skills,
-    gear: row.equip && row.items[row.equip] ? { id: row.equip, plus: row.items[row.equip].plus } : null,
+    items: row.items, skills: row.skills, equip: row.equip,
+    gear: worn('weapon'),
+    wear: Object.fromEntries(SLOTS.filter((s) => s !== 'weapon').map((s) => [s, worn(s)])),
   };
 }
 
@@ -129,12 +141,13 @@ export function spendSkillPoint(profile, hero, skill) {
   return true;
 }
 
-// Wield an item the hero holds, or null for bare hands.
-export function setEquip(profile, hero, id) {
+// Wear an item the hero holds, in the slot it belongs to; `setEquip(profile, hero, null, slot)`
+// empties a slot (a null weapon is the hero's own).
+export function setEquip(profile, hero, id, slot = id ? slotOf(id) : 'weapon') {
   const row = profile.heroes[hero];
-  if (!row) return false;
-  if (id !== null && !row.items[id]) return false;
-  row.equip = id;
+  if (!row || !SLOTS.includes(slot)) return false;
+  if (id !== null && (!row.items[id] || slotOf(id) !== slot)) return false;
+  row.equip[slot] = id;
   return true;
 }
 
@@ -188,15 +201,16 @@ export function recordRun(profile, game, { hero, town }) {
     t.best = Math.max(t.best, Math.round(game.score));
     if (next && !openBefore) unlocked = next;
   }
-  // Loot: a new weapon is held (and wielded if the hands were empty); a duplicate refines
-  // the held one by +1 up to the cap, where it is simply lost.
+  // Loot: a new item is held (and worn if its slot was empty); a duplicate refines the held
+  // one by +1 up to the cap, where it is simply lost.
   const loot = [];
   for (const id of game.loot || []) {
-    if (!ITEMS[id] || ITEMS[id].hero !== hero) continue;
+    if (!fits(id, hero)) continue;
     const held = row.items[id];
     if (!held) {
       row.items[id] = { plus: 0 };
-      if (!row.equip) row.equip = id;
+      const slot = slotOf(id);
+      if (!row.equip[slot]) row.equip[slot] = id;
       loot.push({ id, plus: 0, merged: false });
     } else {
       held.plus = Math.min(REFINE.max, held.plus + 1);

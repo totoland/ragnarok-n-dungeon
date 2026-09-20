@@ -52,7 +52,7 @@ document.getElementById('pause-profile').addEventListener('click', () => charact
 function applyLoadout() {
   if (!game || ended) return;
   const me = heroOf(profile, selectedHero);
-  setGear(game, me.gear);
+  setGear(game, me.gear, me.wear);
   game.player.skillLv = { ...me.skills };
 }
 document.getElementById('title-settings').addEventListener('click', () => settingsUI.open());
@@ -267,7 +267,7 @@ function start() {
   const me = heroOf(profile, selectedHero);
   game = createGame({
     hero: selectedHero, seed: (Date.now() % 100000) | 0, dungeon: TOWNS[selectedTown] || TOWNS.prontera,
-    tier: pickedTier(), xp: me.xp, gear: me.gear, skills: { ...me.skills },
+    tier: pickedTier(), xp: me.xp, gear: me.gear, wear: me.wear, skills: { ...me.skills },
     drop: dropFor(profile, selectedHero, selectedTown),
   });
   profile.last = { hero: selectedHero, town: selectedTown };

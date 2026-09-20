@@ -114,6 +114,7 @@ class Sfx {
       case 'roomEnter': this.tone({ freq: 196, to: 392, type: 'triangle', dur: 0.3, vol: 0.06 }); break;
       case 'bossAdds': this.tone({ freq: 70, to: 200, type: 'sawtooth', dur: 0.6, vol: 0.12 }); break;
       // A boss drop: a soft bell rolled up an octave, held. Rings out after the boss's death cry.
+      case 'itemDrop': [1318, 1568, 2093].forEach((f, i) => this.tone({ freq: f, type: 'sine', dur: 0.5, vol: 0.05, at: i * 0.09 })); break;
       case 'bossDrop': [1046, 1318, 1568, 2093].forEach((f, i) => this.tone({ freq: f, type: 'sine', dur: 0.9, vol: 0.06, at: 0.4 + i * 0.12 })); break;
       // The RO level-up fanfare in spirit: a fast rising run and a held top note.
       case 'levelUp': [659, 784, 988, 1318].forEach((f, i) => this.tone({ freq: f, type: 'triangle', dur: 0.14, vol: 0.07, at: i * 0.07 })); this.tone({ freq: 1568, type: 'triangle', dur: 0.7, vol: 0.09, at: 0.3 }); this.tone({ freq: 784, type: 'sine', dur: 0.7, vol: 0.05, at: 0.3 }); break;

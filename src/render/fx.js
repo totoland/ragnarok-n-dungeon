@@ -246,6 +246,12 @@ export function createFx(world) {
         setTimeout(() => number(ev.x, ev.y + 2.6, ev.z, ITEMS[ev.item]?.name || 'Loot', '#ffe08a', true), 500);
         break;
       }
+      case 'itemDrop': {  // a monster's drop: a smaller pillar, the name, no shake
+        beam(ev.x, ev.z, { life: 1.1 });
+        burst(ev.x, ev.y + 0.3, ev.z, 24, { color: 0xffe08a, speed: 1.2, up: 4, life: 1.0, size: 0.28, gravity: -2 });
+        number(ev.x, ev.y + 1.8, ev.z, ITEMS[ev.item]?.name || 'Loot', '#ffe08a', true);
+        break;
+      }
       case 'levelUp': {   // a gold column climbing the hero, a ring at the feet, the words
         number(ev.x, ev.y + 2.3, ev.z, 'LEVEL UP', '#ffe08a', true);
         ring(ev.x, ev.z, { color: 0xffd76a, radius: 2.2, life: 0.7 });

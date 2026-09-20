@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ITEMS, ITEM_IDS, itemMods, itemName, glowOf, DEFAULT_WEAPON } from '../src/sim/data/items.js';
+import { ITEMS, ITEM_IDS, itemMods, itemName, glowOf, DEFAULT_WEAPON, wearMods, SLOTS } from '../src/sim/data/items.js';
+import { MONSTERS } from '../src/sim/data/monsters.js';
 import { HEROES } from '../src/sim/data/heroes.js';
 import { TOWNS } from '../src/sim/data/dungeon.js';
 import { BASE_MODS } from '../src/sim/resolve.js';
@@ -114,4 +115,26 @@ test('setGear swaps the weapon mid-run: stats re-resolve, HP keeps its fraction,
   assert.equal(g.events.length, n, 'same weapon again is a no-op');
   update(g, EMPTY_INPUT);
   assert.equal(p.level, 3);
+});
+
+test('worn slots: a cape refines into HP not ATK, never glows, and reaches the hero merged with the weapon', () => {
+  ITEMS.testCape = { name: 'Test Cape', slot: 'cape', mods: { hp: 1.08 }, tip: 't' };
+  MONSTERS.poring.drops = [{ item: 'testCape', chance: 1 }];
+  try {
+    for (const id of ITEM_IDS) assert.ok(SLOTS.includes(ITEMS[id].slot), `${id} has a slot`);
+    const m = itemMods({ id: 'testCape', plus: 3 });
+    assert.ok(Math.abs(m.hp - 1.08 * (1 + REFINE.hp * 3)) < 1e-9); assert.equal(m.atk, undefined);
+    assert.equal(glowOf({ id: 'testCape', plus: 9 }), 0);
+    assert.deepEqual(wearMods(null), [{}, {}, {}]);
+    const wear = { cape: { id: 'testCape', plus: 0 }, hat: null, accessory: null };
+    const g = createGame({ hero: 'knight', dungeon: quiet, gear: { id: 'katana', plus: 0 }, wear });
+    assert.equal(g.player.hpMax, Math.round(HEROES.knight.hp * 1.08)); assert.equal(g.player.crit, 0.30);
+    assert.equal(g.player.wear, wear, 'the renderer can read what is worn');
+    setGear(g, g.gear, { ...wear, cape: null });
+    assert.equal(g.player.hpMax, HEROES.knight.hp, 'taking the cape off mid-run drops the HP share');
+    // a monster's own drop table
+    const e = createEnemy(g, 'poring', 4, 0); g.enemies.push(e); e.hp = 0; g.onEnemyHit(e, 1, false, true, 'slash1');
+    assert.deepEqual(g.loot, ['testCape']);
+    assert.ok(g.events.some((ev) => ev.type === 'itemDrop' && ev.item === 'testCape' && ev.monster === 'poring'));
+  } finally { delete ITEMS.testCape; delete MONSTERS.poring.drops; }
 });

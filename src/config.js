@@ -44,8 +44,9 @@ export const DROPS = {
   boss: { chance: 0.35 },
 };
 
-// Refining: every + adds a share of ATK; from `glowAt` the weapon glows and crits hit harder.
-export const REFINE = { max: 10, atk: 0.03, glowAt: 5, critDmg: 0.05 };
+// Refining: every + on a weapon adds a share of ATK and from `glowAt` it glows and crits hit
+// harder; every + on anything worn (cape, hat, accessory, armor) adds a share of HP.
+export const REFINE = { max: 10, atk: 0.03, hp: 0.02, glowAt: 5, critDmg: 0.05 };
 
 // Skill points: each level on a skill adds a share of damage (attack skills) or of duration
 // (buff skills). Points come one per hero level (see LEVEL), spent in the character panel.

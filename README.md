@@ -253,19 +253,27 @@ screen: XP banked, levels gained, a town unlocked, the tier the next run will be
 screen then offers **Continue →** the next town, the same town again at the next tier, or
 the title. `__dro.grant(xp)` and `__dro.resetProfile()` drive it from the console.
 
-### Weapons, refining and skill points
+### Equipment slots, refining and skill points
 
-[src/sim/data/items.js](src/sim/data/items.js) is the weapon table: each is a sparse
-modifier set (`{ atkSpeed: 1.10, crit: 0.30 }` for the Katana) that `mergeMods` folds with
-the level's. Every town names one drop per hero class (`loot` in data/dungeon.js: Baphomet
+[src/sim/data/items.js](src/sim/data/items.js) is the item table. Every item has a `slot` —
+`weapon`, `cape`, `hat`, `accessory` (`armor` is reserved until there are models for it) —
+an optional `hero` that restricts it to a class, and a sparse modifier set
+(`{ atkSpeed: 1.10, crit: 0.30 }` for the Katana) that `mergeMods` folds with the level's.
+The profile wears one item per slot (`equip: { weapon, cape, hat, accessory }`); the sim
+takes the weapon as `gear` and the rest as `wear` and merges them all in a fixed slot order.
+A monster's own drop table is `drops: [{ item, chance }]` on its def in data/monsters.js —
+rolled per entry on every kill, straight into `game.loot` with an `itemDrop` moment — so a
+new item is data only. Only weapons exist so far; the names are placeholders and will be
+replaced before any store build. Every town names one drop per hero class (`loot` in data/dungeon.js: Baphomet
 → Katana / Gakkung Bow, Phreeoni → Tsurugi / Arbalest). The shell hands the sim
 `createGame({ gear: { id, plus }, skills: { quicken: 2 }, drop: { item, chance } })`: the
 boss's drop is certain the first time a hero clears the town and `DROPS.boss.chance` after
 (`dropFor()` in profile.js); the sim rolls it off the run's rng at the kill, pushes a
 `bossDrop` event (pillar of light, bell, the name) and lists it in `game.loot`, which
 `recordRun()` banks — a new weapon is held and wielded if the hands were empty, a duplicate
-refines the held one by +1. Refining (`REFINE` in config.js) adds 3 % ATK per plus and,
-from +5, a gold glow on the weapon's own materials and 5 % more crit damage.
+refines the held one by +1. Refining (`REFINE` in config.js) adds 3 % ATK per plus on a
+weapon and, from +5, a gold glow on the weapon's own materials and 5 % more crit damage;
+anything worn refines into 2 % HP per plus instead.
 
 Skill points come one per level and are spent in the **Profile** panel
 (`src/render/character-ui.js`), reachable from the title (the gold button under the hero

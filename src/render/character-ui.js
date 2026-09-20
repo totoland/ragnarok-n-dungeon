@@ -3,7 +3,7 @@
 // hero wielding whatever is selected, and one Equip button. Owns no game state: it edits
 // the profile, persists it, and calls back so the title and a live run pick the change up.
 import { HEROES, SKILL_INFO, PASSIVE_INFO } from '../sim/data/heroes.js';
-import { ITEMS, itemName, DEFAULT_WEAPON } from '../sim/data/items.js';
+import { ITEMS, itemName, DEFAULT_WEAPON, SLOTS, SLOT_INFO, slotOf, fits } from '../sim/data/items.js';
 import { MONSTERS } from '../sim/data/monsters.js';
 import { TOWNS } from '../sim/data/dungeon.js';
 import { xpAtLevel, xpToNext } from '../sim/progress.js';
@@ -18,7 +18,7 @@ const el = (tag, cls, text) => {
   if (text != null) n.textContent = text;
   return n;
 };
-const SLOTS = 12;
+const GRID = 12;
 
 export function createCharacterUI({ input, getProfile, onChange }) {
   const root = $('character');
@@ -30,6 +30,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
   let hero = 'knight';
   let tab = 'skills';
   let selected;          // item id picked in the inventory; null = the hero's own weapon
+  let filter = 'all';    // which slot the inventory shows, or every one
 
   const commit = () => { saveProfile(getProfile()); onChange?.(); };
 
@@ -97,25 +98,36 @@ export function createCharacterUI({ input, getProfile, onChange }) {
   }
 
   // ---------------------------------------------------------------- equipment
-  // Every entry the inventory can show: the hero's own weapon, what he holds, and what the
-  // towns still have for him (dimmed, with where it drops).
+  // Every entry the inventory can show: the hero's own weapon, everything he holds, and the
+  // weapons the towns still have for him (dimmed, with where they drop).
   function entries(h) {
-    const list = [{ id: null, name: DEFAULT_WEAPON[hero], held: true, tip: 'Your own weapon. No bonuses, nothing to refine.' }];
+    const list = [{ id: null, slot: 'weapon', name: DEFAULT_WEAPON[hero], held: true, tip: 'Your own weapon. No bonuses, nothing to refine.' }];
+    const seen = new Set();
     for (const [key, town] of Object.entries(TOWNS)) {
       const id = town.loot?.[hero];
       if (!id || !ITEMS[id]) continue;
+      seen.add(id);
       const held = h.items[id];
       list.push(held
-        ? { id, name: itemName({ id, plus: held.plus }, hero), held: true, plus: held.plus, tip: ITEMS[id].tip }
-        : { id, name: ITEMS[id].name, held: false, tip: ITEMS[id].tip, source: `Drops from ${bossOf(town)} · ${town.town}`, townKey: key });
+        ? { id, slot: 'weapon', name: itemName({ id, plus: held.plus }, hero), held: true, plus: held.plus, tip: ITEMS[id].tip }
+        : { id, slot: 'weapon', name: ITEMS[id].name, held: false, tip: ITEMS[id].tip, source: `Drops from ${bossOf(town)} · ${town.town}`, townKey: key });
+    }
+    for (const [id, it] of Object.entries(h.items)) {
+      if (seen.has(id) || !fits(id, hero)) continue;
+      list.push({ id, slot: slotOf(id), name: itemName({ id, plus: it.plus }, hero), held: true, plus: it.plus, tip: ITEMS[id].tip });
     }
     return list;
   }
+  const wornId = (h, slot) => (slot === 'weapon' ? h.gear?.id ?? null : h.wear[slot]?.id ?? null);
 
-  function slot(entry, h, { equipped = false } = {}) {
+  function slot(entry, h, { equipped = false, label = null } = {}) {
     const b = el('button', 'slotb');
     b.type = 'button';
-    if (!entry) { b.classList.add('empty'); b.disabled = true; return b; }
+    if (!entry) {
+      b.classList.add('empty');
+      if (label) { b.appendChild(el('span', 'slotlabel', label)); b.disabled = false; } else b.disabled = true;
+      return b;
+    }
     const url = preview.icon(hero, entry.id);
     if (url) { const img = el('img'); img.src = url; img.alt = entry.name; img.draggable = false; b.appendChild(img); }
     else b.appendChild(el('span', 'noicon', entry.name[0]));
@@ -133,21 +145,30 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     if (selected === undefined || !list.some((e) => e.id === selected)) selected = h.gear?.id ?? null;
     const wrap = el('div', 'equip');
 
-    // Left: the wielded slot, then the grid.
+    // Left: what is worn, one slot each, then the inventory. Tapping a worn slot filters
+    // the inventory to that slot; tapping it again shows everything.
     const inv = el('div', 'inv');
-    inv.appendChild(el('div', 'bgroup', 'Wielding'));
-    const worn = el('div', 'slots');
-    worn.appendChild(slot(list.find((e) => e.id === (h.gear?.id ?? null)), h, { equipped: true }));
-    const wornName = el('div', 'wornname', itemName(h.gear, hero));
-    const wornRow = el('div', 'wornrow'); wornRow.append(worn, wornName);
+    inv.appendChild(el('div', 'bgroup', 'Equipped'));
+    const wornRow = el('div', 'slots worn');
+    for (const sl of SLOTS) {
+      const id = wornId(h, sl);
+      const entry = list.find((e) => e.id === id && e.slot === sl);
+      const cell = el('div', `wornslot${filter === sl ? ' on' : ''}`);
+      const b = entry ? slot(entry, h, { equipped: true }) : slot(null, h, { label: SLOT_INFO[sl].name });
+      if (entry) b.classList.toggle('selected', false);
+      b.addEventListener('click', (ev) => { ev.stopPropagation(); filter = filter === sl ? 'all' : sl; if (entry) { selected = entry.id; preview.setGear(wornId(h, 'weapon')); } render(); }, true);
+      cell.append(b, el('span', 'wornlabel', SLOT_INFO[sl].name));
+      wornRow.appendChild(cell);
+    }
     inv.appendChild(wornRow);
-    const held = list.filter((e) => e.held).length;
-    const head = el('div', 'bgroup', 'Inventory');
-    head.append(el('span', 'pts', ` · ${held} / ${SLOTS}`));
+    const shown = filter === 'all' ? list : list.filter((e) => e.slot === filter);
+    const head = el('div', 'bgroup', filter === 'all' ? 'Inventory' : `Inventory · ${SLOT_INFO[filter].name}`);
+    head.append(el('span', 'pts', ` · ${list.filter((e) => e.held && e.id).length} / ${GRID}`));
+    if (filter !== 'all') { const all = el('button', 'showall', 'show all'); all.type = 'button'; all.addEventListener('click', () => { filter = 'all'; render(); }); head.append(all); }
     inv.appendChild(head);
     const grid = el('div', 'slots grid');
-    for (const e of list) grid.appendChild(slot(e, h, { equipped: e.id === (h.gear?.id ?? null) }));
-    for (let i = list.length; i < SLOTS; i++) grid.appendChild(slot(null, h));
+    for (const e of shown) grid.appendChild(slot(e, h, { equipped: e.id === wornId(h, e.slot) }));
+    for (let i = shown.length; i < GRID; i++) grid.appendChild(slot(null, h));
     inv.appendChild(grid);
 
     // Right: the turntable and what is selected.
@@ -157,27 +178,36 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     const e = list.find((x) => x.id === selected) || list[0];
     const detail = el('div', 'detail');
     detail.appendChild(el('strong', null, e.name));
-    detail.appendChild(el('div', 'stat', e.tip));
+    detail.appendChild(el('div', 'stat', `${SLOT_INFO[e.slot].name} · ${e.tip}`));
     if (e.held && e.id) {
       const plus = e.plus || 0;
       const bits = [];
-      if (plus) bits.push(`+${Math.round(REFINE.atk * plus * 100)}% ATK from refining`);
-      if (plus >= REFINE.glowAt) bits.push(`glowing, +${Math.round(REFINE.critDmg * 100)}% crit damage`);
+      if (plus) bits.push(e.slot === 'weapon' ? `+${Math.round(REFINE.atk * plus * 100)}% ATK from refining` : `+${Math.round(REFINE.hp * plus * 100)}% HP from refining`);
+      if (e.slot === 'weapon' && plus >= REFINE.glowAt) bits.push(`glowing, +${Math.round(REFINE.critDmg * 100)}% crit damage`);
       bits.push(plus >= REFINE.max ? 'fully refined' : `next duplicate → +${plus + 1}`);
       detail.appendChild(el('div', 'stat', bits.join(' · ')));
     }
     if (!e.held) detail.appendChild(el('div', 'src', e.source));
-    const isWorn = e.id === (h.gear?.id ?? null);
-    const btn = el('button', 'equipbtn', !e.held ? 'Not yet found' : isWorn ? 'Wielding' : 'Equip');
+    const isWorn = e.id === wornId(h, e.slot);
+    const btns = el('div', 'equipbtns');
+    const btn = el('button', 'equipbtn', !e.held ? 'Not yet found' : isWorn ? (e.slot === 'weapon' ? 'Wielding' : 'Wearing') : 'Equip');
     btn.type = 'button';
     btn.disabled = !e.held || isWorn;
-    btn.addEventListener('click', () => { if (setEquip(profile, hero, e.id)) { commit(); render(); } });
-    detail.appendChild(btn);
+    btn.addEventListener('click', () => { if (setEquip(profile, hero, e.id, e.slot)) { commit(); render(); } });
+    btns.appendChild(btn);
+    if (isWorn && e.id && e.slot !== 'weapon') {
+      const off = el('button', 'equipbtn ghost', 'Take off');
+      off.type = 'button';
+      off.addEventListener('click', () => { if (setEquip(profile, hero, null, e.slot)) { commit(); render(); } });
+      btns.appendChild(off);
+    }
+    detail.appendChild(btns);
     look.appendChild(detail);
 
     wrap.append(inv, look);
     body.appendChild(wrap);
-    if (preview.ready) preview.mount(stage, hero, selected);
+    // The turntable always shows the wielded weapon plus the selected one if it is a weapon.
+    if (preview.ready) preview.mount(stage, hero, e.slot === 'weapon' ? selected : wornId(h, 'weapon'));
     else stage.appendChild(el('div', 'stagenote', 'Loading models…'));
     note.textContent = 'Tap a slot to preview it on your hero, then Equip. A duplicate drop refines the weapon you hold by +1; from +5 it glows.';
   }
@@ -186,6 +216,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     if (key) hero = key;
     if (which) tab = which;
     selected = undefined;
+    filter = 'all';
     render();
     root.hidden = false;
     input.setEnabled(false);

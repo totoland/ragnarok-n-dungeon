@@ -6,6 +6,7 @@ import {
 } from '../src/profile.js';
 import { xpAtLevel } from '../src/sim/progress.js';
 import { NGPLUS, DROPS, REFINE, SKILL } from '../src/config.js';
+import { ITEMS } from '../src/sim/data/items.js';
 
 function fakeStore(seed = null) {
   let v = seed;
@@ -17,7 +18,8 @@ test('a fresh profile: every hero at level 1, only the first town open, tier 0 e
   const p = defaultProfile();
   assert.deepEqual(Object.keys(p.heroes), HERO_KEYS);
   for (const h of HERO_KEYS) {
-    assert.deepEqual(heroOf(p, h), { xp: 0, level: 1, skillPoints: 0, towns: p.heroes[h].towns, items: {}, skills: p.heroes[h].skills, gear: null });
+    assert.deepEqual(heroOf(p, h), { xp: 0, level: 1, skillPoints: 0, towns: p.heroes[h].towns, items: {}, skills: p.heroes[h].skills, equip: p.heroes[h].equip, gear: null, wear: { cape: null, hat: null, accessory: null } });
+    assert.deepEqual(p.heroes[h].equip, { weapon: null, cape: null, hat: null, accessory: null });
     for (const t of TOWN_KEYS) assert.equal(tierFor(p, h, t), 0);
   }
   assert.equal(isUnlocked(p, TOWN_KEYS[0]), true);
@@ -100,14 +102,14 @@ test('loot: the first weapon is held and wielded, a duplicate refines it, the ca
   const r = recordRun(p, { ...finished('won', 500), loot: ['katana'] }, { hero: 'knight', town: 'prontera' });
   assert.deepEqual(r.loot, [{ id: 'katana', plus: 0, merged: false }]);
   assert.deepEqual(p.heroes.knight.items, { katana: { plus: 0 } });
-  assert.equal(p.heroes.knight.equip, 'katana');
+  assert.equal(p.heroes.knight.equip.weapon, 'katana');
   assert.deepEqual(heroOf(p, 'knight').gear, { id: 'katana', plus: 0 });
   assert.equal(dropFor(p, 'knight', 'prontera').chance, DROPS.boss.chance, 'after the first clear: a chance');
   const r2 = recordRun(p, { ...finished('won', 900, 500), loot: ['katana'] }, { hero: 'knight', town: 'prontera' });
   assert.deepEqual(r2.loot, [{ id: 'katana', plus: 1, merged: true }]);
   assert.deepEqual(heroOf(p, 'knight').gear, { id: 'katana', plus: 1 });
   recordRun(p, { ...finished('won', 1), loot: ['tsurugi'] }, { hero: 'knight', town: 'morroc' });
-  assert.equal(p.heroes.knight.equip, 'katana', 'a second weapon does not swap what is wielded');
+  assert.equal(p.heroes.knight.equip.weapon, 'katana', 'a second weapon does not swap what is wielded');
   assert.ok(p.heroes.knight.items.tsurugi);
   recordRun(p, { ...finished('won', 1), loot: ['gakkung'] }, { hero: 'knight', town: 'prontera' });
   assert.equal(p.heroes.knight.items.gakkung, undefined, 'a bow is not the knight\'s to keep');
@@ -120,7 +122,34 @@ test('loot: the first weapon is held and wielded, a duplicate refines it, the ca
   assert.deepEqual(back.heroes.knight.items, p.heroes.knight.items);
   const odd = normalize({ heroes: { knight: { items: { katana: { plus: 99 }, gakkung: { plus: 1 }, junk: 1 }, equip: 'tsurugi' } } });
   assert.deepEqual(odd.heroes.knight.items, { katana: { plus: REFINE.max } });
-  assert.equal(odd.heroes.knight.equip, null, 'an unheld equip is dropped');
+  assert.equal(odd.heroes.knight.equip.weapon, null, 'an unheld equip is dropped');
+  const old = normalize({ heroes: { knight: { items: { katana: { plus: 2 } }, equip: 'katana' } } });
+  assert.equal(old.heroes.knight.equip.weapon, 'katana', 'the pre-slot save shape (equip as the weapon id) still loads');
+  const wrong = normalize({ heroes: { knight: { items: { katana: { plus: 2 } }, equip: { cape: 'katana' } } } });
+  assert.equal(wrong.heroes.knight.equip.cape, null, 'a weapon cannot sit in the cape slot');
+});
+
+test('slots: a worn item goes in its own slot, can be taken off, and a drop fills an empty slot', () => {
+  // A stand-in cape and accessory so the slot rules can be exercised before real ones exist.
+  ITEMS.testCape = { name: 'Test Cape', slot: 'cape', mods: { hp: 1.08 }, tip: 't' };
+  ITEMS.testRing = { name: 'Test Ring', slot: 'accessory', hero: 'hunter', mods: { atk: 1.05 }, tip: 't' };
+  try {
+    const p = defaultProfile();
+    const r = recordRun(p, { ...finished('won', 10), loot: ['testCape', 'testRing', 'katana'] }, { hero: 'knight', town: 'prontera' });
+    assert.deepEqual(r.loot.map((l) => l.id), ['testCape', 'katana'], 'the hunter-only ring is not kept');
+    assert.deepEqual(p.heroes.knight.equip, { weapon: 'katana', cape: 'testCape', hat: null, accessory: null });
+    const h = heroOf(p, 'knight');
+    assert.deepEqual(h.wear, { cape: { id: 'testCape', plus: 0 }, hat: null, accessory: null });
+    assert.equal(setEquip(p, 'knight', null, 'cape'), true);
+    assert.equal(p.heroes.knight.equip.cape, null);
+    assert.equal(setEquip(p, 'knight', 'testCape'), true, 'slot inferred from the item');
+    assert.equal(setEquip(p, 'knight', 'testCape', 'hat'), false, 'a cape is not a hat');
+    assert.equal(setEquip(p, 'knight', 'nothing', 'cape'), false);
+    recordRun(p, { ...finished('won', 10), loot: ['testCape'] }, { hero: 'knight', town: 'prontera' });
+    assert.equal(p.heroes.knight.items.testCape.plus, 1, 'worn things refine too');
+    const back = normalize(JSON.parse(JSON.stringify(p)));
+    assert.deepEqual(back.heroes.knight.equip, p.heroes.knight.equip);
+  } finally { delete ITEMS.testCape; delete ITEMS.testRing; }
 });
 
 test('skill points: one per level, spent one at a time, capped per skill, refunded if the save is over budget', () => {

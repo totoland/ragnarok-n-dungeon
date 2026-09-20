@@ -76,6 +76,7 @@ export function createHud() {
       case 'roomClear': banner(ev.last ? 'Victory' : 'Clear!'); break;
       case 'bossAdds': banner('Reinforcements', 'boss'); break;
       case 'bossDrop': setTimeout(() => banner(ITEMS[ev.item]?.name || 'Loot', 'loot'), 700); break;
+      case 'itemDrop': banner(ITEMS[ev.item]?.name || 'Loot', 'loot'); break;
       case 'levelUp':
         banner(`Level ${ev.level}`);
         el.heroBadge.classList.remove('pop'); void el.heroBadge.offsetWidth; el.heroBadge.classList.add('pop');
