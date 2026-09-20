@@ -385,6 +385,7 @@ function frame(now) {
 
   const frameStart = performance.now();
   for (const k in phase) phase[k] = 0;
+  readCounts(counts);
 
   if (!paused) {
     // hit-stop: freeze the sim for a few ms after a solid hit, the belt-scroller crunch
@@ -451,11 +452,24 @@ function mark(label) { world.marks.push({ at: performance.now(), label }); if (w
 // which part it was and what the rest cost - a fix aimed at the wrong half of a frame is
 // worse than no fix, because it looks like progress.
 const phase = { sim: 0, pre: 0, fx: 0, hero: 0, monsters: 0, scene: 0, hud: 0, draw: 0 };
+// "draw" is still three different answers in one number: a shader compiled, something
+// uploaded, or the GPU simply having too much to do. The renderer counts the first two, so
+// take the counts either side of a long frame and let the difference say which it was.
+const counts = { prog: 0, tex: 0, geo: 0 };
+function readCounts(into) {
+  const r = world.renderer;
+  into.prog = r.info.programs ? r.info.programs.length : 0;
+  into.tex = r.info.memory.textures;
+  into.geo = r.info.memory.geometries;
+}
 function phaseMark(total) {
   let name = '', worst = 0;
   for (const k in phase) if (phase[k] > worst) { worst = phase[k]; name = k; }
   const rest = Object.entries(phase).filter(([k, v]) => k !== name && v >= 1.5).map(([k, v]) => `${k} ${v.toFixed(0)}`).join(' ');
-  mark(`${Math.round(total)}ms frame: ${name} ${worst.toFixed(0)}ms${rest ? ` + ${rest}` : ''}`);
+  const now = {};
+  readCounts(now);
+  const grew = ['prog', 'tex', 'geo'].map((k) => (now[k] > counts[k] ? `+${now[k] - counts[k]}${k}` : '')).filter(Boolean).join(' ');
+  mark(`${Math.round(total)}ms frame: ${name} ${worst.toFixed(0)}ms${rest ? ` + ${rest}` : ''}${grew ? ` [${grew}]` : ' [no new gpu objects]'}`);
 }
 let heldSince = 0;
 function renderFrame(dt) {
