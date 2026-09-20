@@ -515,24 +515,37 @@ function phaseMark(total) {
 // the nearest thing alive, hold the attack, and spend a skill when one is off cooldown. It
 // re-presses every so often because a skill disarms hold-to-attack, and hold only re-arms on
 // a fresh edge - the same rule a controller is held to.
-let autoFrame = 0;
+let autoFrame = 0, autoKills = -1, autoStuck = 0, autoSkipNearest = false;
 const autoHeld = {}, autoPressed = {};
 function autoInput(g) {
   for (const k in autoHeld) delete autoHeld[k];
   for (const k in autoPressed) delete autoPressed[k];
   autoFrame++;
   const p = g.player;
-  let target = null, best = Infinity;
+  let target = null, best = autoSkipNearest ? -Infinity : Infinity;
   for (const e of g.enemies) {
     if (e.dead) continue;
     const d = Math.abs(e.x - p.x) + Math.abs(e.z - p.z) * 0.5;
-    if (d < best) { best = d; target = e; }
+    if (autoSkipNearest ? d > best : d < best) { best = d; target = e; }
   }
   if (target) {
     const dx = target.x - p.x, dz = target.z - p.z;
-    const reach = p.hero === 'hunter' ? 6 : 1.7;
-    if (dx > reach) autoHeld.right = true; else if (dx < -reach) autoHeld.left = true;
-    if (dz > 0.5) autoHeld.down = true; else if (dz < -0.5) autoHeld.up = true;
+    // Close to arm's length whoever the hero is. A standoff for the hunter looked right and
+    // was not: a monster pinned against the far wall ends up nearer than the standoff, the
+    // walk key is never pressed, and the hero faces wherever it last walked - which is how a
+    // soak run spent a minute firing away from four skeletons standing behind it, with the
+    // wave unable to end and nothing new able to spawn. Facing follows the walk key here, so
+    // the walk key has to follow the target.
+    if (dx > 0.8) autoHeld.right = true; else if (dx < -0.8) autoHeld.left = true;
+    if (dz > 0.4) autoHeld.down = true; else if (dz < -0.4) autoHeld.up = true;
+  }
+  // And if a wave still refuses to die, stop asking the same monster. Every few seconds
+  // without a kill, take the one furthest away instead and dash at it.
+  if (g.kills !== autoKills) { autoKills = g.kills; autoStuck = 0; } else autoStuck++;
+  if (autoStuck > 300) {
+    autoStuck = 0;
+    autoSkipNearest = !autoSkipNearest;
+    autoPressed.dash = true;
   }
   autoHeld.attack = true;
   if (autoFrame % 9 === 0) autoPressed.attack = true;       // a fresh edge, to re-arm the hold
