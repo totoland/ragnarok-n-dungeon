@@ -1,0 +1,8 @@
+# What every environment shares: the Deployment and its Service. Namespace, hosts, replica
+# count and the pinned image tag are the overlay's (overlays/lab, overlays/prod).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml

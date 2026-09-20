@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ragnarok-n-dungeon
+  # Same shape as prod's ingress (see overlays/prod/ingress.yaml for why there is no TLS
+  # block): the LAN nip.io host the tunnel rule points at, and the public host.
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: ragnarok-lab.192-168-0-125.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ragnarok-n-dungeon
+                port: { name: http }
+    - host: ragnarok-lab.totoland.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ragnarok-n-dungeon
+                port: { name: http }

@@ -8,7 +8,11 @@
 # to GHCR — it is imported straight into k3s containerd, which is why the Deployment pins
 # imagePullPolicy: IfNotPresent.
 #
-# Usage:  ./deploy/deploy.sh
+# Two environments, one image:
+#   ./deploy/deploy.sh          build → lab   (ragnarok-lab.totoland.cloud)
+#   ./deploy/deploy.sh prod     promote the tag lab is running to prod - no rebuild, the
+#                               image is already in containerd, so prod gets the exact bytes
+#                               that were tested on lab. TAG=sha-... promotes a specific one.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -16,7 +20,63 @@ REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/.deployrc"
 [ -f "$SCRIPT_DIR/.deployrc.local" ] && source "$SCRIPT_DIR/.deployrc.local"
 
-KUSTOMIZATION="$SCRIPT_DIR/k8s/kustomization.yaml"
+TARGET="${1:-lab}"
+case "$TARGET" in
+  lab)  NAMESPACE=$LAB_NAMESPACE;  ARGOCD_APP=$LAB_ARGOCD_APP;  HOST=$LAB_HOST;  PUBLIC=$LAB_PUBLIC ;;
+  prod) NAMESPACE=$PROD_NAMESPACE; ARGOCD_APP=$PROD_ARGOCD_APP; HOST=$PROD_HOST; PUBLIC=$PROD_PUBLIC ;;
+  *) echo "usage: $0 [lab|prod]"; exit 2 ;;
+esac
+KUSTOMIZATION="$SCRIPT_DIR/k8s/overlays/$TARGET/kustomization.yaml"
+LAB_KUSTOMIZATION="$SCRIPT_DIR/k8s/overlays/lab/kustomization.yaml"
+
+pin_tag() {   # pin_tag <kustomization> <tag>
+  python3 - "$1" "$2" <<'PY'
+import re, sys
+path, tag = sys.argv[1], sys.argv[2]
+s = open(path).read()
+assert 'newTag:' in s, "newTag not found in " + path
+open(path, 'w').write(re.sub(r'(newTag:\s*)\S+', lambda m: m.group(1) + tag, s, count=1))
+PY
+}
+
+sync_and_wait() {   # sync_and_wait <argocd app> <namespace> <deployment>
+  ssh "$PI" bash -s "$1" "$2" "$3" <<'REMOTE'
+set -e
+APP="$1"; NS="$2"; DEP="$3"
+kubectl -n argocd annotate application "$APP" argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
+sleep 3   # let the repo-server fetch the commit we just pushed
+kubectl -n argocd patch application "$APP" --type merge -p '{"operation":{"sync":{}}}' >/dev/null
+kubectl -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced application/"$APP" --timeout=120s >/dev/null || true
+for i in $(seq 30); do kubectl -n "$NS" get deploy "$DEP" >/dev/null 2>&1 && break; sleep 2; done
+kubectl -n "$NS" rollout status deploy "$DEP" --timeout=150s
+REMOTE
+}
+
+if [ "$TARGET" = prod ]; then
+  # Promotion: whatever lab pinned (or TAG=) goes to prod as is. Refuse a dirty tree so the
+  # promotion commit is exactly that and nothing else.
+  if ! git -C "$REPO" diff --quiet || ! git -C "$REPO" diff --cached --quiet; then
+    echo "✗ working tree is dirty — commit or stash before promoting to prod"; exit 1
+  fi
+  TAG="${TAG:-$(sed -n 's/^ *newTag: *//p' "$LAB_KUSTOMIZATION" | head -1)}"
+  IMAGE="$IMAGE_REPO:$TAG"
+  ssh "$PI" "sudo k3s ctr images ls -q | grep -qx '$IMAGE'" || { echo "✗ $IMAGE is not in the Pi's containerd - deploy it to lab first"; exit 1; }
+  echo "▶ Promote $IMAGE  →  prod ($NAMESPACE/$DEPLOYMENT)"
+  pin_tag "$KUSTOMIZATION" "$TAG"
+  if ! git -C "$REPO" diff --quiet -- "$KUSTOMIZATION"; then
+    git -C "$REPO" add "$KUSTOMIZATION"
+    git -C "$REPO" commit -q -m "promote: $TAG → prod"
+  fi
+  git -C "$REPO" push -q origin "$GIT_BRANCH"
+  echo "▶ Syncing Argo CD + waiting for rollout..."
+  sync_and_wait "$ARGOCD_APP" "$NAMESPACE" "$DEPLOYMENT"
+  echo ""
+  echo "✅ Promoted $IMAGE → $NAMESPACE/$DEPLOYMENT"
+  echo "   Public: $PUBLIC"
+  echo "   LAN:    http://$HOST"
+  exit 0
+fi
+
 TAG="${TAG:-sha-$(git -C "$REPO" rev-parse --short=12 HEAD)}"
 if ! git -C "$REPO" diff --quiet || ! git -C "$REPO" diff --cached --quiet; then
   TAG="${TAG}-wip$(date +%H%M%S)"
@@ -24,7 +84,7 @@ if ! git -C "$REPO" diff --quiet || ! git -C "$REPO" diff --cached --quiet; then
 fi
 IMAGE="$IMAGE_REPO:$TAG"
 
-echo "▶ Deploy $IMAGE  →  $PI  ($NAMESPACE/$DEPLOYMENT)"
+echo "▶ Deploy $IMAGE  →  $PI  ($NAMESPACE/$DEPLOYMENT) [lab]"
 
 # 1. Ship the build context. The excludes mirror .dockerignore; assets/blender is ~9 MB of
 #    source art that never reaches the image.
@@ -50,35 +110,21 @@ echo "▶ Importing into k3s containerd..."
 ssh "$PI" "docker save $IMAGE | sudo k3s ctr images import -"
 
 # 3. Pin the tag in git so Argo CD deploys it, and so the commit is an auditable record.
-echo "▶ Pinning image tag in kustomization.yaml..."
-python3 - "$KUSTOMIZATION" "$TAG" <<'PY'
-import re, sys
-path, tag = sys.argv[1], sys.argv[2]
-s = open(path).read()
-s2 = re.sub(r'(newTag:\s*)\S+', lambda m: m.group(1) + tag, s, count=1)
-assert 'newTag:' in s, "newTag not found in kustomization.yaml"
-open(path, 'w').write(s2)
-PY
+echo "▶ Pinning image tag in overlays/lab..."
+pin_tag "$KUSTOMIZATION" "$TAG"
 if ! git -C "$REPO" diff --quiet -- "$KUSTOMIZATION"; then
   git -C "$REPO" add "$KUSTOMIZATION"
-  git -C "$REPO" commit -q -m "deploy: $TAG"
+  git -C "$REPO" commit -q -m "deploy: $TAG → lab"
 fi
 git -C "$REPO" push -q origin "$GIT_BRANCH"
 
 # 4. Nudge Argo and wait for the rollout.
 echo "▶ Syncing Argo CD + waiting for rollout..."
-ssh "$PI" bash -s "$ARGOCD_APP" "$NAMESPACE" "$DEPLOYMENT" <<'REMOTE'
-set -e
-APP="$1"; NS="$2"; DEP="$3"
-kubectl -n argocd annotate application "$APP" argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
-sleep 3   # let the repo-server fetch the commit we just pushed
-kubectl -n argocd patch application "$APP" --type merge -p '{"operation":{"sync":{}}}' >/dev/null
-kubectl -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced application/"$APP" --timeout=120s >/dev/null || true
-for i in $(seq 30); do kubectl -n "$NS" get deploy "$DEP" >/dev/null 2>&1 && break; sleep 2; done
-kubectl -n "$NS" rollout status deploy "$DEP" --timeout=150s
-REMOTE
+sync_and_wait "$ARGOCD_APP" "$NAMESPACE" "$DEPLOYMENT"
 
 echo ""
-echo "✅ Deployed $IMAGE → $NAMESPACE/$DEPLOYMENT"
-echo "   LAN:   http://$HOST"
-echo "   Logs:  ssh $PI 'kubectl -n $NAMESPACE logs deploy/$DEPLOYMENT --tail=50 -f'"
+echo "✅ Deployed $IMAGE → $NAMESPACE/$DEPLOYMENT [lab]"
+echo "   Public: $PUBLIC"
+echo "   LAN:    http://$HOST"
+echo "   Logs:   ssh $PI 'kubectl -n $NAMESPACE logs deploy/$DEPLOYMENT --tail=50 -f'"
+echo "   Prod:   ./deploy/deploy.sh prod   (promotes this exact image)"

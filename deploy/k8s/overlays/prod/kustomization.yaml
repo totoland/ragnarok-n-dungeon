@@ -1,0 +1,16 @@
+# Production: ragnarok.totoland.cloud. Nothing lands here by a build - deploy.sh prod
+# promotes the tag already proven on lab, so prod and lab run byte-identical images.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ragnarok-n-dungeon
+
+resources:
+  - namespace.yaml
+  - ../../base
+  - ingress.yaml
+
+# Pinned by `deploy.sh prod` to an immutable commit-sha tag, so a rollback is a one-line revert.
+images:
+  - name: ghcr.io/totoland/ragnarok-n-dungeon
+    newTag: sha-170186e08c9a

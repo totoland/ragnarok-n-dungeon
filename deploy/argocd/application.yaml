@@ -10,10 +10,30 @@ spec:
     # repo on this cluster has its own repository secret; this one deliberately does not.
     repoURL: https://github.com/totoland/ragnarok-n-dungeon.git
     targetRevision: main
-    path: deploy/k8s
+    path: deploy/k8s/overlays/prod
   destination:
     server: https://kubernetes.default.svc
     namespace: ragnarok-n-dungeon
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+---
+# Lab: same repo and branch, the lab overlay, its own namespace. `deploy.sh` (no argument)
+# lands every build here; `deploy.sh prod` promotes a proven tag to the app above.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ragnarok-n-dungeon-lab
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/totoland/ragnarok-n-dungeon.git
+    targetRevision: main
+    path: deploy/k8s/overlays/lab
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ragnarok-n-dungeon-lab
   syncPolicy:
     syncOptions:
       - CreateNamespace=true
