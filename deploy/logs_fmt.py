@@ -15,7 +15,9 @@ for line in sys.stdin:
     g = r.get('game') or {}
     i = r.get('input') or {}
     at = (r.get('at') or '')[11:19]
-    build = (r.get('build') or '')[-12:]
+    # The last twelve characters of "ios-<sha>-dirty" are neither the tag nor the commit,
+    # which cost a round of wondering whether the device was running the fix at all.
+    build = (r.get('build') or '')
     print(f"— {at} {r.get('session')}#{r.get('n')} {r.get('reason')} env={r.get('env')} build={build} {r.get('css')}@{r.get('devicePR')}")
     print(f"   fps {p.get('fps')} p50 {p.get('p50')} p95 {p.get('p95')} worst {p.get('worst')} dpr {p.get('dpr')}/{p.get('dprMax')} "
           f"refresh {p.get('refreshHz')} pacing {p.get('pacing')} long {p.get('longShare')}%")

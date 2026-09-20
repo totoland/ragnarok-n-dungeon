@@ -76,33 +76,52 @@ export function createFx(world) {
 
   // ---- transient meshes (slash arcs, rings, shockwaves)
   const transients = [];
+  // An arc is drawn on every swing and every arrow that lands, and each one used to bring a
+  // material with it and take it away again a sixth of a second later. That is the busiest
+  // allocation in a fight, and a material with no users left hands its shader program back,
+  // so the next swing compiled one. Keep the bodies and swap the colour instead; the colour
+  // and the opacity are uniforms, which is exactly what a reused material is for.
+  const transientPool = { slash: [], beam: [], ring: [] };
+  function takeTransient(kind, geo, color, opacity, order) {
+    const m = transientPool[kind].pop()
+      || new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.material.color.setHex(color);
+    m.material.opacity = opacity;
+    m.renderOrder = order;
+    m.visible = true;
+    m.scale.setScalar(1);
+    m.rotation.set(0, 0, 0);
+    return m;
+  }
+  function freeTransient(t) {
+    scene.remove(t.m);
+    const list = transientPool[t.kind];
+    if (list && list.length < 16) list.push(t.m); else t.m.material.dispose();
+  }
   const arcGeo = new THREE.RingGeometry(0.8, 1.9, 24, 1, 0, Math.PI * 0.8);
   function slash(x, y, z, facing, { color = 0xd8ecff, scale = 1, tilt = 0.35, life = 0.16, spin = -1.2 } = {}) {
-    const m = new THREE.Mesh(arcGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const m = takeTransient('slash', arcGeo, color, 0.9, 5);
     m.position.set(x + facing * 0.9, y + 1.1, z + 0.35);
     m.scale.setScalar(scale);
     m.rotation.set(tilt, 0, facing > 0 ? -0.9 : Math.PI + 0.9 - 2.2);
-    m.renderOrder = 5;
     scene.add(m);
     transients.push({ m, t: 0, life, kind: 'slash', spin: spin * facing, grow: 1.35 });
   }
   // A pillar of light where the boss fell: an open cylinder that rises and thins out.
   const beamGeo = new THREE.CylinderGeometry(0.5, 0.7, 9, 24, 1, true);
   function beam(x, z, { color = 0xffe08a, life = 1.6 } = {}) {
-    const m = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const m = takeTransient('beam', beamGeo, color, 0.55, 6);
     m.position.set(x, 4.5, z);
     m.scale.set(0.2, 0.05, 0.2);
-    m.renderOrder = 6;
     scene.add(m);
     transients.push({ m, t: 0, life, kind: 'beam' });
   }
   const ringGeo = new THREE.RingGeometry(0.6, 1.0, 40);
   function ring(x, z, { color = 0xff7a20, radius = 2.4, life = 0.45, y = 0.05 } = {}) {
-    const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const m = takeTransient('ring', ringGeo, color, 0.95, 4);
     m.position.set(x, y, z);
     m.rotation.x = -Math.PI / 2;
     m.scale.setScalar(0.2);
-    m.renderOrder = 4;
     scene.add(m);
     transients.push({ m, t: 0, life, kind: 'ring', radius });
   }
@@ -400,7 +419,7 @@ export function createFx(world) {
       if (t.kind === 'slash') { t.m.rotation.z += t.spin * dt * 6; t.m.scale.multiplyScalar(1 + (t.grow - 1) * dt * 4); t.m.material.opacity = 0.9 * (1 - k); }
       else if (t.kind === 'ring') { const s = 0.2 + (t.radius - 0.2) * (1 - Math.pow(1 - k, 3)); t.m.scale.setScalar(s); t.m.material.opacity = 0.95 * (1 - k); }
       else if (t.kind === 'beam') { const up = Math.min(1, k * 4); t.m.scale.set(0.2 + 0.8 * up, up, 0.2 + 0.8 * up); t.m.rotation.y += dt * 1.5; t.m.material.opacity = 0.55 * (1 - Math.pow(k, 2)); }
-      if (t.t >= t.life) { scene.remove(t.m); t.m.material.dispose(); transients.splice(i, 1); }
+      if (t.t >= t.life) { freeTransient(t); transients.splice(i, 1); }
     }
     flashLight.intensity = Math.max(0, flashLight.intensity - 220 * dt);
 
@@ -450,7 +469,7 @@ export function createFx(world) {
     parts.length = 0;
     for (const n of numbers) freeNumber(n.sp);
     numbers.length = 0;
-    for (const t of transients) { scene.remove(t.m); t.m.material.dispose(); }
+    for (const t of transients) freeTransient(t);
     transients.length = 0;
     for (const [, m] of projectiles) scene.remove(m);
     projectiles.clear();

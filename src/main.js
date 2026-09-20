@@ -456,6 +456,27 @@ const phase = { sim: 0, pre: 0, fx: 0, hero: 0, monsters: 0, scene: 0, hud: 0, d
 // uploaded, or the GPU simply having too much to do. The renderer counts the first two, so
 // take the counts either side of a long frame and let the difference say which it was.
 const counts = { prog: 0, tex: 0, geo: 0 };
+// Knowing that seven programs were compiled does not say seven of what, and two rounds of
+// fixing the wrong thing came out of guessing. A program's cache key opens with the shader
+// it was built from - meshstandard, sprite, points, or a pair of ids for a custom one - so
+// remember which ids have been seen and let a long frame name the newcomers itself.
+const seenPrograms = new Set();
+function newProgramKinds() {
+  const list = world.renderer.info.programs || [];
+  const kinds = [];
+  for (const prog of list) {
+    if (seenPrograms.has(prog.id)) continue;
+    seenPrograms.add(prog.id);
+    // The field is cacheKey; program.code belongs to the shader cache, not the program, and
+    // reading it gave an empty string for everything - which reads exactly like a custom
+    // shader and sent one more round of this in the wrong direction.
+    const key = String(prog.cacheKey || '');
+    kinds.push(key.split(',')[0] || (key ? 'custom' : '?'));
+  }
+  const tally = {};
+  for (const k of kinds) tally[k] = (tally[k] || 0) + 1;
+  return Object.entries(tally).map(([k, n]) => (n > 1 ? `${n}x${k}` : k)).join(' ');
+}
 function readCounts(into) {
   const r = world.renderer;
   into.prog = r.info.programs ? r.info.programs.length : 0;
@@ -469,7 +490,8 @@ function phaseMark(total) {
   const now = {};
   readCounts(now);
   const grew = ['prog', 'tex', 'geo'].map((k) => (now[k] > counts[k] ? `+${now[k] - counts[k]}${k}` : '')).filter(Boolean).join(' ');
-  mark(`${Math.round(total)}ms frame: ${name} ${worst.toFixed(0)}ms${rest ? ` + ${rest}` : ''}${grew ? ` [${grew}]` : ' [no new gpu objects]'}`);
+  const kinds = now.prog > counts.prog ? newProgramKinds() : '';
+  mark(`${Math.round(total)}ms frame: ${name} ${worst.toFixed(0)}ms${rest ? ` + ${rest}` : ''}${grew ? ` [${grew}${kinds ? ': ' + kinds : ''}]` : ' [no new gpu objects]'}`);
 }
 let heldSince = 0;
 function renderFrame(dt) {
