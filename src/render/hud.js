@@ -2,6 +2,7 @@
 import { SKILL_INFO, PASSIVE_INFO } from '../sim/data/heroes.js';
 import { MONSTERS } from '../sim/data/monsters.js';
 import { TOWNS } from '../sim/data/dungeon.js';
+import { ITEMS, itemName } from '../sim/data/items.js';
 import { levelFromXp, xpAtLevel, xpToNext } from '../sim/progress.js';
 
 const $ = (id) => document.getElementById(id);
@@ -74,6 +75,7 @@ export function createHud() {
       }
       case 'roomClear': banner(ev.last ? 'Victory' : 'Clear!'); break;
       case 'bossAdds': banner('Reinforcements', 'boss'); break;
+      case 'bossDrop': setTimeout(() => banner(ITEMS[ev.item]?.name || 'Loot', 'loot'), 700); break;
       case 'levelUp':
         banner(`Level ${ev.level}`);
         el.heroBadge.classList.remove('pop'); void el.heroBadge.offsetWidth; el.heroBadge.classList.add('pop');
@@ -130,7 +132,7 @@ export function createHud() {
       const label = active ? buff.t.toFixed(0) : left > 0.05 ? (left >= 1 ? left.toFixed(0) : left.toFixed(1)) : '';
       s.num.textContent = label;
       s.el.classList.toggle('active', active);
-      if (active) s.el.style.setProperty('--buff', (buff.t / atk.buff.dur).toFixed(4));
+      if (active) s.el.style.setProperty('--buff', (buff.t / (buff.dur || atk.buff.dur)).toFixed(4));
       const poor = p.mp < atk.mp;
       s.el.classList.toggle('poor', poor);
 
@@ -173,6 +175,12 @@ export function createHud() {
       const line = document.createElement('span');
       line.textContent = `+${progress.xpGained.toLocaleString()} XP · ${lv}`;
       el.endProgress.appendChild(line);
+      for (const l of progress.loot || []) {
+        const li = document.createElement('span');
+        li.className = 'loot';
+        li.textContent = l.merged ? `${ITEMS[l.id].name} refined to +${l.plus}` : `${itemName({ id: l.id, plus: 0 })} obtained!`;
+        el.endProgress.appendChild(li);
+      }
       if (progress.unlocked) {
         const u = document.createElement('span');
         u.className = 'unlock';

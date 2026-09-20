@@ -3,15 +3,18 @@
 // projectile spawns fire as attackT sweeps through them, and a buffered attack press at or
 // after `cancelAt` chains into `next`. Skills can cancel a basic attack from `cancelAt` too,
 // which is what makes the combos feel like a belt-scroller instead of a queue.
-import { SIM, FLOOR, PLAYER, SKILL_KEYS } from '../config.js';
+import { SIM, FLOOR, PLAYER, SKILL_KEYS, SKILL } from '../config.js';
 import { HEROES } from './data/heroes.js';
 import { boxHits, rollDamage, applyHit } from './combat.js';
 import { resolveHero, mergeMods } from './resolve.js';
 import { levelMods } from './progress.js';
 
-export function createPlayer(heroKey, mods, level = 1) {
+export function createPlayer(heroKey, mods, level = 1, skills = {}) {
   const p = {
     kind: 'player', hero: heroKey, level: 1, def: null,
+    // Skill levels by id (0 when unset) and the weapon, both read-only in the sim: the
+    // shell folds them in at creation. gear is here for the renderer (a +5 glows).
+    skillLv: skills, gear: null,
     crit: 0, critDmg: 0,
     x: 1.5, z: 0, y: 0, vx: 0, vy: 0, facing: 1, grounded: true,
     hp: 0, hpMax: 0, mp: 0, mpMax: 0, atk: 0, speed: 0,
@@ -45,8 +48,13 @@ export function setLevel(p, level, mods) {
   foldBuffs(p, 0);
 }
 
-function applyBuff(p, b) {
-  p.buffs[b.id] = { t: b.dur, atkSpeed: b.atkSpeed || 1, dodge: b.dodge || 0 };   // recast refreshes
+// Skill levels: an attack skill hits harder per level, a buff lasts longer. Anything that is
+// not a skill (the basic combo, the falcon's passive) has no level and reads as 1.
+export const skillDmg = (p, id) => 1 + SKILL.dmg * (p.skillLv?.[id] || 0);
+const skillDur = (p, id) => 1 + SKILL.buffDur * (p.skillLv?.[id] || 0);
+
+function applyBuff(p, b, dur = b.dur) {
+  p.buffs[b.id] = { t: dur, dur, atkSpeed: b.atkSpeed || 1, dodge: b.dodge || 0 };   // recast refreshes
   // Fold now rather than on the next tick's timers: the cast that grants a buff should be
   // under it from its first frame, not from 33 ms later.
   foldBuffs(p, 0);
@@ -83,7 +91,7 @@ export function startAttack(g, p, id) {
   p.spawned = atk.spawns ? atk.spawns.map(() => false) : [];
   p.mp -= cost(p, atk);
   if (atk.cd) p.cooldowns[id] = atk.cd;
-  if (atk.buff) applyBuff(p, atk.buff);
+  if (atk.buff) applyBuff(p, atk.buff, atk.buff.dur * skillDur(p, id));
   p.buf.attack = 0;
   for (const k of SKILL_KEYS) p.buf[k] = 0;
   g.events.push({ type: 'attack', id, hero: p.hero, x: p.x, z: p.z, y: p.y, facing: p.facing });
@@ -157,7 +165,7 @@ function runAttack(g, p, dt) {
       p.spawned[i] = true;
       g.spawnProjectile({
         owner: 'player', kind: s.kind, x: p.x + p.facing * 0.6, z: p.z, y: p.y + s.y,
-        vx: s.speed * p.facing, vy: s.vy || 0, dmg: s.dmg, knock: s.knock, stun: s.stun,
+        vx: s.speed * p.facing, vy: s.vy || 0, dmg: s.dmg * skillDmg(p, p.attack), knock: s.knock, stun: s.stun,
         life: s.life, pierce: !!s.pierce, facing: p.facing,
       });
     });
@@ -175,7 +183,7 @@ function runAttack(g, p, dt) {
 }
 
 export function landHit(g, p, e, hit, dir) {
-  const { dmg, crit } = rollDamage(p.atk, hit.dmg, g.rng, p.crit, p.critDmg);
+  const { dmg, crit } = rollDamage(p.atk, hit.dmg * skillDmg(p, p.attack), g.rng, p.crit, p.critDmg);
   const killed = applyHit(e, dmg, hit.knock, hit.stun, dir, e.mass);
   e.facing = -dir || e.facing;
   g.onEnemyHit(e, dmg, crit, killed, p.attack);

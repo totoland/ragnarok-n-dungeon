@@ -253,6 +253,27 @@ screen: XP banked, levels gained, a town unlocked, the tier the next run will be
 screen then offers **Continue →** the next town, the same town again at the next tier, or
 the title. `__dro.grant(xp)` and `__dro.resetProfile()` drive it from the console.
 
+### Weapons, refining and skill points
+
+[src/sim/data/items.js](src/sim/data/items.js) is the weapon table: each is a sparse
+modifier set (`{ atkSpeed: 1.10, crit: 0.30 }` for the Katana) that `mergeMods` folds with
+the level's. Every town names one drop per hero class (`loot` in data/dungeon.js: Baphomet
+→ Katana / Gakkung Bow, Phreeoni → Tsurugi / Arbalest). The shell hands the sim
+`createGame({ gear: { id, plus }, skills: { quicken: 2 }, drop: { item, chance } })`: the
+boss's drop is certain the first time a hero clears the town and `DROPS.boss.chance` after
+(`dropFor()` in profile.js); the sim rolls it off the run's rng at the kill, pushes a
+`bossDrop` event (pillar of light, bell, the name) and lists it in `game.loot`, which
+`recordRun()` banks — a new weapon is held and wielded if the hands were empty, a duplicate
+refines the held one by +1. Refining (`REFINE` in config.js) adds 3 % ATK per plus and,
+from +5, a gold glow on the weapon's own materials and 5 % more crit damage.
+
+Skill points come one per level and are spent in the **Character** panel on the title
+(`src/render/character-ui.js`): each level on an attack skill adds `SKILL.dmg` (10 %) to its
+damage, on a buff skill `SKILL.buffDur` (15 %) to its duration. `p.skillLv` is read at the
+hit and at the cast, nowhere else. The town card of the selected town grows a `‹ NG+N ›`
+picker once it has been cleared, to replay a lower tier. The harness takes `--gear katana:5
+--skill 3` alongside `--level`.
+
 
 ### Towns
 

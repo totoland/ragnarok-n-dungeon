@@ -6,6 +6,7 @@
 // Channel sign conventions (see anim.js): aLx/aRx/lLx/lRx positive = limb swings forward,
 // tx/hx positive = lean/nod forward, cx positive = cape blown back, rx = root tips forward.
 import * as THREE from 'three';
+import { glowOf } from '../sim/data/items.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
@@ -14,6 +15,7 @@ import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 // reads as wind where a green glow just read as poison.
 const AURA = { quicken: new THREE.Color(0.95, 0.72, 0.2) };
 const AURA_TMP = new THREE.Color();
+const GLOW = new THREE.Color(0xffd35a);
 
 const HALF = Math.PI / 2;
 
@@ -192,6 +194,21 @@ export function createHeroView(world, heroKey, assets) {
   });
   // Captured once per model: a restart must not re-read a posed hero as its rest state.
   for (const m of materials) if (!m.userData.emissive) m.userData.emissive = m.emissive ? m.emissive.clone() : null;
+  // The weapon's materials get their own copies, once, so a refined blade can glow on its
+  // own without lighting the gauntlet that shares its material in the export. The model is
+  // reused across runs, so a clone already made is kept rather than cloned again.
+  const weaponMats = new Set();
+  rig.weapon?.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const cloned = mats.map((m) => {
+      if (m.userData.weaponClone) return m;
+      const c = m.clone(); c.userData.weaponClone = true; c.userData.emissive = m.userData.emissive ? m.userData.emissive.clone() : null;
+      return c;
+    });
+    o.material = Array.isArray(o.material) ? cloned : cloned[0];
+    for (const m of cloned) { weaponMats.add(m); materials.delete(m); }
+  });
   if (!model.userData.base) {
     model.userData.base = {};
     for (const k of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'cape', 'weapon', 'root']) if (rig[k]) model.userData.base[k] = rig[k].position.clone();
@@ -279,6 +296,16 @@ export function createHeroView(world, heroKey, assets) {
     for (const m of materials) {
       if (!m.emissive) continue;
       if (flashing) m.emissive.setRGB(0.9, 0.2, 0.15);
+      else if (aura) m.emissive.copy(m.userData.emissive).add(AURA_TMP.copy(aura).multiplyScalar(pulse));
+      else m.emissive.copy(m.userData.emissive);
+    }
+    // A refined weapon glows gold, brighter with every plus past the threshold, breathing
+    // slowly; the hit flash still wins.
+    const glow = glowOf(p.gear);
+    for (const m of weaponMats) {
+      if (!m.emissive) continue;
+      if (flashing) m.emissive.setRGB(0.9, 0.2, 0.15);
+      else if (glow > 0) m.emissive.copy(m.userData.emissive).add(AURA_TMP.copy(GLOW).multiplyScalar((0.25 + 0.6 * glow) * (0.8 + 0.2 * Math.sin(view.t * 3))));
       else if (aura) m.emissive.copy(m.userData.emissive).add(AURA_TMP.copy(aura).multiplyScalar(pulse));
       else m.emissive.copy(m.userData.emissive);
     }

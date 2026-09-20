@@ -4,7 +4,9 @@ import { SIM } from './config.js';
 import { TOWNS } from './sim/data/dungeon.js';
 import { MONSTERS } from './sim/data/monsters.js';
 import { createGame, update as simUpdate } from './sim/game.js';
-import { loadProfile, saveProfile, clearProfile, heroOf, isUnlocked, tierFor, prevTown, recordRun } from './profile.js';
+import { loadProfile, saveProfile, clearProfile, heroOf, isUnlocked, tierFor, prevTown, recordRun, dropFor, skillPointsLeft } from './profile.js';
+import { createCharacterUI } from './render/character-ui.js';
+import { itemName } from './sim/data/items.js';
 import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
@@ -41,6 +43,8 @@ const hintKey = (code) => (code.startsWith('Key') ? code.slice(3) : code === 'Es
 
 const settingsUI = createSettingsUI({ input, touch, settings, onChange: applyBindings });
 applyBindings();
+const characterUI = createCharacterUI({ input, getProfile: () => profile, onChange: () => refreshTitle() });
+document.getElementById('title-character').addEventListener('click', () => characterUI.open(selectedHero));
 document.getElementById('title-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-resume').addEventListener('click', () => { paused = false; hud.showPause(false); });
@@ -56,6 +60,10 @@ let profile = loadProfile();
 let selectedHero = profile.last.hero;
 let selectedTown = profile.last.town;
 let progress = null;   // what recordRun() said about the run that just ended
+// A New Game+ tier picked below the hero's own on a town card, keyed hero:town; unset
+// means the hero's clear count, which is the default and the ceiling.
+const tierPick = new Map();
+const pickedTier = () => Math.min(tierFor(profile, selectedHero, selectedTown), tierPick.get(`${selectedHero}:${selectedTown}`) ?? Infinity);
 let paused = false;
 let hitstop = 0;
 let roomBuilt = -1;
@@ -82,42 +90,66 @@ for (const b of townButtons) b.addEventListener('click', () => { if (b.disabled)
 
 // Everything on the title that depends on the profile or the pick: level pills on the hero
 // cards, lock / tier state on the town cards, and the one-line blurb for the selected town.
+const HEROES_NAME = { knight: 'Knight', hunter: 'Hunter' };
 function refreshTitle() {
   for (const b of heroButtons) {
     const h = heroOf(profile, b.dataset.hero);
-    b.querySelector('.lv').textContent = h.level > 1 || h.xp > 0 ? `Lv ${h.level}` : '';
+    const pts = skillPointsLeft(profile, b.dataset.hero);
+    b.querySelector('.lv').textContent = h.level > 1 || h.xp > 0 ? `Lv ${h.level}${pts ? ` · ${pts} pt${pts === 1 ? '' : 's'}` : ''}` : '';
   }
+  const me = heroOf(profile, selectedHero), myPts = skillPointsLeft(profile, selectedHero);
+  const cbtn = document.getElementById('title-character');
+  cbtn.textContent = `${HEROES_NAME[selectedHero]} · Lv ${me.level} · ${itemName(me.gear)}${myPts ? ` · ${myPts} point${myPts === 1 ? '' : 's'} to spend` : ''}`;
+  cbtn.classList.toggle('attention', myPts > 0);
   for (const b of townButtons) {
     const key = b.dataset.town, em = b.querySelector('em');
     const open = isUnlocked(profile, key);
     b.disabled = !open;
     if (!open) { em.textContent = `Clear ${TOWNS[prevTown(key)].town} to unlock`; continue; }
     const t = profile.heroes[selectedHero]?.towns?.[key];
-    const tier = tierFor(profile, selectedHero, key);
+    const max = tierFor(profile, selectedHero, key);
+    const tier = key === selectedTown ? pickedTier() : max;
     em.innerHTML = '';
     em.append(townBlurb.get(key));
     if (t?.clears) {
       const span = document.createElement('span');
       span.className = 'tier';
-      span.textContent = ` · cleared ×${t.clears}${tier ? ` · NG+${tier}` : ''}`;
+      span.textContent = ` · cleared ×${t.clears}`;
       em.append(span);
+      // The picker: only on the selected card, only once there is a tier to pick.
+      if (key === selectedTown && max > 0) {
+        const pick = document.createElement('span');
+        pick.className = 'tierpick';
+        const mk = (label, delta) => {
+          const b = document.createElement('span');
+          b.setAttribute('role', 'button'); b.textContent = label;
+          const next = tier + delta;
+          if (next < 0 || next > max) b.classList.add('off');
+          else b.addEventListener('click', (e) => { e.stopPropagation(); tierPick.set(`${selectedHero}:${key}`, next); refreshTitle(); });
+          return b;
+        };
+        const lbl = document.createElement('span');
+        lbl.textContent = tier ? `NG+${tier}` : 'Normal';
+        pick.append(mk('‹', -1), lbl, mk('›', 1));
+        em.append(pick);
+      } else if (tier) em.append(` · NG+${tier}`);
     }
   }
   const town = TOWNS[selectedTown];
   const last = town.rooms[town.rooms.length - 1];
   const boss = MONSTERS[last.waves?.[0]?.[0]?.type]?.name || last.name;
-  const tier = tierFor(profile, selectedHero, selectedTown);
+  const tier = pickedTier();
   const sub = document.getElementById('title-sub');
   if (sub) sub.textContent = `${town.name} — ${town.rooms.length} rooms, one ${boss}.${tier ? ` New Game+${tier}: monsters ${Math.round(tier * 35)}% tougher.` : ''}`;
 }
 input.on('confirm', () => {
-  if (settingsUI.isOpen) return;
+  if (settingsUI.isOpen || characterUI.isOpen) return;
   sfx.init();
   if (!hud.el.title.hidden && assets) start();
   else if (!hud.el.end.hidden) endPrimary();
 });
 window.addEventListener('keydown', (e) => {
-  if (hud.el.title.hidden || !assets || settingsUI.isOpen) return;
+  if (hud.el.title.hidden || !assets || settingsUI.isOpen || characterUI.isOpen) return;
   const a = keyLookup[e.code];
   if (a === 'left' || a === 'right') { selectedHero = selectedHero === 'knight' ? 'hunter' : 'knight'; markSelected(); }
 });
@@ -215,10 +247,13 @@ function start() {
   fx.clear();
   if (!isUnlocked(profile, selectedTown)) selectedTown = 'prontera';
   // The run is a function of the profile at its start: the hero's lifetime xp sets the
-  // level, the town's clear count sets the New Game+ tier. Nothing else crosses over.
+  // level, the picked tier (the clear count by default) the difficulty, the wielded weapon
+  // and spent skill points the loadout, the clear count whether the boss's drop is certain.
+  const me = heroOf(profile, selectedHero);
   game = createGame({
     hero: selectedHero, seed: (Date.now() % 100000) | 0, dungeon: TOWNS[selectedTown] || TOWNS.prontera,
-    tier: tierFor(profile, selectedHero, selectedTown), xp: heroOf(profile, selectedHero).xp,
+    tier: pickedTier(), xp: me.xp, gear: me.gear, skills: { ...me.skills },
+    drop: dropFor(profile, selectedHero, selectedTown),
   });
   profile.last = { hero: selectedHero, town: selectedTown };
   saveProfile(profile);
@@ -355,5 +390,8 @@ window.__dro = {
   get profile() { return profile; },
   // Debug: grant xp to the selected hero / wipe the profile, then redraw the title.
   grant(xp) { profile.heroes[selectedHero].xp += xp | 0; saveProfile(profile); markTown(); markSelected(); },
-  resetProfile() { profile = clearProfile(); selectedTown = 'prontera'; markTown(); markSelected(); },
+  resetProfile() { profile = clearProfile(); selectedTown = 'prontera'; tierPick.clear(); markTown(); markSelected(); },
+  // Debug: hand the selected hero a weapon at +N (a fresh one is wielded).
+  give(id, plus = 0) { const row = profile.heroes[selectedHero]; row.items[id] = { plus }; if (!row.equip) row.equip = id; saveProfile(profile); markSelected(); },
+  character: characterUI,
 };

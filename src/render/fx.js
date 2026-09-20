@@ -1,6 +1,7 @@
 // Effects: drains game.events into particles, damage numbers, slash arcs, projectiles, rings
 // and camera shake. Own clock, never touches the sim.
 import * as THREE from 'three';
+import { ITEMS } from '../sim/data/items.js';
 import { particleSprite, textTexture } from './textures.js';
 import { addShake } from './scene.js';
 
@@ -67,6 +68,16 @@ export function createFx(world) {
     m.renderOrder = 5;
     scene.add(m);
     transients.push({ m, t: 0, life, kind: 'slash', spin: spin * facing, grow: 1.35 });
+  }
+  // A pillar of light where the boss fell: an open cylinder that rises and thins out.
+  const beamGeo = new THREE.CylinderGeometry(0.5, 0.7, 9, 24, 1, true);
+  function beam(x, z, { color = 0xffe08a, life = 1.6 } = {}) {
+    const m = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.position.set(x, 4.5, z);
+    m.scale.set(0.2, 0.05, 0.2);
+    m.renderOrder = 6;
+    scene.add(m);
+    transients.push({ m, t: 0, life, kind: 'beam' });
   }
   const ringGeo = new THREE.RingGeometry(0.6, 1.0, 40);
   function ring(x, z, { color = 0xff7a20, radius = 2.4, life = 0.45, y = 0.05 } = {}) {
@@ -228,6 +239,13 @@ export function createFx(world) {
         if (ev.boss) { addShake(world, 1.2); ring(ev.x, ev.z, { color: 0xff6030, radius: 6, life: 1.0 }); }
         break;
       }
+      case 'bossDrop': {  // the boss's weapon: a pillar of light, gold sparks, its name
+        beam(ev.x, ev.z);
+        ring(ev.x, ev.z, { color: 0xffe08a, radius: 3.5, life: 0.9 });
+        burst(ev.x, ev.y + 0.3, ev.z, 60, { color: 0xffe08a, speed: 1.4, up: 6, life: 1.4, size: 0.32, gravity: -2 });
+        setTimeout(() => number(ev.x, ev.y + 2.6, ev.z, ITEMS[ev.item]?.name || 'Loot', '#ffe08a', true), 500);
+        break;
+      }
       case 'levelUp': {   // a gold column climbing the hero, a ring at the feet, the words
         number(ev.x, ev.y + 2.3, ev.z, 'LEVEL UP', '#ffe08a', true);
         ring(ev.x, ev.z, { color: 0xffd76a, radius: 2.2, life: 0.7 });
@@ -353,6 +371,7 @@ export function createFx(world) {
       const k = t.t / t.life;
       if (t.kind === 'slash') { t.m.rotation.z += t.spin * dt * 6; t.m.scale.multiplyScalar(1 + (t.grow - 1) * dt * 4); t.m.material.opacity = 0.9 * (1 - k); }
       else if (t.kind === 'ring') { const s = 0.2 + (t.radius - 0.2) * (1 - Math.pow(1 - k, 3)); t.m.scale.setScalar(s); t.m.material.opacity = 0.95 * (1 - k); }
+      else if (t.kind === 'beam') { const up = Math.min(1, k * 4); t.m.scale.set(0.2 + 0.8 * up, up, 0.2 + 0.8 * up); t.m.rotation.y += dt * 1.5; t.m.material.opacity = 0.55 * (1 - Math.pow(k, 2)); }
       if (t.t >= t.life) { scene.remove(t.m); t.m.material.dispose(); transients.splice(i, 1); }
     }
     flashLight.intensity = Math.max(0, flashLight.intensity - 220 * dt);

@@ -6,6 +6,7 @@
 
 export const DUNGEON = {
   town: 'Prontera', name: 'Culvert of Prontera',
+  loot: { knight: 'katana', hunter: 'gakkung' },     // what the boss drops, per hero (data/items.js)
   rooms: [
     {
       name: 'Prontera Field', width: 16, theme: 'field',
@@ -52,6 +53,7 @@ export const DUNGEON = {
 // draw their own dune sky procedurally, so the town ships with no image at all.
 export const MORROC = {
   town: 'Morroc', name: 'Sograt Desert',
+  loot: { knight: 'tsurugi', hunter: 'arbalest' },
   rooms: [
     {
       name: 'Sograt Sands', width: 18, theme: 'desert',

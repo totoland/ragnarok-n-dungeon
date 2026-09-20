@@ -7,18 +7,25 @@ import { DUNGEON } from './data/dungeon.js';
 import { createRng } from './rng.js';
 import { createPlayer, updatePlayer, hurtPlayer, setLevel } from './player.js';
 import { levelFromXp, xpForKill } from './progress.js';
+import { mergeMods } from './resolve.js';
+import { itemMods } from './data/items.js';
 import { createEnemy, updateEnemy } from './enemies.js';
 import { boxHits, rollDamage, applyHit } from './combat.js';
 
-export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods, tier = 0, xp = 0 } = {}) {
+// The loadout: everything the profile knows that changes the run, fixed when it starts.
+//   tier    the town's New Game+ level; every spawn reads it
+//   xp      the hero's lifetime total - sets the level, grows per kill, written back by the shell
+//   gear    { id, plus } the wielded weapon (data/items.js), folded into the hero's mods
+//   skills  { skillId: level } spent skill points
+//   drop    { item, chance } what the town boss may drop this run; null for nothing
+//   mods    extra modifiers on top (tests, the harness); merged after the weapon's
+export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods, tier = 0, xp = 0, gear = null, skills = {}, drop = null } = {}) {
+  const all = mergeMods(itemMods(gear), mods);
   const g = {
     t: 0, rng: createRng(seed), seed, dungeon,
-    // tier: the town's New Game+ level, fixed for the run; every spawn reads it.
-    tier,
-    // xp is the hero's lifetime total, carried in from the profile. It only ever grows, so
-    // the shell persists it by writing the number back; xpStart is what the run began with.
-    xp, xpStart: xp, mods,
-    player: createPlayer(hero, mods, levelFromXp(xp)),
+    tier, xp, xpStart: xp, mods: all, gear, drop,
+    loot: [],             // item ids the boss dropped this run; the shell banks them at the end
+    player: createPlayer(hero, all, levelFromXp(xp), skills),
     roomIndex: -1, room: null, bounds: { xMin: 0, xMax: 16 },
     waveIndex: -1, spawnQueue: [], enemies: [], projectiles: [], pickups: [],
     events: [], nextId: 1,
@@ -30,6 +37,7 @@ export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods,
   g.spawnProjectile = (p) => spawnProjectile(g, p);
   g.queueSpawn = (type, side, delay) => g.spawnQueue.push({ type, side, t: delay });
   g.onEnemyHit = (e, dmg, crit, killed, attackId) => onEnemyHit(g, e, dmg, crit, killed, attackId);
+  g.player.gear = gear;
   loadRoom(g, 0);
   return g;
 }
@@ -135,6 +143,12 @@ function onEnemyHit(g, e, dmg, crit, killed, attackId) {
     g.score += e.def.score * (1 + Math.min(2, g.combo.count / 20));
     pushEvent(g, { type: 'kill', id: e.id, monster: e.type, x: e.x, z: e.z, y: e.y, boss: e.boss, score: e.def.score });
     if (!e.boss) rollDrop(g, e);
+    else if (g.drop && g.rng.chance(g.drop.chance)) {
+      // The boss's weapon. Not a pickup: the room clears and the run ends on the next tick,
+      // so it goes straight to the loot list and the renderer stages the moment.
+      g.loot.push(g.drop.item);
+      pushEvent(g, { type: 'bossDrop', item: g.drop.item, x: e.x, z: e.z, y: e.y });
+    }
     gainXp(g, xpForKill(e.def, g.tier));
   }
 }

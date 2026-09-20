@@ -183,7 +183,7 @@ body.touch-edit #hud { opacity: 0.25; }
 .tedit-done { padding: 8px 20px; border-radius: 8px; border: 2px solid var(--gold); background: var(--panel); color: var(--gold); font-weight: 700; cursor: pointer; }
 .seg-loose { display: flex; gap: 8px; justify-self: start; flex-wrap: wrap; }
 @media (max-width: 720px) { .tedit-hint { display: none; } }
-#title:not([hidden]) ~ #touch, #end:not([hidden]) ~ #touch, #pause:not([hidden]) ~ #touch, #settings:not([hidden]) ~ #touch { display: none; }
+#title:not([hidden]) ~ #touch, #end:not([hidden]) ~ #touch, #pause:not([hidden]) ~ #touch, #settings:not([hidden]) ~ #touch, #character:not([hidden]) ~ #touch { display: none; }
 
 /* ---------------------------------------------------------------- settings overlay */
 .overlay .row { display: flex; gap: 12px; margin-top: 8px; }
@@ -191,17 +191,17 @@ button.ghost { padding: 9px 18px; border-radius: 8px; border: 1px solid var(--ed
 button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 #pause-resume { padding: 10px 24px; border-radius: 8px; border: 2px solid var(--gold); background: var(--panel); color: var(--gold); font-weight: 700; cursor: pointer; }
 
-#settings .panel { width: min(760px, 94vw); max-height: 88vh; display: flex; flex-direction: column; background: rgba(10,8,14,0.96); border: 1px solid var(--edge); border-radius: 12px; text-align: left; box-shadow: 0 24px 70px rgba(0,0,0,0.7); }
-#settings header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid rgba(232,182,74,0.22); }
-#settings header h2 { margin: 0; font-size: 19px; letter-spacing: 0.04em; color: var(--gold); }
-#settings .x { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--edge); background: transparent; color: var(--ink); cursor: pointer; font-size: 13px; }
-#settings .x:hover { border-color: var(--gold); color: var(--gold); }
+#settings .panel, #character .panel { width: min(760px, 94vw); max-height: 88vh; display: flex; flex-direction: column; background: rgba(10,8,14,0.96); border: 1px solid var(--edge); border-radius: 12px; text-align: left; box-shadow: 0 24px 70px rgba(0,0,0,0.7); }
+#settings header, #character header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid rgba(232,182,74,0.22); }
+#settings header h2, #character header h2 { margin: 0; font-size: 19px; letter-spacing: 0.04em; color: var(--gold); }
+#settings .x, #character .x { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--edge); background: transparent; color: var(--ink); cursor: pointer; font-size: 13px; }
+#settings .x:hover, #character .x:hover { border-color: var(--gold); color: var(--gold); }
 #settings-tabs { display: flex; gap: 6px; padding: 10px 18px 0; }
 #settings-tabs .tab { padding: 7px 14px; border: 1px solid transparent; border-bottom: none; border-radius: 7px 7px 0 0; background: transparent; color: var(--ink); opacity: 0.6; font-size: 13px; cursor: pointer; }
 #settings-tabs .tab.selected { opacity: 1; color: var(--gold); border-color: var(--edge); background: rgba(232,182,74,0.08); }
-#settings-body { flex: 1; overflow-y: auto; padding: 14px 18px; }
-#settings footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 18px; border-top: 1px solid rgba(232,182,74,0.22); }
-#settings-note { margin: 0; font-size: 11.5px; opacity: 0.65; line-height: 1.5; }
+#settings-body, #character-body { flex: 1; overflow-y: auto; padding: 14px 18px; }
+#settings footer, #character footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 18px; border-top: 1px solid rgba(232,182,74,0.22); }
+#settings-note, #character-note { margin: 0; font-size: 11.5px; opacity: 0.65; line-height: 1.5; }
 #settings-note.warn { opacity: 1; color: #f2a65f; }
 
 .bindings { display: flex; flex-direction: column; gap: 4px; }
@@ -236,7 +236,7 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 .tip { font-size: 11.5px; opacity: 0.55; margin: 12px 0 0; }
 
 @media (max-width: 720px) {
-  #settings .panel { width: 96vw; max-height: 92vh; }
+  #settings .panel, #character .panel { width: 96vw; max-height: 92vh; }
   .brow { grid-template-columns: 1fr repeat(5, 56px); gap: 4px; }
   .slot { font-size: 11px; height: 32px; }
   .srow { grid-template-columns: 1fr; gap: 6px; }
@@ -318,12 +318,12 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
   #end .primary { padding: 8px 20px; font-size: 14px; }
   #banner { top: 30%; font-size: clamp(24px, 8vh, 44px); }
 
-  #settings .panel { max-height: 94vh; }
-  #settings header { padding: 8px 16px; }
-  #settings header h2 { font-size: 16px; }
+  #settings .panel, #character .panel { max-height: 94vh; }
+  #settings header, #character header { padding: 8px 16px; }
+  #settings header h2, #character header h2 { font-size: 16px; }
   #settings-tabs { padding: 6px 16px 0; }
   #settings-body { padding: 8px 16px; }
-  #settings footer { padding: 8px 16px; }
+  #settings footer, #character footer { padding: 8px 16px; }
   .bgroup { margin: 8px 0 1px; }
   .slot { height: 26px; }
   .srow { padding: 5px 0; }
@@ -347,3 +347,40 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 .town strong { display: block; font-size: 15px; color: var(--gold); }
 .town em { font-style: normal; font-size: 11px; opacity: 0.8; }
 @media (max-width: 720px) { #towns { flex-direction: row; gap: 8px; } .town { width: min(150px, 42vw); padding: 8px 10px; } }
+
+/* Character panel: xp, weapon chips, skill rows. Shares the settings panel chrome. */
+#character .panel { width: min(640px, 94vw); }
+.cxp { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.cxpbar { flex: 1; height: 8px; border: 1px solid var(--edge); border-radius: 4px; background: rgba(0,0,0,0.5); overflow: hidden; }
+.cxpbar .fill { height: 100%; background: linear-gradient(#ffe08a, var(--gold)); }
+.cxptext { font-size: 12px; opacity: 0.8; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-width: 170px; flex: 1; text-align: left; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--edge); background: rgba(12,10,18,0.6); color: var(--ink); cursor: pointer; }
+.chip strong { display: block; font-size: 13px; color: var(--gold); }
+.chip em { display: block; font-style: normal; font-size: 11px; opacity: 0.7; margin-top: 2px; }
+.chip:hover { border-color: var(--gold); }
+.chip.on { background: rgba(232,182,74,0.18); border-color: var(--gold); box-shadow: 0 0 12px rgba(232,182,74,0.35); }
+.chip.locked { opacity: 0.45; cursor: default; border-style: dashed; }
+.chip.locked:hover { border-color: var(--edge); }
+.chip.glow strong { text-shadow: 0 0 10px rgba(255,224,138,0.9); }
+.pts { font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--ink); opacity: 0.6; }
+.pts.has { color: var(--gold); opacity: 1; font-weight: 700; }
+.skills { display: flex; flex-direction: column; }
+.srow.skillrow { grid-template-columns: 1fr 96px 170px; }
+.pips { display: flex; gap: 4px; }
+.pip { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--edge); background: rgba(0,0,0,0.5); }
+.pip.on { background: var(--gold); box-shadow: 0 0 6px rgba(232,182,74,0.7); }
+.sright { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.seffect { font-size: 12px; opacity: 0.85; }
+.plus { width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--gold); background: rgba(232,182,74,0.15); color: var(--gold); font-size: 18px; font-weight: 700; cursor: pointer; line-height: 1; }
+.plus:hover { background: rgba(232,182,74,0.35); }
+.plus:disabled { opacity: 0.3; cursor: default; border-color: var(--edge); color: var(--ink); background: transparent; }
+@media (max-width: 720px) { .srow.skillrow { grid-template-columns: 1fr 96px; } .sright { grid-column: 1 / -1; justify-content: space-between; } }
+/* Tier picker on the selected town card (spans, not buttons: the card is one). */
+.tierpick { display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; color: var(--gold); font-size: 11px; }
+.tierpick span[role="button"] { display: inline-grid; place-items: center; width: 18px; height: 18px; border: 1px solid var(--edge); border-radius: 4px; cursor: pointer; font-weight: 700; }
+.tierpick span[role="button"]:hover { border-color: var(--gold); }
+.tierpick span[role="button"].off { opacity: 0.3; cursor: default; }
+#end-progress .loot { display: block; color: #ffe08a; }
+#banner.loot { color: #ffe08a; text-shadow: 0 0 28px rgba(255,224,138,0.85), 0 4px 0 #6a4a10; }
+#title-character.attention { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 14px rgba(232,182,74,0.35); }

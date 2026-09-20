@@ -39,7 +39,17 @@ export const DROPS = {
   lowHp: 0.4,
   pickupRadius: 0.8,
   life: 20,                                            // seconds a potion lies on the floor
+  // A town boss drops its weapon (data/dungeon.js `loot`) for certain the first time a hero
+  // beats it, and with this chance after. A duplicate refines the one you hold (+1).
+  boss: { chance: 0.35 },
 };
+
+// Refining: every + adds a share of ATK; from `glowAt` the weapon glows and crits hit harder.
+export const REFINE = { max: 10, atk: 0.03, glowAt: 5, critDmg: 0.05 };
+
+// Skill points: each level on a skill adds a share of damage (attack skills) or of duration
+// (buff skills). Points come one per hero level (see LEVEL), spent in the character panel.
+export const SKILL = { maxLevel: 5, dmg: 0.10, buffDur: 0.15 };
 
 export const SKILL_KEYS = ['skill1', 'skill2', 'skill3'];
 

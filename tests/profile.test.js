@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PROFILE_KEY, TOWN_KEYS, HERO_KEYS, defaultProfile, normalize, loadProfile, saveProfile, clearProfile,
-  heroOf, isUnlocked, tierFor, nextTown, prevTown, recordRun,
+  heroOf, isUnlocked, tierFor, nextTown, prevTown, recordRun, dropFor, setEquip, spendSkillPoint, skillPointsLeft,
 } from '../src/profile.js';
 import { xpAtLevel } from '../src/sim/progress.js';
-import { NGPLUS } from '../src/config.js';
+import { NGPLUS, DROPS, REFINE, SKILL } from '../src/config.js';
 
 function fakeStore(seed = null) {
   let v = seed;
@@ -17,7 +17,7 @@ test('a fresh profile: every hero at level 1, only the first town open, tier 0 e
   const p = defaultProfile();
   assert.deepEqual(Object.keys(p.heroes), HERO_KEYS);
   for (const h of HERO_KEYS) {
-    assert.deepEqual(heroOf(p, h), { xp: 0, level: 1, skillPoints: 0, towns: p.heroes[h].towns });
+    assert.deepEqual(heroOf(p, h), { xp: 0, level: 1, skillPoints: 0, towns: p.heroes[h].towns, items: {}, skills: p.heroes[h].skills, gear: null });
     for (const t of TOWN_KEYS) assert.equal(tierFor(p, h, t), 0);
   }
   assert.equal(isUnlocked(p, TOWN_KEYS[0]), true);
@@ -91,4 +91,55 @@ test('a lost run keeps its xp and clears nothing; recording twice is harmless', 
   assert.equal(isUnlocked(p, 'morroc'), false);
   recordRun(p, g, { hero: 'hunter', town: 'prontera' });
   assert.equal(p.heroes.hunter.xp, 300, 'the sim carries the lifetime total, so a re-record does not double it');
+});
+
+test('loot: the first weapon is held and wielded, a duplicate refines it, the cap holds', () => {
+  const p = defaultProfile();
+  assert.deepEqual(dropFor(p, 'knight', 'prontera'), { item: 'katana', chance: 1 }, 'first clear: guaranteed');
+  assert.equal(dropFor(p, 'knight', 'nowhere'), null);
+  const r = recordRun(p, { ...finished('won', 500), loot: ['katana'] }, { hero: 'knight', town: 'prontera' });
+  assert.deepEqual(r.loot, [{ id: 'katana', plus: 0, merged: false }]);
+  assert.deepEqual(p.heroes.knight.items, { katana: { plus: 0 } });
+  assert.equal(p.heroes.knight.equip, 'katana');
+  assert.deepEqual(heroOf(p, 'knight').gear, { id: 'katana', plus: 0 });
+  assert.equal(dropFor(p, 'knight', 'prontera').chance, DROPS.boss.chance, 'after the first clear: a chance');
+  const r2 = recordRun(p, { ...finished('won', 900, 500), loot: ['katana'] }, { hero: 'knight', town: 'prontera' });
+  assert.deepEqual(r2.loot, [{ id: 'katana', plus: 1, merged: true }]);
+  assert.deepEqual(heroOf(p, 'knight').gear, { id: 'katana', plus: 1 });
+  recordRun(p, { ...finished('won', 1), loot: ['tsurugi'] }, { hero: 'knight', town: 'morroc' });
+  assert.equal(p.heroes.knight.equip, 'katana', 'a second weapon does not swap what is wielded');
+  assert.ok(p.heroes.knight.items.tsurugi);
+  recordRun(p, { ...finished('won', 1), loot: ['gakkung'] }, { hero: 'knight', town: 'prontera' });
+  assert.equal(p.heroes.knight.items.gakkung, undefined, 'a bow is not the knight\'s to keep');
+  for (let i = 0; i < 20; i++) recordRun(p, { ...finished('won', 1), loot: ['katana'] }, { hero: 'knight', town: 'prontera' });
+  assert.equal(p.heroes.knight.items.katana.plus, REFINE.max);
+  assert.equal(setEquip(p, 'knight', 'tsurugi'), true); assert.equal(heroOf(p, 'knight').gear.id, 'tsurugi');
+  assert.equal(setEquip(p, 'knight', 'gakkung'), false, 'cannot wield what is not held');
+  assert.equal(setEquip(p, 'knight', null), true); assert.equal(heroOf(p, 'knight').gear, null);
+  const back = normalize(JSON.parse(JSON.stringify(p)));
+  assert.deepEqual(back.heroes.knight.items, p.heroes.knight.items);
+  const odd = normalize({ heroes: { knight: { items: { katana: { plus: 99 }, gakkung: { plus: 1 }, junk: 1 }, equip: 'tsurugi' } } });
+  assert.deepEqual(odd.heroes.knight.items, { katana: { plus: REFINE.max } });
+  assert.equal(odd.heroes.knight.equip, null, 'an unheld equip is dropped');
+});
+
+test('skill points: one per level, spent one at a time, capped per skill, refunded if the save is over budget', () => {
+  const p = defaultProfile();
+  assert.equal(skillPointsLeft(p, 'knight'), 0);
+  assert.equal(spendSkillPoint(p, 'knight', 'quicken'), false, 'nothing to spend at level 1');
+  p.heroes.knight.xp = xpAtLevel(4);
+  assert.equal(skillPointsLeft(p, 'knight'), 3);
+  assert.equal(spendSkillPoint(p, 'knight', 'quicken'), true);
+  assert.equal(spendSkillPoint(p, 'knight', 'bash'), false, 'not one of the hero\'s slotted skills');
+  assert.equal(spendSkillPoint(p, 'knight', 'quicken'), true);
+  assert.equal(spendSkillPoint(p, 'knight', 'magnumBreak'), true);
+  assert.equal(spendSkillPoint(p, 'knight', 'magnumBreak'), false, 'out of points');
+  assert.deepEqual(heroOf(p, 'knight').skills, { quicken: 2, magnumBreak: 1, bowlingBash: 0 });
+  p.heroes.knight.xp = xpAtLevel(30);
+  for (let i = 0; i < 9; i++) spendSkillPoint(p, 'knight', 'quicken');
+  assert.equal(p.heroes.knight.skills.quicken, SKILL.maxLevel);
+  const over = normalize({ heroes: { hunter: { xp: xpAtLevel(2), skills: { windWalk: 3, arrowShower: 2 } } } });
+  assert.deepEqual(over.heroes.hunter.skills, { windWalk: 0, arrowShower: 0, blitzBeat: 0 }, 'over budget → refunded');
+  const ok = normalize({ heroes: { hunter: { xp: xpAtLevel(6), skills: { windWalk: 3, arrowShower: 2, bogus: 4 } } } });
+  assert.deepEqual(ok.heroes.hunter.skills, { windWalk: 3, arrowShower: 2, blitzBeat: 0 });
 });

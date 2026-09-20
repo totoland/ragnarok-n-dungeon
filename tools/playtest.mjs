@@ -5,6 +5,7 @@
 //   node tools/playtest.mjs --tier 2    # every monster at New Game+ tier 2
 //   node tools/playtest.mjs --matrix    # tiers 0..2, no pass/fail gate
 //   node tools/playtest.mjs --level 8   # the hero starts at level 8 (xp from sim/progress.js)
+//   node tools/playtest.mjs --gear katana:5 --skill 3   # wield a +5 Katana, every skill at level 3
 //   node tools/playtest.mjs --dungeon morroc   # another town; reports, no gate
 //
 // The bot is deliberately simple: walk to the nearest live enemy's lane, mash attack when in
@@ -13,6 +14,7 @@
 // not a bullet hell), and must never clear it without taking any damage.
 import { createGame, update } from '../src/sim/game.js';
 import { xpAtLevel } from '../src/sim/progress.js';
+import { HEROES } from '../src/sim/data/heroes.js';
 import { TOWNS } from '../src/sim/data/dungeon.js';
 import { FLOOR, SIM } from '../src/config.js';
 
@@ -75,7 +77,8 @@ function botInput(g, frame) {
 }
 
 function run(hero, seed, verbose = false, opts = {}) {
-  const g = createGame({ hero, seed, ...opts });
+  const skills = skillLevel ? Object.fromEntries(HEROES[hero].skills.map((id) => [id, skillLevel])) : {};
+  const g = createGame({ hero, seed, skills, ...opts });
   const log = [];
   let frame = 0;
   const maxFrames = 60 * 60 * 6;
@@ -120,7 +123,13 @@ if (townFlag && !town) { console.error(`unknown dungeon '${townFlag}' - one of: 
 const tierFlag = flag('--tier');
 const tier = tierFlag ? Number(tierFlag) : 0;
 const levelFlag = flag('--level');
-const start = levelFlag ? { xp: xpAtLevel(Number(levelFlag)) } : {};
+const gearFlag = flag('--gear'), skillFlag = flag('--skill');
+const start = {
+  ...(levelFlag ? { xp: xpAtLevel(Number(levelFlag)) } : {}),
+  ...(gearFlag ? { gear: { id: gearFlag.split(':')[0], plus: Number(gearFlag.split(':')[1] || 0) } } : {}),
+};
+// --skill N: every slotted skill at level N, resolved per hero inside run() since the ids differ.
+const skillLevel = skillFlag ? Number(skillFlag) : 0;
 const rows = [];
 if (flag('--matrix')) {
   for (const t of [0, 1, 2]) for (const h of heroes) for (const s of seeds) rows.push(run(h, s, false, { tier: t, ...start, ...(town ? { dungeon: town } : {}) }));
@@ -136,7 +145,7 @@ for (const h of heroes) for (const s of seeds) rows.push(run(h, s, !!seedArg, { 
 console.table(rows);
 const wins = rows.filter((r) => r.phase === 'won').length;
 console.log(`${wins}/${rows.length} runs cleared the dungeon; avg hp left ${(rows.reduce((a, r) => a + r.hp / r.hpMax, 0) / rows.length * 100).toFixed(0)}%`);
-if (town || levelFlag) { console.log(`(${townFlag || `level ${levelFlag}`}: no pass/fail gate - the bar below is calibrated for a fresh hero in Prontera)`); process.exit(0); }
+if (town || levelFlag || gearFlag || skillFlag) { console.log(`(${townFlag || 'loadout'}: no pass/fail gate - the bar below is calibrated for a fresh hero in Prontera)`); process.exit(0); }
 const flawless = rows.filter((r) => r.phase === 'won' && r.hp === r.hpMax).length;
 if (flawless) { console.error(`${flawless} flawless runs — the dungeon is too easy`); process.exitCode = 1; }
 // The bot has no boss strategy beyond backing off, so half the runs is the bar; a kiting hunter
