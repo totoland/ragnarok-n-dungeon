@@ -607,17 +607,36 @@ export function createMonsterViews(world) {
     world.scene.add(group);
     const materials = new Set();
     built.root.traverse((o) => { if (o.isMesh) { const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) materials.add(m); } });
-    for (const m of materials) { m.userData.emissive = m.emissive.clone(); m.userData.opacity = m.opacity; }
+    for (const m of materials) {
+      // A recycled view arrives mid-death: flashed, faded, half transparent. Put it back the
+      // way it was built rather than recording the state it died in as its resting state.
+      if (m.userData.emissive) { m.emissive.copy(m.userData.emissive); m.opacity = m.userData.opacity; m.transparent = m.userData.transparent; }
+      else { m.userData.emissive = m.emissive.clone(); m.userData.opacity = m.opacity; m.userData.transparent = m.transparent; }
+    }
     const v = { id: e.id, type: e.type, group, built, materials, cur: {}, scratch: {}, walkPhase: 0, yaw: e.facing * HALF, t: Math.random() * 10, dead: false };
     views.set(e.id, v);
     return v;
   }
 
-  function dispose(v) {
+  // Freeing a monster used to mean freeing everything it was made of. Several dozen
+  // geometries and materials went back to the driver, and with them the shader programs -
+  // which the next monster of that type then compiled again. The tablet's report caught it
+  // as seven programs compiled inside one 69 ms frame. So the body goes back on the shelf
+  // instead; only a room change or the end of a run actually destroys anything.
+  const KEEP = 8;
+  function retire(v) {
     world.scene.remove(v.group);
-    v.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
-    for (const m of v.materials) m.dispose();
+    v.group.remove(v.built.root);
+    const list = (pool[v.type] ||= []);
+    if (list.length < KEEP) list.push(v.built); else destroy(v.built);
     views.delete(v.id);
+  }
+
+  function destroy(built) {
+    built.root.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.isMesh) { const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.dispose(); }
+    });
   }
 
   function updateHumanoid(v, e, dt) {
@@ -701,7 +720,7 @@ export function createMonsterViews(world) {
   }
 
   function dropPool() {
-    for (const list of Object.values(pool)) for (const b of list) b.root.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+    for (const list of Object.values(pool)) for (const b of list) destroy(b);
     for (const k in pool) pool[k] = [];
     queue = [];
   }
@@ -759,9 +778,10 @@ export function createMonsterViews(world) {
       // and a wave that dies together frees them together.
       let freed = 0;
       const t0 = performance.now();
-      for (const v of [...views.values()]) if (!seen.has(v.id)) { dispose(v); freed++; }
-      if (freed > 1) note(`${freed} monsters freed ${Math.round(performance.now() - t0)}ms (${views.size} left)`);
+      for (const v of [...views.values()]) if (!seen.has(v.id)) { retire(v); freed++; }
+      if (freed > 1) note(`${freed} monsters shelved ${Math.round(performance.now() - t0)}ms (${views.size} left)`);
     },
-    clear() { for (const v of [...views.values()]) dispose(v); },
+    // The end of a run: nothing is coming back, so let it all go, shelf included.
+    clear() { for (const v of [...views.values()]) { world.scene.remove(v.group); destroy(v.built); views.delete(v.id); } dropPool(); },
   };
 }
