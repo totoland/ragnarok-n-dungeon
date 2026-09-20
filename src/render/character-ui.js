@@ -19,6 +19,13 @@ const el = (tag, cls, text) => {
   return n;
 };
 const GRID = 12;
+// Slot glyphs for items that have no model yet (everything but weapons, for now).
+const GLYPH = {
+  cape: '<svg viewBox="0 0 40 40"><path d="M12 6 L28 6 L34 34 Q20 28 6 34 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M20 6 L20 30" stroke="currentColor" stroke-width="1.4" opacity=".5"/></svg>',
+  hat: '<svg viewBox="0 0 40 40"><path d="M10 24 Q10 9 20 9 Q30 9 30 24 Z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M5 25 Q20 32 35 25" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  accessory: '<svg viewBox="0 0 40 40"><circle cx="20" cy="23" r="9" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 12 L20 6 L25 12 L20 15 Z" fill="currentColor"/></svg>',
+  weapon: '<svg viewBox="0 0 40 40"><path d="M8 32 L28 8 M24 4 L32 12 M10 26 L14 30" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
+};
 
 export function createCharacterUI({ input, getProfile, onChange }) {
   const root = $('character');
@@ -130,13 +137,13 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     }
     const url = preview.icon(hero, entry.id);
     if (url) { const img = el('img'); img.src = url; img.alt = entry.name; img.draggable = false; b.appendChild(img); }
-    else b.appendChild(el('span', 'noicon', entry.name[0]));
+    else { const g = el('span', 'glyph'); g.innerHTML = GLYPH[entry.slot] || GLYPH.weapon; b.appendChild(g); }
     if (!entry.held) b.classList.add('unknown');
     if (entry.plus) b.appendChild(el('span', 'badge', `+${entry.plus}`));
     if (equipped) b.appendChild(el('span', 'tag', 'E'));
     b.classList.toggle('selected', entry.id === selected);
     b.title = entry.held ? entry.name : `${entry.name} — ${entry.source}`;
-    b.addEventListener('click', () => { selected = entry.id; preview.setGear(selected); render(); });
+    b.addEventListener('click', () => { selected = entry.id; render(); });
     return b;
   }
 
@@ -156,7 +163,7 @@ export function createCharacterUI({ input, getProfile, onChange }) {
       const cell = el('div', `wornslot${filter === sl ? ' on' : ''}`);
       const b = entry ? slot(entry, h, { equipped: true }) : slot(null, h, { label: SLOT_INFO[sl].name });
       if (entry) b.classList.toggle('selected', false);
-      b.addEventListener('click', (ev) => { ev.stopPropagation(); filter = filter === sl ? 'all' : sl; if (entry) { selected = entry.id; preview.setGear(wornId(h, 'weapon')); } render(); }, true);
+      b.addEventListener('click', (ev) => { ev.stopPropagation(); filter = filter === sl ? 'all' : sl; if (entry) selected = entry.id; render(); }, true);
       cell.append(b, el('span', 'wornlabel', SLOT_INFO[sl].name));
       wornRow.appendChild(cell);
     }
@@ -206,8 +213,10 @@ export function createCharacterUI({ input, getProfile, onChange }) {
 
     wrap.append(inv, look);
     body.appendChild(wrap);
-    // The turntable always shows the wielded weapon plus the selected one if it is a weapon.
-    if (preview.ready) preview.mount(stage, hero, e.slot === 'weapon' ? selected : wornId(h, 'weapon'));
+    // The turntable shows the selected weapon (with its glow), or the wielded one while a
+    // cape or hat is selected, since those have no models yet.
+    const onStage = e.slot === 'weapon' ? e : list.find((x) => x.id === wornId(h, 'weapon') && x.slot === 'weapon');
+    if (preview.ready) preview.mount(stage, hero, onStage?.id ? { id: onStage.id, plus: onStage.plus || 0 } : null);
     else stage.appendChild(el('div', 'stagenote', 'Loading models…'));
     note.textContent = 'Tap a slot to preview it on your hero, then Equip. A duplicate drop refines the weapon you hold by +1; from +5 it glows.';
   }

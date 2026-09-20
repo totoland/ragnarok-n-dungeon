@@ -4,6 +4,7 @@
 // own model wielding the selected weapon, turning slowly in a box in the profile panel.
 import * as THREE from 'three';
 import { showWeapon, restPose } from './heroes.js';
+import { ITEMS, glowOf } from '../sim/data/items.js';
 
 const ICON = 112;
 
@@ -25,14 +26,34 @@ export function createPreview() {
   const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 50);
   const icons = new Map();
 
-  // The weapon node alone, reset to its own frame: the grip at the origin, the blade up +Y.
-  function weaponOf(hero, gearId) {
+  // Materials on the shared asset carry whatever the live view last did to them - a +7's
+  // glow, a hit flash - so anything rendered here gets its own copies, emissive reset.
+  const GOLD = new THREE.Color(0xffd35a);
+  function ownMaterials(root, glow = 0) {
+    root.traverse((o) => {
+      if (!o.isMesh) return;
+      const mats = (Array.isArray(o.material) ? o.material : [o.material]).map((m) => {
+        const c = m.clone();
+        if (c.emissive) { c.emissive.copy(m.userData.emissive || new THREE.Color(0)); if (glow > 0) c.emissive.add(GOLD.clone().multiplyScalar(0.25 + 0.6 * glow)); }
+        return c;
+      });
+      o.material = Array.isArray(o.material) ? mats : mats[0];
+    });
+  }
+
+  // The item's node alone, reset to its own frame: the grip at the origin, the blade up +Y.
+  // A weapon without a baked model falls back to the hero's own; anything else (a cape, a
+  // hat) only has a model when a `<slot>_<id>` node exists, and returns null otherwise.
+  function nodeOf(hero, gearId) {
     const model = assets[hero];
-    const node = (gearId && model.getObjectByName(`weapon_${gearId}`)) || model.getObjectByName('weapon');
+    const slot = gearId ? ITEMS[gearId]?.slot || 'weapon' : 'weapon';
+    let node = gearId ? model.getObjectByName(`${slot}_${gearId}`) : null;
+    if (!node && slot === 'weapon') node = model.getObjectByName('weapon');
     if (!node) return null;
     const c = node.clone();
     c.position.set(0, 0, 0); c.rotation.set(0, 0, 0); c.scale.set(1, 1, 1);
     c.traverse((o) => { o.visible = true; });
+    ownMaterials(c);
     return c;
   }
 
@@ -40,8 +61,8 @@ export function createPreview() {
     const k = `${hero}:${gearId || ''}`;
     if (icons.has(k)) return icons.get(k);
     if (!assets) return null;
-    const c = weaponOf(hero, gearId);
-    if (!c) return null;
+    const c = nodeOf(hero, gearId);
+    if (!c) { icons.set(k, null); return null; }
     const holder = new THREE.Group();
     holder.add(c);
     scene.add(holder);
@@ -81,12 +102,14 @@ export function createPreview() {
     camera.position.set(0, 1.15, 4.9);
     camera.lookAt(0, 1.02, 0);
   }
-  function mount(container, hero, gearId) {
+  // gear: { id, plus } or null - the plus sets the glow the turntable shows.
+  function mount(container, hero, gear) {
     if (!assets) return;
     if (mounted && mounted.hero !== hero) unmount();
     if (!mounted) {
       const model = assets[hero].clone();
       restPose(model, hero);
+      ownMaterials(model);
       const holder = new THREE.Group();
       holder.add(model);
       scene.add(holder);
@@ -104,9 +127,17 @@ export function createPreview() {
       mounted.raf = requestAnimationFrame(loop);
     }
     if (mounted.container !== container) { container.appendChild(canvas); mounted.container = container; fit(container); }
-    showWeapon(mounted.model, gearId);
+    setGear(gear);
   }
-  function setGear(gearId) { if (mounted) showWeapon(mounted.model, gearId); }
+  function setGear(gear) {
+    if (!mounted) return;
+    showWeapon(mounted.model, gear?.id ?? null);
+    const glow = glowOf(gear);
+    mounted.model.traverse((o) => {
+      if (!(o.name === 'weapon' || /^weapon_[a-z]+$/.test(o.name)) || !o.visible) return;
+      ownMaterials(o, glow);
+    });
+  }
   function unmount() {
     if (!mounted) return;
     cancelAnimationFrame(mounted.raf);
