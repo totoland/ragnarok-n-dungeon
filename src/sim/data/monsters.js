@@ -125,9 +125,12 @@ export const MONSTERS = {
   // the Orc Lord does - written, tested, and not in a town.
   sandman: {
     name: 'Sandman', ai: 'boss', boss: true,
-    hp: 1400, atk: 19, speed: 1.9, mass: 6.0,
+    // He is enormous and he was standing still: slow to close, slow to wind up, and two
+    // seconds between swings on top of it. Quicker on his feet and quicker to swing, with
+    // the mace's reach counted from a body twice anyone else's width.
+    hp: 1400, atk: 19, speed: 2.3, mass: 6.0,
     hurtbox: { r: 1.2, h: 3.0 },
-    attack: { range: 2.6, windup: 0.6, dur: 0.36, cd: 2.0, box: { x0: 0.0, x1: 3.0, y0: -0.4, y1: 3.0 }, knock: [7, 2] },
+    attack: { range: 3.1, windup: 0.5, dur: 0.34, cd: 1.5, box: { x0: 0.0, x1: 3.4, y0: -0.4, y1: 3.0 }, knock: [7, 2] },
     // He does not run so much as pour: the whole column moves and reforms on the far side.
     charge: { windup: 0.7, dur: 0.6, speed: 11.5, cd: 9.5, box: { x0: -0.6, x1: 2.2, y0: -0.5, y1: 3.0 }, knock: [9, 3] },
     // The mace comes down and the floor answers on both sides.

@@ -30,8 +30,13 @@ export function applyHit(target, dmg, knock, stun, dir, mass = 1) {
   target.hp = Math.max(0, target.hp - dmg);
   const k = 1 / Math.max(0.35, mass);
   target.vx = knock[0] * dir * k;
-  if (mass >= 3) { // super armour: bosses flinch but are never launched or stun-locked
-    target.hitstun = Math.max(target.hitstun, stun * 0.45);
+  // Hyper armour. A boss used to keep 45 % of the stun, which reads as a flinch and is
+  // enough to cut a wind-up - so the Sandman, who is hit constantly because he is enormous
+  // and slow, almost never got an attack out at all. A boss now takes the hit without
+  // breaking stride: the flash, the damage and a shove are the feedback, and the wind-up is
+  // still the tell to read. Mass 3 and over is exactly the five bosses and none of the
+  // minions, the Baphomet's brood included.
+  if (mass >= 3) {
     target.flash = 0.12;
     return target.hp <= 0;
   }
