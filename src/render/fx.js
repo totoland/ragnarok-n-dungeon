@@ -258,14 +258,16 @@ export function createFx(world) {
       case 'hit': {
         if (ev.target === 'enemy') {
           const crit = ev.crit;
+          // A critical reads from its number: red digits rimmed in gold, bigger, punched in.
+          // It used to add two gold arcs crossing over the enemy and spinning apart, which
+          // is the pair of turning blades Toto spotted, plus twice the sparks and two and a
+          // half times the shake. All of it landed on the frame a critical did, which is
+          // also the frame carrying the biggest hit in the fight. The number says it well
+          // enough on its own; a crit is otherwise an ordinary hit now.
           number(ev.x, ev.y + 0.4, ev.z, String(ev.dmg), '#ffffff', crit, crit);
-          burst(ev.x, ev.y, ev.z, crit ? 26 : 12, { color: crit ? 0xffd24a : 0xfff4d0, speed: crit ? 5.5 : 4, up: 3, life: 0.35, size: crit ? 0.34 : 0.28, dir: Math.sign(ev.launched ? 0 : 1) });
-          if (crit) {   // the two crossed gold slashes that stamp a critical in RO
-            slash(ev.x, ev.y + 0.9, ev.z, 1, { color: 0xffe08a, scale: 1.3, tilt: 0.8, life: 0.18, spin: -2.5 });
-            slash(ev.x, ev.y + 0.9, ev.z, -1, { color: 0xffe08a, scale: 1.3, tilt: -0.8, life: 0.18, spin: 2.5 });
-          }
+          burst(ev.x, ev.y, ev.z, 12, { color: 0xfff4d0, speed: 4, up: 3, life: 0.35, size: 0.28, dir: Math.sign(ev.launched ? 0 : 1) });
           if (ev.monster === 'poring' || ev.monster === 'lunatic') burst(ev.x, ev.y, ev.z, 8, { color: ev.monster === 'poring' ? 0xff86b4 : 0xffffff, speed: 3, up: 3, life: 0.5, size: 0.3, gravity: 12 });
-          addShake(world, crit ? 0.35 : 0.14);
+          addShake(world, 0.14);
           if (ev.attack === 'blitzBeat' || ev.attack === 'autoBlitz') burst(ev.x, ev.y + 0.6, ev.z, 14, { color: 0xffe0a0, speed: 5, up: 2, life: 0.4, size: 0.3 });
         } else {
           number(ev.x, ev.y + 0.6, ev.z, String(ev.dmg), '#ff5a4a', true);
