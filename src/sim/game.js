@@ -312,6 +312,8 @@ export function update(g, input, dt = SIM.dt) {
       if (g.room.waves.length && g.roomT >= 0.8) startWave(g, 0);
     } else if (!alive && g.spawnQueue.length === 0) {
       if (g.waveIndex + 1 < g.room.waves.length) startWave(g, g.waveIndex + 1);
+      // A soak room has no last wave: the table starts again, so the run never clears.
+      else if (g.dungeon.soak) { g.loops = (g.loops || 0) + 1; startWave(g, 0); }
       else { g.phase = 'cleared'; pushEvent(g, { type: 'roomClear', index: g.roomIndex, last: g.roomIndex === g.dungeon.rooms.length - 1 }); }
     }
   } else if (g.phase === 'cleared') {

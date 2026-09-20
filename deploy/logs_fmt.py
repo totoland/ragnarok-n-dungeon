@@ -44,6 +44,9 @@ for line in sys.stdin:
         print(f"   game: {g.get('hero')} {g.get('town')}/{g.get('room')} t={g.get('t')} {g.get('phase')} lv{g.get('level')} "
               f"hp{g.get('hp')} state={g.get('state')}/{g.get('attack')} hold={g.get('hold')} "
               f"enemies={g.get('alive')}/{g.get('enemies')}")
+    sk = r.get('soak') or {}
+    if sk:
+        print(f"   soak: loop {sk.get('loops')} wave {sk.get('wave')} kills {sk.get('kills')}")
     raw = i.get('raw') or {}
     if raw:
         print(f"   input: held {raw.get('held')} pad {raw.get('pad')} padHeld {raw.get('padHeld')}")

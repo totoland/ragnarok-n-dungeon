@@ -1,7 +1,7 @@
 // Boot: load hero GLBs, hero select, fixed-timestep sim loop with hit-stop, render every frame.
 // `window.__dro` is the debug handle.
 import { SIM } from './config.js';
-import { TOWNS } from './sim/data/dungeon.js';
+import { TOWNS, SOAK } from './sim/data/dungeon.js';
 import { MONSTERS } from './sim/data/monsters.js';
 import { createGame, update as simUpdate, setGear } from './sim/game.js';
 import { loadProfile, saveProfile, clearProfile, heroOf, isUnlocked, tierFor, prevTown, recordRun, dropFor, skillPointsLeft } from './profile.js';
@@ -26,7 +26,10 @@ const hud = createHud();
 const settings = loadSettings();
 const input = createInput(window, { settings });
 hud.onSkill = (i) => { if (game && !paused && !ended) input.press(`skill${i + 1}`); };
-const telemetry = createTelemetry({ world, input, game: () => game });
+const telemetry = createTelemetry({
+  world, input, game: () => game,
+  extra: () => (soak && game ? { soak: { loops: game.loops || 0, kills: game.kills, wave: game.waveIndex + 1 } } : null),
+});
 const touch = attachTouch(input, { settings });
 let keyLookup = lookup(settings.keys);
 
@@ -59,6 +62,12 @@ function applyLoadout() {
   setGear(game, me.gear, me.wear);
   game.player.skillLv = { ...me.skills };
 }
+document.getElementById('title-soak')?.addEventListener('click', () => {
+  soak = true;
+  sfx.init();
+  start();
+});
+
 document.getElementById('title-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-resume').addEventListener('click', () => { paused = false; hud.showPause(false); });
@@ -86,12 +95,13 @@ let prewarmed = -1;   // room index whose textures are already drawn and uploade
 let acc = 0;
 let last = performance.now();
 let ended = false;
+let soak = false;      // the endless room, played by autoInput() rather than by a person
 
 // hero selection
 const heroButtons = [...document.querySelectorAll('.hero')];
 for (const b of heroButtons) {
   b.disabled = true;
-  b.addEventListener('click', () => { selectedHero = b.dataset.hero; sfx.init(); start(); });
+  b.addEventListener('click', () => { selectedHero = b.dataset.hero; sfx.init(); soak = false; start(); });
 }
 // town selection - a click just marks it; the hero buttons / Enter still start the run.
 // A locked town is disabled until the one before it has been cleared by any hero.
@@ -298,12 +308,17 @@ function start() {
   // and spent skill points the loadout, the clear count whether the boss's drop is certain.
   const me = heroOf(profile, selectedHero);
   game = createGame({
-    hero: selectedHero, seed: (Date.now() % 100000) | 0, dungeon: TOWNS[selectedTown] || TOWNS.prontera,
+    hero: selectedHero, seed: (Date.now() % 100000) | 0, dungeon: soak ? SOAK : (TOWNS[selectedTown] || TOWNS.prontera),
     tier: pickedTier(), xp: me.xp, gear: me.gear, wear: me.wear, skills: { ...me.skills },
     drop: dropFor(profile, selectedHero, selectedTown),
   });
-  profile.last = { hero: selectedHero, town: selectedTown };
-  saveProfile(profile);
+  if (!soak) { profile.last = { hero: selectedHero, town: selectedTown }; saveProfile(profile); }
+  if (soak) {
+    prewarmRoom(world, SOAK.rooms[0], 0);
+    while (prewarmTick(world));
+    monsters.prebuild(SOAK.rooms[0], MONSTERS);
+    while (monsters.tick());
+  }
   progress = null;
   heroView = createHeroView(world, selectedHero, assets);
   hud.bindHero(game.player);
@@ -324,6 +339,7 @@ function start() {
 // Back to the title from the end screen: tear the run down and put the plinths back.
 function toTitle() {
   if (!game) return;
+  soak = false;
   if (heroView) { heroView.dispose(); heroView = null; }
   monsters.clear();
   fx.clear();
@@ -396,7 +412,8 @@ function frame(now) {
       let steps = 0;
       const simStart = performance.now();
       while (acc >= SIM.dt && steps < 5) {
-        simUpdate(game, input.snapshot(), SIM.dt);
+        simUpdate(game, soak ? autoInput(game) : input.snapshot(), SIM.dt);
+        if (soak) game.player.hp = game.player.hpMax;   // the point is the frames, not the fight
         acc -= SIM.dt;
         steps++;
       }
@@ -494,12 +511,47 @@ function phaseMark(total) {
   const kinds = now.prog > counts.prog ? newProgramKinds() : '';
   mark(`${Math.round(total)}ms frame: ${name} ${worst.toFixed(0)}ms${rest ? ` + ${rest}` : ''}${grew ? ` [${grew}${kinds ? ': ' + kinds : ''}]` : ' [no new gpu objects]'}`);
 }
+// A hand that never gets tired, for a soak run. It writes the input a player would: walk at
+// the nearest thing alive, hold the attack, and spend a skill when one is off cooldown. It
+// re-presses every so often because a skill disarms hold-to-attack, and hold only re-arms on
+// a fresh edge - the same rule a controller is held to.
+let autoFrame = 0;
+const autoHeld = {}, autoPressed = {};
+function autoInput(g) {
+  for (const k in autoHeld) delete autoHeld[k];
+  for (const k in autoPressed) delete autoPressed[k];
+  autoFrame++;
+  const p = g.player;
+  let target = null, best = Infinity;
+  for (const e of g.enemies) {
+    if (e.dead) continue;
+    const d = Math.abs(e.x - p.x) + Math.abs(e.z - p.z) * 0.5;
+    if (d < best) { best = d; target = e; }
+  }
+  if (target) {
+    const dx = target.x - p.x, dz = target.z - p.z;
+    const reach = p.hero === 'hunter' ? 6 : 1.7;
+    if (dx > reach) autoHeld.right = true; else if (dx < -reach) autoHeld.left = true;
+    if (dz > 0.5) autoHeld.down = true; else if (dz < -0.5) autoHeld.up = true;
+  }
+  autoHeld.attack = true;
+  if (autoFrame % 9 === 0) autoPressed.attack = true;       // a fresh edge, to re-arm the hold
+  const skills = p.def.skills || [];
+  if (skills.length) {
+    const slot = ['skill1', 'skill2', 'skill3'][(autoFrame / 40 | 0) % Math.min(3, skills.length)];
+    if (autoFrame % 40 === 0) autoPressed[slot] = true;
+  }
+  return { held: autoHeld, pressed: autoPressed };
+}
+
 let heldSince = 0;
 function renderFrame(dt) {
   if (game.roomIndex !== roomBuilt) mark(`build room ${game.room.name}`);
   // A held attack that never lets go is the bug being chased; stamp it with what the input
   // layer sees the moment it passes six seconds, so the report can be read back.
-  const live = game.phase !== 'won' && game.phase !== 'dead';   // a finished run freezes the last hold; that is not a stuck button
+  // A finished run freezes the last hold, and a soak run holds the attack on purpose for as
+  // long as it runs; neither is the stuck button this watches for.
+  const live = !soak && game.phase !== 'won' && game.phase !== 'dead';
   if (live && game.player.holdAttack) {
     if (!heldSince) heldSince = performance.now();
     else if (heldSince > 0 && performance.now() - heldSince > 6000) {

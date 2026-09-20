@@ -99,4 +99,26 @@ export const MORROC = {
 // Every town the title screen can start, in unlock order: clearing one opens the next (see
 // profile.js). DUNGEON stays the default export shape for the tests and the harness; TOWNS
 // is what the shell and `--dungeon` read.
+// A room that never ends, for leaving on a tablet while the reports come in. Its waves are
+// the ones the real towns build up to, in a loop that climbs and starts again, so a long
+// session keeps meeting the same heavy moments instead of drifting into an easy one. Not a
+// place to play: no exit, no boss, no ending. `soak` is what game.js looks for.
+export const SOAK = {
+  town: 'Soak', name: 'Proving Ground', soak: true,
+  loot: { knight: 'katana', hunter: 'gakkung' },
+  rooms: [
+    {
+      name: 'Proving Ground', width: 22, theme: 'crypt',
+      waves: [
+        [{ type: 'poring', count: 4 }, { type: 'lunatic', count: 2 }],
+        [{ type: 'skeleton', count: 3 }, { type: 'skelArcher', count: 2 }],
+        [{ type: 'lunatic', count: 4 }, { type: 'poring', count: 3 }, { type: 'ant', count: 2 }],
+        [{ type: 'skeleton', count: 3 }, { type: 'skelArcher', count: 2 }, { type: 'sandman', count: 2 }],
+        [{ type: 'golem', count: 2 }, { type: 'babyWolf', count: 3 }, { type: 'pecoPeco', count: 2 }],
+        [{ type: 'skeleton', count: 4 }, { type: 'skelArcher', count: 3 }, { type: 'lunatic', count: 3 }, { type: 'poring', count: 2 }],
+      ],
+    },
+  ],
+};
+
 export const TOWNS = { prontera: DUNGEON, morroc: MORROC };

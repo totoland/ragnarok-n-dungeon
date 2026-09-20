@@ -623,12 +623,16 @@ export function createMonsterViews(world) {
   // which the next monster of that type then compiled again. The tablet's report caught it
   // as seven programs compiled inside one 69 ms frame. So the body goes back on the shelf
   // instead; only a room change or the end of a run actually destroys anything.
-  const KEEP = 8;
+  // How many of each type to keep on the shelf: what the room actually asks for at most,
+  // because a room needing nine of something and a shelf holding eight means one built cold
+  // on every lap. prebuild() works that number out already.
+  const need = {};
+  const keepFor = (type) => Math.max(4, need[type] || 0);
   function retire(v) {
     world.scene.remove(v.group);
     v.group.remove(v.built.root);
     const list = (pool[v.type] ||= []);
-    if (list.length < KEEP) list.push(v.built); else destroy(v.built);
+    if (list.length < keepFor(v.type)) list.push(v.built); else destroy(v.built);
     views.delete(v.id);
   }
 
@@ -730,7 +734,7 @@ export function createMonsterViews(world) {
     // pool already holds. Leftovers from the room before are dropped first.
     prebuild(roomDef, monsterDefs) {
       dropPool();
-      const need = {};
+      for (const k in need) delete need[k];
       for (const wave of roomDef.waves || []) for (const g of wave) {
         need[g.type] = (need[g.type] || 0) + g.count;
         const adds = monsterDefs?.[g.type]?.adds;
