@@ -341,3 +341,45 @@ commit (`promote: sha-… → prod`) is the audit trail; a rollback is reverting
 ./deploy/deploy.sh prod` promotes a specific image. `deploy/k8s/base` holds the Deployment
 and Service; each overlay owns its namespace, hosts, replica count and pinned tag; the two
 Argo Applications are in `deploy/argocd/application.yaml`.
+
+### iOS, as a native app
+
+`./tools/ios.sh` builds the game as an app. It checks the machine, creates the Xcode project
+if it is not there, and opens Xcode on something ready to sign and run. Running it again is
+safe: each step fills in only what is missing.
+
+```
+./tools/ios.sh            check, set up, build, open Xcode
+./tools/ios.sh build      rebuild and sync after editing the game
+./tools/ios.sh check      preflight only, changes nothing
+./tools/ios.sh devices    iPhones and iPads this Mac can build to
+```
+
+It needs a full Xcode 16 or newer, not just the Command Line Tools, and Node 20 or newer.
+Capacitor 8 builds through Swift Package Manager, so there is no CocoaPods anywhere in this.
+On the iPad, Developer Mode has to be on (Settings → Privacy & Security) before Xcode will
+install anything. A free Apple ID signs fine; the app stops launching after seven days and
+running again re-signs it.
+
+The site has no build step and nginx serves the working tree, but an app bundle has to hold
+exactly the game's files and nothing else. `tools/build-web.mjs` assembles that folder from
+the same list the `Dockerfile` copies, minus the service worker and the web manifest, which
+describe an installable web app and mean nothing inside a signed bundle. `src/install.js`
+sees the native bridge and skips registering a worker there is no copy of. Keep the file list
+in step with the `Dockerfile`: a file missing from one 404s in the same way in the other.
+
+Telemetry is the reason to build this at all — the stuck-attack bug only ever showed up on a
+tablet with a controller and nothing plugged into it. An app has no server to report to, so
+the endpoint has to be absolute. On the machine that deploys it comes out of `deploy/.deployrc`
+by itself; anywhere else, pass it in, and the built `www/` is ignored by git so the hostname
+never lands here:
+
+```
+DRO_LOG_ENDPOINT=https://your-lab-host ./tools/ios.sh
+DRO_LOG_ENDPOINT= ./tools/ios.sh        build with reporting off
+```
+
+Two things are still open before any submission. The profile lives in `localStorage`, which
+WKWebView may clear when the device is short of space, and belongs in Capacitor Preferences.
+And every name in here is a placeholder standing in for Ragnarok's, which has to be settled
+before the app goes anywhere near a store.

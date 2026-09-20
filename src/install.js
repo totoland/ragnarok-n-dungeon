@@ -1,6 +1,11 @@
 // Install-to-device support, kept out of main.js because none of it touches the game: it
 // registers the service worker and offers the browser's install prompt on the title screen.
 
+// Inside the native shell none of this applies: the app is installed already, every file
+// is in the bundle, and there is no worker to register - build-web.mjs does not ship one.
+const native = !!(window.Capacitor?.isNativePlatform?.() ?? window.Capacitor?.isNative)
+  || location.protocol === 'capacitor:';
+
 const btn = document.getElementById('title-install');
 const hint = document.getElementById('install-hint');
 
@@ -8,7 +13,7 @@ const standalone = window.matchMedia('(display-mode: standalone)').matches
   || window.matchMedia('(display-mode: fullscreen)').matches
   || window.navigator.standalone === true;
 
-if ('serviceWorker' in navigator) {
+if (!native && 'serviceWorker' in navigator) {
   // After load, so the worker's first-run precache never competes with the GLBs for bandwidth.
   window.addEventListener('load', () => {
     // updateViaCache: 'none' - the worker script itself is always fetched past the HTTP cache.
@@ -26,7 +31,7 @@ if ('serviceWorker' in navigator) {
 
 // Chromium hands us the prompt; holding the event is the only way to trigger it later.
 let deferred = null;
-window.addEventListener('beforeinstallprompt', (e) => {
+if (!native) window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferred = e;
   if (!standalone && btn) btn.hidden = false;
@@ -44,7 +49,7 @@ window.addEventListener('appinstalled', () => { if (btn) btn.hidden = true; defe
 
 // Safari fires no prompt event at all, on iOS or on the Mac, so the only way to install is
 // the menu - say which one rather than leaving a button that would never appear.
-if (!standalone && hint) {
+if (!native && !standalone && hint) {
   const ua = navigator.userAgent;
   const webkit = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(ua);
   const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);

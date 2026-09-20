@@ -12,3 +12,9 @@ assets/blender/**/preview*.png
 deploy/.deployrc
 deploy/.deployrc.local
 docs/telemetry.ndjson
+
+# Native build: www/ is assembled by tools/build-web.mjs (and may carry the lab hostname),
+# Pods and the copied web folder are products of `cap sync`.
+www/
+ios/App/Pods/
+ios/App/App/public/

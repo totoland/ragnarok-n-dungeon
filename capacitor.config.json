@@ -1,0 +1,10 @@
+{
+  "appId": "cloud.totoland.dungeon",
+  "appName": "Dungeon RO",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "backgroundColor": "#07060a"
+  }
+}

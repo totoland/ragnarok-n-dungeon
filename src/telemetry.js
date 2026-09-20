@@ -9,6 +9,13 @@
 const KEY = 'dro.log';
 const PERIOD = 10000;
 
+// Where the reports go. Empty on the web: /__log sits on the same origin the page came from.
+// The native build has no origin to report to, so build-web.mjs stamps an absolute one into
+// <meta name="log-endpoint">; reports then reach lab from a device with nothing plugged in.
+const ENDPOINT = (document.querySelector('meta[name="log-endpoint"]')?.content || '').replace(/\/+$/, '');
+const NATIVE = !!(window.Capacitor?.isNativePlatform?.() ?? window.Capacitor?.isNative)
+  || location.protocol === 'capacitor:';
+
 export function createTelemetry({ world, input, game: getGame, extra }) {
   const params = new URLSearchParams(location.search);
   let on = false;
@@ -65,9 +72,13 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
     frames.length = 0; worst = 0;
     showBadge();
     badge.classList.remove('blink'); void badge.offsetWidth; badge.classList.add('blink');
-    const blob = new Blob([JSON.stringify(body)], { type: 'application/json' });
-    if (!(navigator.sendBeacon && navigator.sendBeacon('/__log', blob))) {
-      fetch('/__log', { method: 'POST', body: blob, keepalive: true }).catch(() => {});
+    // text/plain, not JSON: a cross-origin beacon with a JSON type needs a preflight that
+    // sendBeacon cannot send, and the report would never leave the device. Both servers log
+    // the raw body regardless of what it calls itself.
+    const blob = new Blob([JSON.stringify(body)], { type: 'text/plain;charset=UTF-8' });
+    const url = `${ENDPOINT}/__log`;
+    if (!(navigator.sendBeacon && navigator.sendBeacon(url, blob))) {
+      fetch(url, { method: 'POST', body: blob, keepalive: true, mode: 'no-cors' }).catch(() => {});
     }
   }
 
@@ -78,14 +89,21 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
     document.addEventListener('visibilitychange', () => { if (document.hidden) report('hidden'); });
     window.addEventListener('pagehide', () => report('pagehide'));
     showBadge();
-    console.info(`[telemetry] on (${env}) - reporting every ${PERIOD / 1000}s to /__log`);
+    console.info(`[telemetry] on (${env}) - reporting every ${PERIOD / 1000}s to ${ENDPOINT}/__log`);
   }
 
-  // The server names the environment; lab reports by default.
-  fetch('/__env', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => {
-    env = (t || '').trim() || 'dev';
-    if (on || env === 'lab') start();
-  }).catch(() => { env = 'dev'; if (on) start(); });
+  if (ENDPOINT) {
+    // A build with an endpoint stamped in was built to be watched: there is no /__env to ask
+    // and no address bar to put ?log=1 in, so it reports from the first frame.
+    env = NATIVE ? `ios-${(window.Capacitor?.getPlatform?.() || 'app')}` : 'packaged';
+    start();
+  } else {
+    // The server names the environment; lab reports by default.
+    fetch('/__env', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => {
+      env = (t || '').trim() || 'dev';
+      if (on || env === 'lab') start();
+    }).catch(() => { env = 'dev'; if (on) start(); });
+  }
 
   return { get on() { return !!timer; }, get sent() { return sent; }, report };
 }
