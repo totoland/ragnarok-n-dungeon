@@ -32,6 +32,21 @@ const out = path.resolve(root, process.argv[2] || 'www');
 const FILES = ['index.html', 'style.css', 'gamepad.html'];
 const DIRS = ['src', 'vendor', 'assets'];
 
+// assets/ is copied whole, so something has to keep the source art out of it: assets/blender
+// holds the .blend files and the scripts that build the models, 15 MB that no build of the
+// game ever loads, and a bundle is not the place to hand a user the models' source. The web
+// image keeps them out through .dockerignore; keep the two lists in step.
+const EXCLUDE = [
+  /(^|\/)assets\/blender(\/|$)/,   // .blend files, build scripts, portrait renders
+  /(^|\/)__pycache__(\/|$)/,
+  /(^|\/)\.DS_Store$/,
+  /\.blend1?$/,
+];
+const keep = (abs) => {
+  const rel = path.relative(root, abs).split(path.sep).join('/');
+  return !EXCLUDE.some((re) => re.test(rel));
+};
+
 function buildId() {
   try {
     const sha = execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], { cwd: root }).toString().trim();
@@ -44,11 +59,16 @@ function buildId() {
 // of the untracked deploy config, so a device build reports to the same place the browser does.
 function logEndpoint() {
   if (process.env.DRO_LOG_ENDPOINT !== undefined) return process.env.DRO_LOG_ENDPOINT.trim();
-  try {
-    const rc = fs.readFileSync(path.join(root, 'deploy', '.deployrc'), 'utf8');
-    const hit = rc.match(/^\s*LAB_PUBLIC\s*=\s*["']?([^"'\s#]+)/m);
-    if (hit) return hit[1].replace(/\/+$/, '');
-  } catch { /* no deploy config on this machine: reports stay off */ }
+  // .deployrc.local first: on a machine that only builds the app there is no deploy config,
+  // and writing the address down once beats remembering the variable on every build. Both
+  // paths are gitignored, so the hostname stays out of the repository either way.
+  for (const f of ['.deployrc.local', '.deployrc']) {
+    try {
+      const rc = fs.readFileSync(path.join(root, 'deploy', f), 'utf8');
+      const hit = rc.match(/^\s*LAB_PUBLIC\s*=\s*["']?([^"'\s#]+)/m);
+      if (hit) return hit[1].replace(/\/+$/, '');
+    } catch { /* not on this machine */ }
+  }
   return '';
 }
 
@@ -58,7 +78,7 @@ const endpoint = logEndpoint();
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 for (const f of FILES) fs.copyFileSync(path.join(root, f), path.join(out, f));
-for (const d of DIRS) fs.cpSync(path.join(root, d), path.join(out, d), { recursive: true });
+for (const d of DIRS) fs.cpSync(path.join(root, d), path.join(out, d), { recursive: true, filter: keep });
 
 let html = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
 html = html.replace('__BUILD__', id);
@@ -71,4 +91,14 @@ fs.writeFileSync(path.join(out, 'index.html'), html);
 
 const count = (p) => fs.readdirSync(p, { recursive: true }).filter((f) => !fs.statSync(path.join(p, f)).isDirectory()).length;
 console.log(`www: ${count(out)} files, build ${id}`);
-console.log(endpoint ? `telemetry: reports go to ${endpoint}/__log` : 'telemetry: off (no DRO_LOG_ENDPOINT and no LAB_PUBLIC in deploy/.deployrc)');
+if (endpoint) {
+  console.log(`telemetry: reports go to ${endpoint}/__log`);
+} else {
+  console.log('telemetry: OFF - this build reports nothing, and a controller bug on the');
+  console.log('           device will leave no trace. To turn it on, once:');
+  console.log("             echo 'LAB_PUBLIC=https://your-lab-host' > deploy/.deployrc.local");
+}
+
+// A bundle that shipped the model sources would still run, so nothing would ever catch it.
+const leaked = fs.readdirSync(out, { recursive: true }).filter((f) => keep(path.join(root, f)) === false);
+if (leaked.length) { console.error(`refusing to ship source art: ${leaked.slice(0, 3).join(', ')}`); process.exit(1); }
