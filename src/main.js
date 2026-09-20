@@ -383,17 +383,22 @@ function frame(now) {
 
   if (!game) { if (preview) updatePreview(dtReal); monsters.tick(); world.renderer.render(world.scene, world.camera); return; }
 
+  const frameStart = performance.now();
+  for (const k in phase) phase[k] = 0;
+
   if (!paused) {
     // hit-stop: freeze the sim for a few ms after a solid hit, the belt-scroller crunch
     if (hitstop > 0) hitstop -= dtReal;
     else {
       acc += dtReal;
       let steps = 0;
+      const simStart = performance.now();
       while (acc >= SIM.dt && steps < 5) {
         simUpdate(game, input.snapshot(), SIM.dt);
         acc -= SIM.dt;
         steps++;
       }
+      phase.sim = performance.now() - simStart;
       for (const ev of game.events) {
         if (ev.type === 'hit') hitstop = Math.max(hitstop, ev.crit || ev.target === 'player' ? 0.07 : ev.attack === 'bash' || ev.attack === 'slash3' ? 0.06 : 0.028);
       }
@@ -422,7 +427,14 @@ function frame(now) {
 
   renderFrame(paused ? 0 : dtReal + pendingDt);
   pendingDt = 0;
+  const drawStart = performance.now();
   world.renderer.render(world.scene, world.camera);
+  phase.draw = performance.now() - drawStart;
+  // The draw time here is how long it took to hand the commands over, not how long the GPU
+  // spent on them. A long frame with a cheap draw is the CPU's fault; a long frame that is
+  // almost all draw is the GPU telling us it is behind.
+  const total = performance.now() - frameStart;
+  if (total > 34) phaseMark(total);
 }
 requestAnimationFrame(frame);
 
@@ -432,6 +444,19 @@ requestAnimationFrame(frame);
 const MARKED = { roomEnter: (e) => `room ${e.name}`, wave: (e) => `wave ${e.index + 1}`, bossAdds: () => 'boss adds', levelUp: (e) => `level ${e.level}`, bossDrop: (e) => `drop ${e.item}`, itemDrop: (e) => `drop ${e.item}`, won: () => 'won', gameOver: () => 'game over', attack: (e) => (e.id?.startsWith('slash') || e.id?.startsWith('arrow') ? null : `skill ${e.id}`) };
 world.marks = [];
 function mark(label) { world.marks.push({ at: performance.now(), label }); if (world.marks.length > 12) world.marks.shift(); }
+
+// A spike label says what the game was doing; it does not say where the time went. Two
+// suspects for the stutter with several monsters on screen were both cleared by the marks
+// that name them, which leaves the frame itself. Time its parts, and when one runs long say
+// which part it was and what the rest cost - a fix aimed at the wrong half of a frame is
+// worse than no fix, because it looks like progress.
+const phase = { sim: 0, fx: 0, hero: 0, monsters: 0, scene: 0, hud: 0, draw: 0 };
+function phaseMark(total) {
+  let name = '', worst = 0;
+  for (const k in phase) if (phase[k] > worst) { worst = phase[k]; name = k; }
+  const rest = Object.entries(phase).filter(([k, v]) => k !== name && v >= 1.5).map(([k, v]) => `${k} ${v.toFixed(0)}`).join(' ');
+  mark(`${Math.round(total)}ms frame: ${name} ${worst.toFixed(0)}ms${rest ? ` + ${rest}` : ''}`);
+}
 let heldSince = 0;
 function renderFrame(dt) {
   if (game.roomIndex !== roomBuilt) mark(`build room ${game.room.name}`);
@@ -450,11 +475,12 @@ function renderFrame(dt) {
   }
   if (game.phase === 'cleared') monsters.tick();   // one queued monster view per frame on the walk out
   for (const ev of game.events) { const f = MARKED[ev.type]; const label = f && f(ev); if (label) mark(label); sfx.handle(ev); }
-  fx.update(game, dt);
-  heroView.update(game, dt);
-  monsters.update(game, dt);
-  updateScene(world, game, dt);
-  hud.update(game, dt);
+  let t = performance.now();
+  fx.update(game, dt);              phase.fx = performance.now() - t; t = performance.now();
+  heroView.update(game, dt);        phase.hero = performance.now() - t; t = performance.now();
+  monsters.update(game, dt);        phase.monsters = performance.now() - t; t = performance.now();
+  updateScene(world, game, dt);     phase.scene = performance.now() - t; t = performance.now();
+  hud.update(game, dt);             phase.hud = performance.now() - t;
   if (!ended && (game.phase === 'won' || game.phase === 'dead')) {
     ended = true;
     // Bank the run the moment it ends, not when the overlay shows: a tab closed during the
