@@ -129,7 +129,8 @@ def ellipsoid(name, centre, size, mat, n=12, rings=8):
 
 
 # ------------------------------------------------------------------ blade
-T0, T1 = 0.30, 2.34            # habaki top to tip, along g
+T0, T1 = 0.46, 2.34            # habaki top to tip, along g. The fittings sit clear of the
+                               # gauntlet, which rises well past the leather grip's top.
 L = T1 - T0
 SORI = 0.12                    # how far the tip drifts toward the spine
 rings = []
@@ -139,12 +140,12 @@ for i in range(N + 1):
     t = T0 + L * u
     bend = SORI * u * u
     if u < 0.84:
-        w = 0.125 - 0.022 * (u / 0.84)          # gentle taper along the body
-        d = 0.030 - 0.010 * (u / 0.84)
+        w = 0.105 - 0.018 * (u / 0.84)          # gentle taper along the body
+        d = 0.026 - 0.010 * (u / 0.84)
     else:
         k = (u - 0.84) / 0.16                    # kissaki: the edge sweeps up to the spine
-        w = 0.103 * math.sqrt(max(0.0, 1 - k * k)) + 0.004
-        d = 0.020 - 0.014 * k
+        w = 0.087 * math.sqrt(max(0.0, 1 - k * k)) + 0.004
+        d = 0.016 - 0.011 * k
     spine = bend + w / 2
     ridge = bend + w / 2 - w * 0.42               # shinogi, the thickest line
     edge = bend - w / 2
@@ -152,19 +153,18 @@ for i in range(N + 1):
 blade = loft('Katana | curved single-edge blade', rings, [steel, bright, shadow], cap=True, smooth=True,
              side_mat=lambda j: [0, 1, 1, 0, 2][j])
 # The polish line: a bright hair along the shinogi on the front face.
-hl = [P(T0 + L * (i / N), SORI * (i / N) ** 2 + (0.125 - 0.022 * min(1, i / N / 0.84)) * 0.08, 0.019) for i in range(N + 1)]
 
 # ------------------------------------------------------------------ fittings at the guard
 # Habaki: a brass collar hugging the blade root.
-loft('Katana | brass habaki', [oval(0.255, 0.085, 0.036, 12), oval(0.30, 0.088, 0.037, 12), oval(0.40, 0.082, 0.033, 12)], brass, smooth=False)
+loft('Katana | brass habaki', [oval(0.395, 0.074, 0.032, 12), oval(0.44, 0.077, 0.033, 12), oval(0.53, 0.070, 0.029, 12)], brass, smooth=False)
 # Tsuba: a dark iron disc, four-lobed, with a bright rim showing between two seppa.
-loft('Katana | iron tsuba', [oval(0.222, 0.235, 0.235, 40, lobes=0.045), oval(0.256, 0.235, 0.235, 40, lobes=0.045)], iron, smooth=False)
-loft('Katana | tsuba rim', [oval(0.230, 0.246, 0.246, 40, lobes=0.045), oval(0.248, 0.246, 0.246, 40, lobes=0.045)], bright, smooth=False)
-for t in (0.205, 0.262):
+loft('Katana | iron tsuba', [oval(0.362, 0.235, 0.235, 40, lobes=0.045), oval(0.396, 0.235, 0.235, 40, lobes=0.045)], iron, smooth=False)
+loft('Katana | tsuba rim', [oval(0.370, 0.246, 0.246, 40, lobes=0.045), oval(0.388, 0.246, 0.246, 40, lobes=0.045)], bright, smooth=False)
+for t in (0.345, 0.402):
     loft('Katana | seppa %.3f' % t, [oval(t, 0.105, 0.105, 24), oval(t + 0.012, 0.105, 0.105, 24)], bright, smooth=False)
 
 # ------------------------------------------------------------------ tsuka (handle)
-TB, TT = -0.66, 0.205
+TB, TT = -0.62, 0.345
 core = loft('Katana | rayskin core', [oval(TB + 0.02, 0.050, 0.034), oval(TT, 0.058, 0.040)], ray)
 # The silk wrap: a black sleeve, slightly proud of the core, with the diamond windows of
 # rayskin showing through as thin ivory rhombi on the front and back faces.
@@ -181,10 +181,10 @@ for side in (1, -1):
         k += 1
         t -= step
 # Fuchi at the guard end and kashira capping the pommel, both iron; menuki under the wrap.
-loft('Katana | iron fuchi', [oval(0.135, 0.066, 0.047), oval(0.205, 0.068, 0.048)], iron, smooth=False)
+loft('Katana | iron fuchi', [oval(0.275, 0.066, 0.047), oval(0.345, 0.068, 0.048)], iron, smooth=False)
 loft('Katana | iron kashira', [oval(TB - 0.045, 0.030, 0.020), oval(TB - 0.02, 0.052, 0.036), oval(TB + 0.035, 0.058, 0.040)], iron)
-ellipsoid('Katana | gold menuki front', P(-0.16, 0.0, 0.046), (0.030, 0.011, 0.052), gold)
-ellipsoid('Katana | gold menuki back', P(-0.34, 0.0, -0.046), (0.030, 0.011, 0.052), gold)
+ellipsoid('Katana | gold menuki front', P(-0.10, 0.0, 0.046), (0.030, 0.011, 0.052), gold)
+ellipsoid('Katana | gold menuki back', P(-0.30, 0.0, -0.046), (0.030, 0.011, 0.052), gold)
 
 scene['Katana'] = 'Second weapon, exported as weapon_katana. Built by add_katana.py.'
 bpy.context.view_layer.update()
