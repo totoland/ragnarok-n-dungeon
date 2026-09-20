@@ -2,30 +2,20 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ragnarok-n-dungeon
-  # Same shape as prod's ingress (see overlays/prod/ingress.yaml for why there is no TLS
-  # block): the LAN nip.io host the tunnel rule points at, and the public host.
+  # k3s ships Traefik as the default ingress controller.
+  #
+  # No TLS block and no cert-manager annotation, on purpose: this cluster has no
+  # cert-manager. HTTPS terminates at Cloudflare's edge and reaches the Pi over a named
+  # tunnel, so Traefik only ever sees plain HTTP.
+  #
+  # The one host is a private .internal name. The tunnel rule for the public hostname
+  # points at http://localhost:80 on the node and sets httpHostHeader to this name, so the
+  # public hostname - and the node's address - never appear in this repository. On the LAN:
+  # curl -H "Host: ragnarok-lab.internal" http://<node>/
 spec:
   ingressClassName: traefik
   rules:
     - host: ragnarok-lab.internal
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: ragnarok-n-dungeon
-                port: { name: http }
-    - host: ragnarok-lab.192-168-0-125.nip.io
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: ragnarok-n-dungeon
-                port: { name: http }
-    - host: ragnarok-lab.totoland.cloud
       http:
         paths:
           - path: /
