@@ -55,6 +55,14 @@ const THEMES = {
   throne: { floor: '#5c4a46', grout: '#251b19', wall: '#5a3f3a', mortar: '#221513', fog: 0x140a0a, hemi: [0xb08a70, 0x2e1a14], torch: 0xff7a30, props: 'throne' },
 };
 
+// The fixed point-light budget. Seven is what the most lit room in the game asks for - the
+// throne room, with an exit glow, four wall torches and two braziers beside the seat. A room
+// that wants fewer leaves the rest dark; one that wanted more would simply not light its last
+// bracket, which is the right way round: a dim corner beats a recompiled scene. See
+// createScene for why the count is fixed.
+const POINT_LIGHTS = 7;
+const PARKED_Y = -60;   // where an unused light waits, far under the floor
+
 export function createScene(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   // A tablet at its native 2x is four times the pixels of 1x on a mobile GPU that also has
@@ -94,7 +102,26 @@ export function createScene(canvas) {
   rim.position.set(6, 6, -8);
   scene.add(rim);
 
-  const world = { renderer, scene, camera, hemi, key, rim, room: null, torches: [], shake: 0, camX: 2, t: 0, dpr: dprMax, dprMax, coarse };
+  // Point lights are pooled, and the pool never changes size.
+  //
+  // Three.js bakes the scene's light counts into every shader's cache key, so a room with a
+  // different number of point lights is a different shader for every material in the game.
+  // Rooms used to make their own: one exit glow outdoors, one glow plus four torches inside.
+  // Crossing between the two recompiled the lot - not at once, but one 50 ms frame at a time
+  // as each material was next drawn, which is what a player feels as a stutter minutes into
+  // a run and what the warm-up at the title screen could not prevent, because it had warmed
+  // the other count. The budget is fixed here instead: a room moves these and sets their
+  // intensity, and one it does not need sits at zero. That costs a few multiplies in the
+  // fragment shader on an outdoor room and buys one shader set for the whole game.
+  const points = [];
+  for (let i = 0; i < POINT_LIGHTS; i++) {
+    const l = new THREE.PointLight(0xffffff, 0, 10, 1.7);
+    l.position.set(0, PARKED_Y, 0);
+    scene.add(l);
+    points.push(l);
+  }
+
+  const world = { renderer, scene, camera, hemi, key, rim, points, exitGlow: points[0], room: null, torches: [], shake: 0, camX: 2, t: 0, dpr: dprMax, dprMax, coarse };
 
   function resize() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -173,6 +200,11 @@ export function prewarmTick(world) {
 }
 
 export function disposeRoom(world) {
+  // The pool outlives the room. Park every light dark so nothing from the old room lingers
+  // over the new one, or over the title screen when a run ends. Before the early return:
+  // there is a moment at boot where the lights are set but no room is.
+  world.torches = [];
+  for (const l of world.points) { l.intensity = 0; l.position.set(0, PARKED_Y, 0); }
   if (!world.room) return;
   world.scene.remove(world.room);
   world.room.traverse((o) => {
@@ -189,11 +221,12 @@ export function disposeRoom(world) {
     }
   });
   world.room = null;
-  world.torches = [];
 }
 
 export function buildRoom(world, roomDef, index) {
   disposeRoom(world);
+  let usedLights = 0;
+  const takeLight = () => world.points[usedLights++] || null;
   const theme = THEMES[roomDef.theme] || THEMES.sewer;
   const g = new THREE.Group();
   const W = roomDef.width;
@@ -302,10 +335,13 @@ export function buildRoom(world, roomDef, index) {
       g.add(blob);
     }
   }
-  const archGlow = new THREE.PointLight(0xe8b64a, 0, 6, 2);
+  // The exit glow is the first light out of the pool. Pooled lights belong to the scene, not
+  // to this group, so disposing the room does not take them with it - or change the count.
+  const archGlow = takeLight();
+  archGlow.color.set(0xe8b64a);
+  archGlow.intensity = 0;
+  archGlow.distance = 6; archGlow.decay = 2;
   archGlow.position.set(W - 0.5, 1.8, 0);
-  archGlow.name = 'exitGlow';
-  g.add(archGlow);
 
   // pillars + torches along the back wall
   const pillarMat = new THREE.MeshStandardMaterial({ color: 0x3a3540, roughness: 0.85 });
@@ -325,9 +361,13 @@ export function buildRoom(world, roomDef, index) {
     const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 6), new THREE.MeshStandardMaterial({ color: 0x2a1a10 }));
     stick.position.set(x + 0.55, 2.6, zBack + 0.8);
     g.add(stick);
-    const light = new THREE.PointLight(theme.torch, 18, 10, 1.7);
+    // A bracket past the budget still gets its flame mesh, it just does not light. Lit rooms
+    // are built to fit; this would only matter to a wider one added later.
+    const light = takeLight();
+    if (!light) continue;
+    light.color.set(theme.torch);
+    light.intensity = 18; light.distance = 10; light.decay = 1.7;
     light.position.set(x + 0.55, 3.3, zBack + 1.2);
-    g.add(light);
     world.torches.push({ light, flame, base: 18, seed: x });
   }
 
@@ -446,9 +486,14 @@ export function buildRoom(world, roomDef, index) {
       const brazier = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.25, 0.9, 10), pillarMat);
       brazier.position.set(W / 2 + side * 3.2, 0.45, zBack + 1.8);
       g.add(brazier);
-      const fire = new THREE.PointLight(0xff6a20, 18, 10, 1.6);
+      // From the pool like every other point light. These two are why the budget is seven:
+      // the throne room used to make them itself, which made the boss room a third light
+      // count and recompiled the scene on the walk in.
+      const fire = takeLight();
+      if (!fire) continue;
+      fire.color.set(0xff6a20);
+      fire.intensity = 18; fire.distance = 10; fire.decay = 1.6;
       fire.position.set(W / 2 + side * 3.2, 1.4, zBack + 1.8);
-      g.add(fire);
       world.torches.push({ light: fire, flame: null, base: 18, seed: side * 3 });
     }
   }
@@ -496,8 +541,8 @@ export function updateScene(world, game, dt) {
     if (t.flame) t.flame.scale.set(1, 0.85 + 0.3 * f, 1);
   }
   if (world.room) {
-    const glow = world.room.getObjectByName('exitGlow');
-    if (glow) glow.intensity += (((game.phase === 'cleared') ? 30 : 0) - glow.intensity) * Math.min(1, 4 * dt);
+    const glow = world.exitGlow;
+    glow.intensity += (((game.phase === 'cleared') ? 30 : 0) - glow.intensity) * Math.min(1, 4 * dt);
   }
 }
 
