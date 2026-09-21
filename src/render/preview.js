@@ -4,6 +4,7 @@
 // own model wielding the selected weapon, turning slowly in a box in the profile panel.
 import * as THREE from 'three';
 import { showWeapon, restPose } from './heroes.js';
+import { hatNode, createHatSlot } from './gear.js';
 import { ITEMS, auraOf } from '../sim/data/items.js';
 import { auraTick, stripAura } from './aura.js';
 
@@ -45,12 +46,14 @@ export function createPreview() {
   }
 
   // The item's node alone, reset to its own frame: the grip at the origin, the blade up +Y.
-  // A weapon without a baked model falls back to the hero's own; anything else (a cape, a
-  // hat) only has a model when a `<slot>_<id>` node exists, and returns null otherwise.
+  // A weapon without a baked model falls back to the hero's own; a hat comes from its own
+  // GLB (gear.js); anything else only has a model when a `<slot>_<id>` node exists, and
+  // returns null otherwise.
   function nodeOf(hero, gearId) {
     const model = assets[hero];
     const slot = gearId ? ITEMS[gearId]?.slot || 'weapon' : 'weapon';
     let node = gearId ? model.getObjectByName(`${slot}_${gearId}`) : null;
+    if (!node && slot === 'hat') node = hatNode(assets.gear, gearId, hero);
     if (!node && slot === 'weapon') node = model.getObjectByName('weapon');
     if (!node) return null;
     const c = node.clone();
@@ -118,7 +121,9 @@ export function createPreview() {
       const holder = new THREE.Group();
       holder.add(model);
       scene.add(holder);
-      mounted = { hero, model, holder, raf: 0, t: 0, last: performance.now(), container: null, gear: null };
+      const showHat = createHatSlot({ head: model.getObjectByName('head') }, hero, assets.gear,
+                                    assets.meta?.[hero]?.pivot?.head?.[1] ?? 0);
+      mounted = { hero, model, holder, showHat, hat: undefined, raf: 0, t: 0, last: performance.now(), container: null, gear: null };
       // A slow swing about the front rather than a spin: the weapon hand stays in view and
       // the flat of the blade catches the light on every pass.
       const loop = (now) => {
@@ -138,6 +143,15 @@ export function createPreview() {
   function setGear(gear) {
     if (!mounted) return;
     mounted.gear = gear;
+    // The panel puts one item on the stage at a time, whatever slot it belongs to: a hat
+    // goes on the head and the hero keeps their own weapon, which is what showWeapon does
+    // for an id it has no blade for anyway.
+    const hat = gear?.id && ITEMS[gear.id]?.slot === 'hat' ? gear.id : null;
+    if (hat !== mounted.hat) {
+      mounted.hat = hat;
+      const node = mounted.showHat(hat);
+      if (node) ownMaterials(node);   // only on the first wear; after that the copies are kept
+    }
     showWeapon(mounted.model, gear?.id ?? null);
     const aura = auraOf(gear);
     mounted.model.traverse((o) => {

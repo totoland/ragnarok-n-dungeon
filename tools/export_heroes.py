@@ -31,6 +31,7 @@ Hierarchy (every node's origin is its joint, all in the model's rest pose):
     └─ falcon           pivot: body centre (hunter only; wingL / wingR are its children)
 """
 import json
+import math
 import os
 import sys
 
@@ -207,6 +208,17 @@ def classify_goat_samurai(group, name, cx):
     return "torso"                                      # body, neck, throat
 
 
+def classify_gear(group, name, cx):
+    """Worn gear is one rigid piece: there is nothing to segment, so every mesh is the part.
+
+    A hat does not animate on its own - it rides the head node the game already poses - so
+    the exporter's whole job here is to join, scale and set the origin where the head goes.
+    """
+    if "head band" in name:
+        return None     # the sweatband lines the inside of the crown; a skull fills that space
+    return "hat"
+
+
 MODELS = {
     "knight": {
         "scene": "RO Knight | Studio",
@@ -324,6 +336,28 @@ MODELS = {
             "legL": (-0.22, 0, 2.53), "legR": (0.22, 0, 2.53),
         },
     },
+    # ---- Worn gear. Not a character: one rigid piece with no limbs, exported to its own
+    # directory so a hat is fetched alongside the heroes rather than baked into both of them.
+    # `height` is the hat's own overall height in game units (feather tip included), and the
+    # pivot is the middle of the interior head band - the point the game drops onto a skull.
+    "robinHat": {
+        "scene": "Robin Hood Hat",
+        "height": 0.37,                     # game units; the knight's whole head is 0.44
+        "model_height": 0.3516,             # Blender units, brim underside to feather tip
+        "classify": classify_gear,
+        "collections": ["ROBIN HOOD • Hat"],   # the studio collection stays behind
+        # Authored at subsurf 2, which is 60k verts for a hat. One level is already smooth
+        # at the size it is drawn, and thinning after it costs less shape than decimating
+        # a subdivided mesh down the same distance.
+        "subsurf": 1,
+        "decimate": 0.4,
+        # Authored with the long brim lying across X and the feather at +X. A quarter turn
+        # stands it up the way the hat is worn: the brim's point out over the brow, the
+        # feather behind and leaning off to the wearer's left (glTF front +Z, so left is +X).
+        "yaw": 90,
+        "parent": {"hat": "root"},
+        "pivot": {"root": (0, 0, 0), "hat": (0, 0, 0.0065)},
+    },
 }
 
 
@@ -423,14 +457,20 @@ def world_center(o):
     return sum(pts, Vector()) / 8
 
 
-def bake_group(scene, name, objects, scale, pivot):
-    """Evaluate (modifiers applied), bake world transforms, join into one object at `pivot`."""
+def bake_group(scene, name, objects, scale, pivot, yaw=0.0):
+    """Evaluate (modifiers applied), bake world transforms, join into one object at `pivot`.
+
+    `yaw` turns the model about Z on the way out, for a source file whose front does not point
+    the way the game's does. It is baked rather than left to the renderer so the GLB alone is
+    correct wherever it is loaded - the live hero, a plinth, the profile turntable.
+    """
     dg = bpy.context.evaluated_depsgraph_get()
+    turn = Matrix.Rotation(yaw, 4, "Z") if yaw else Matrix.Identity(4)
     parts = []
     for o in objects:
         ev = o.evaluated_get(dg)
         me = bpy.data.meshes.new_from_object(ev, preserve_all_data_layers=True, depsgraph=dg)
-        me.transform(Matrix.Scale(scale, 4) @ o.matrix_world)
+        me.transform(Matrix.Scale(scale, 4) @ turn @ o.matrix_world)
         part = bpy.data.objects.new(f"__{name}_{o.name}", me)
         scene.collection.objects.link(part)
         parts.append(part)
@@ -463,12 +503,24 @@ def export(model_key, out_dir):
     # arrives with, from a remesh rather than from detail anyone can see, and thinning the
     # whole figure hard enough to fix that would take the lance and the spikes with it.
     dec = recipe.get("decimate")
+    yaw = math.radians(recipe.get("yaw", 0))
+    # A subdivision level costs four times the verts of the one below it, and a model authored
+    # for a render sits a level or two above what the game draws. Capping the modifier is a
+    # better trade than decimating afterwards: it never had the vertices to lose.
+    sub = recipe.get("subsurf")
     groups = {}
     for o in model_meshes(scene, cols):
         for slot in o.material_slots:
             flatten_procedural_colour(slot.material)
         g = mesh_group(o, cols)
-        groups.setdefault(classify(g, o.name, world_center(o).x), []).append(o)
+        limb = classify(g, o.name, world_center(o).x)
+        if limb is None:
+            continue                # a classifier returning None drops the mesh from the bake
+        groups.setdefault(limb, []).append(o)
+        if sub is not None:
+            for m in o.modifiers:
+                if m.type == "SUBSURF":
+                    m.levels = m.render_levels = min(m.render_levels, sub)
         ratio = dec.get(g, dec.get("*", 1)) if isinstance(dec, dict) else dec
         if ratio and ratio < 1:
             o.modifiers.new("__export_decimate", "DECIMATE").ratio = ratio
@@ -484,7 +536,7 @@ def export(model_key, out_dir):
     scene.collection.objects.link(root)
     nodes = {"root": root}
     for limb, objs in groups.items():
-        nodes[limb] = bake_group(scene, limb, objs, scale, recipe["pivot"][limb])
+        nodes[limb] = bake_group(scene, limb, objs, scale, recipe["pivot"][limb], yaw)
 
     # Parent so every node's local translation is joint-to-joint in the rest pose.
     for limb, parent in recipe["parent"].items():

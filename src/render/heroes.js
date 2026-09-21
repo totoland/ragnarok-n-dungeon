@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { auraOf } from '../sim/data/items.js';
 import { auraTick } from './aura.js';
+import { loadGearAssets, createHatSlot } from './gear.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
@@ -156,12 +157,13 @@ const DEFS = { knight: KNIGHT, hunter: HUNTER };
 
 export async function loadHeroAssets(base = 'assets/heroes/') {
   const loader = new GLTFLoader();
-  const [knight, hunter, meta] = await Promise.all([
+  const [knight, hunter, meta, gear] = await Promise.all([
     loader.loadAsync(base + 'knight.glb'),
     loader.loadAsync(base + 'hunter.glb'),
     fetch(base + 'meta.json').then((r) => r.json()),
+    loadGearAssets(),
   ]);
-  return { knight: knight.scene, hunter: hunter.scene, meta };
+  return { knight: knight.scene, hunter: hunter.scene, meta, gear };
 }
 
 // Alternative weapons the exporter baked next to `weapon` (weapon_katana, ...): same
@@ -247,6 +249,8 @@ export function createHeroView(world, heroKey, assets) {
     });
   }
   let shownGear = undefined;
+  let shownHat = undefined;
+  const showHat = createHatSlot(rig, heroKey, assets.gear, assets.meta?.[heroKey]?.pivot?.head?.[1] ?? 0);
   if (!model.userData.base) {
     model.userData.base = {};
     for (const k of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'cape', 'weapon', 'root']) if (rig[k]) model.userData.base[k] = rig[k].position.clone();
@@ -326,6 +330,8 @@ export function createHeroView(world, heroKey, assets) {
     applyPose(rig, base, def.rest, view.cur, view.yaw);
     // The wielded weapon rides the sword's grip: same pose every frame, and only it shows.
     if (shownGear !== (p.gear?.id ?? null)) { shownGear = p.gear?.id ?? null; showWeapon(model, shownGear); }
+    // The hat rides the head node and needs no per-frame work, only a swap when it changes.
+    if (shownHat !== (p.wear?.hat?.id ?? null)) { shownHat = p.wear?.hat?.id ?? null; showHat(shownHat); }
     for (const v of Object.values(rig.variants)) { v.rotation.copy(rig.weapon.rotation); v.position.copy(rig.weapon.position); }
 
     // hit flash (red tint) and the classic i-frame blink
