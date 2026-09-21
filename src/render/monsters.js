@@ -6,6 +6,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
 const HALF = Math.PI / 2;
+// Scratch colours for the rage tint, made once rather than per material per frame.
+let RAGE_A = null, RAGE_B = null;
 const TAU = Math.PI * 2;
 // Seconds per cycle for the `idle` clips in CLIPS_BY_TYPE, i.e. their source duration.
 const IDLE_SECS = 1.93;
@@ -232,7 +234,7 @@ function rigFromGlb(model, { scale = 1, darken = 0 } = {}) {
     if (darken) o.material.color.multiplyScalar(1 - darken);
   });
   const rig = { root };
-  for (const name of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'weapon']) {
+  for (const name of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'weapon', 'shards']) {
     const n = root.getObjectByName(name);
     if (n) rig[name] = n;
   }
@@ -1053,10 +1055,14 @@ export function createMonsterViews(world) {
     for (const m of materials) {
       // A recycled view arrives mid-death: flashed, faded, half transparent. Put it back the
       // way it was built rather than recording the state it died in as its resting state.
-      if (m.userData.emissive) { m.emissive.copy(m.userData.emissive); m.opacity = m.userData.opacity; m.transparent = m.userData.transparent; }
-      else { m.userData.emissive = m.emissive.clone(); m.userData.opacity = m.opacity; m.userData.transparent = m.transparent; }
+      if (m.userData.emissive) { m.emissive.copy(m.userData.emissive); m.color.copy(m.userData.color); m.opacity = m.userData.opacity; m.transparent = m.userData.transparent; }
+      else { m.userData.emissive = m.emissive.clone(); m.userData.color = m.color.clone(); m.userData.opacity = m.opacity; m.userData.transparent = m.transparent; }
     }
-    const v = { id: e.id, type: e.type, group, built, materials, cur: {}, scratch: {}, walkPhase: 0, yaw: e.facing * HALF, t: Math.random() * 10, dead: false };
+    // The build comes off a shelf, so anything the last owner left on it is reset here: a
+    // boss that died raging would otherwise hand the next one his flung-out shards.
+    if (built.rig?.shards) { built.rig.shards.scale.setScalar(1); built.rig.shards.rotation.set(0, 0, 0); }
+    group.scale.setScalar(1);
+    const v = { id: e.id, type: e.type, group, built, materials, cur: {}, scratch: {}, walkPhase: 0, yaw: e.facing * HALF, t: Math.random() * 10, dead: false, rageT: 0, shardSpin: 0 };
     views.set(e.id, v);
     return v;
   }
@@ -1216,14 +1222,48 @@ export function createMonsterViews(world) {
         v.group.position.set(e.x, e.y, e.z);
         if (v.built.kind === 'humanoid') updateHumanoid(v, e, dt); else updateBlob(v, e, dt);
 
+        // The shards a sculpt carries loose (the Dark Sword's obsidian) turn on their own,
+        // slowly while he is whole and fast once he is not - and in the second half they fly
+        // out wide, which is the only part of a phase change the silhouette can show.
+        const rage = e.def.rage, raging = rage && e.addsDone && !e.dead;
+        if (v.built.rig?.shards) {
+          v.rageT = Math.min(1, (v.rageT || 0) + (raging ? dt * 1.6 : -dt * 3));
+          const sh = v.built.rig.shards;
+          v.shardSpin = (v.shardSpin || 0) + dt * (0.5 + 2.6 * v.rageT);
+          sh.rotation.y = v.shardSpin;
+          sh.rotation.z = Math.sin(v.t * 0.7) * 0.1;
+          const out = 1 + (rage ? (rage.shards - 1) * v.rageT : 0);
+          sh.scale.setScalar(out);
+        }
+
         // hit flash, and the dead sink into the floor and fade
         const flash = e.flash > 0;
         const fade = e.dead ? Math.max(0, 1 - Math.max(0, e.deathT - 0.5) / 0.6) : 1;
         if (e.dead && v.built.kind === 'humanoid') v.group.position.y -= Math.max(0, e.deathT - 0.5) * 0.6;
+        // Tinting is a uniform, not a shader variant: a raging boss costs no new program and
+        // nothing to download, which is the whole reason he changes colour rather than model.
+        const k = raging ? (v.rageT ?? 0) : 0;
+        if (rage && (k > 0 || v.wasRaging)) {
+          v.wasRaging = k > 0;
+          if (!RAGE_A) { RAGE_A = new THREE.Color(); RAGE_B = new THREE.Color(); }
+          RAGE_A.setHex(rage.tint); RAGE_B.setHex(rage.emissive);
+          if (rage.grow) v.group.scale.setScalar(1 + (rage.grow - 1) * k);
+        }
         for (const m of v.materials) {
-          if (flash) m.emissive.setRGB(0.32, 0.28, 0.24); else m.emissive.copy(m.userData.emissive);
+          if (flash) m.emissive.setRGB(0.32, 0.28, 0.24);
+          else if (k > 0) {
+            // Emissive does the work, not colour. This sculpt is near-black and the room is
+            // lit violet, so a tinted base colour reads as the same black - what shows on a
+            // black model is the light it makes itself. The lerp turns whatever already glows
+            // from violet towards red, and the scale lifts the armour, which glows at nothing,
+            // up off zero.
+            m.emissive.copy(m.userData.emissive).lerp(RAGE_B, k * 0.55);
+          } else m.emissive.copy(m.userData.emissive);
+          if (k > 0) m.color.copy(m.userData.color).lerp(RAGE_A, k * 0.45);
+          else if (v.tinted) m.color.copy(m.userData.color);
           if (fade < 1) { m.transparent = true; m.opacity = m.userData.opacity * fade; }
         }
+        v.tinted = k > 0;
       }
       // Freeing is not free: every primitive's geometry and material goes back to the driver,
       // and a wave that dies together frees them together.

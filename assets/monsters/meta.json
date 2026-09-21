@@ -252,12 +252,17 @@
         0.1752,
         1.3351,
         0.0
+      ],
+      "shards": [
+        0.0,
+        1.8066,
+        0.0
       ]
     },
     "parts": {
       "torso": {
-        "meshes": 96,
-        "verts": 26107
+        "meshes": 79,
+        "verts": 25533
       },
       "head": {
         "meshes": 14,
@@ -282,6 +287,10 @@
       "weapon": {
         "meshes": 36,
         "verts": 4746
+      },
+      "shards": {
+        "meshes": 17,
+        "verts": 574
       }
     }
   }

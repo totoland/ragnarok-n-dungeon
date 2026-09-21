@@ -231,7 +231,12 @@ def classify_dark_sword(group, name, cx):
     if group.endswith("Sword"):
         return "weapon"
     if group.endswith("Magic"):
-        return "weapon" if name.startswith("Blade magic") else "torso"
+        if name.startswith("Blade magic"):
+            return "weapon"
+        # The shards that orbit him are their own limb rather than part of the torso, so the
+        # game can turn them: they idle slowly, and when he breaks in half they fly wide and
+        # spin. Welded into the torso they could only follow his lean.
+        return "shards"
     if group.endswith("Helmet"):
         return "head"
     if group.endswith("Arms") or group.endswith("Hands"):
@@ -406,7 +411,7 @@ MODELS = {
                      "DS \u2022 Hands": 0.5, "DS \u2022 Arms": 0.7, "*": 1},
         "curve_res": (3, 1),
         "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
-                   "weapon": "armL", "legL": "root", "legR": "root"},
+                   "weapon": "armL", "legL": "root", "legR": "root", "shards": "root"},
         "pivot": {
             "root": (0, 0, 0),
             "torso": (0, 0, 4.30),          # the waist, under the cuirass
@@ -414,6 +419,9 @@ MODELS = {
             "armL": (-0.88, 0, 5.75), "armR": (0.88, 0, 5.75),
             "weapon": (-1.13, -0.33, 3.54), # his left fist, closed on the grip
             "legL": (-0.42, 0, 3.20), "legR": (0.42, 0, 3.20),
+            # the middle of the cluster that orbits him, so turning the node turns them
+            # around him rather than sweeping them off to one side
+            "shards": (0, 0, 4.33),
         },
     },
 }

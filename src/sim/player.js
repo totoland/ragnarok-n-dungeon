@@ -262,6 +262,9 @@ function physics(g, p, dt) {
 // Called by the enemy side when one of their attacks connects.
 export function hurtPlayer(g, p, dmg, knock, stun, dir) {
   if (p.iframes > 0 || p.state === 'dead') return false;
+  // The only line the sim gives up to the test panel (render/test-ui.js). `cheats` is unset
+  // in every real run, so this reads as false and the run plays out exactly as it would.
+  if (g.cheats?.invuln) return false;
   // Rolled off the run's rng so a dodge is as reproducible as a crit. Only consumes a roll
   // while something grants dodge, so runs without it play out exactly as before.
   if (p.dodge > 0 && g.rng.next() < p.dodge) {

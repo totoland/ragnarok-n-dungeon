@@ -89,6 +89,7 @@
       <p class="controls" id="title-controls"></p>
       <button id="title-settings" class="ghost" type="button">Settings &amp; controls</button>
       <button id="title-soak" class="ghost" type="button">Soak test — endless waves, plays itself</button>
+      <button id="title-test" class="ghost" type="button" hidden>Test mode</button>
       <button id="title-install" class="ghost" type="button" hidden>Install on this device</button>
       <p id="install-hint" class="sub" hidden></p>
       <p id="loading">Loading heroes…</p>
@@ -132,6 +133,18 @@
       </div>
     </div>
 
+    <div id="testmode" class="overlay" hidden>
+      <div class="panel">
+        <header>
+          <h2>Test mode</h2>
+          <button id="test-close" class="x" type="button" aria-label="Close test mode">✕</button>
+        </header>
+        <div id="test-body"></div>
+        <footer>
+          <p id="test-note"></p>
+        </footer>
+      </div>
+    </div>
     <div id="settings" class="overlay" hidden>
       <div class="panel">
         <header>

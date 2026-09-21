@@ -382,7 +382,15 @@ export function createFx(world) {
         if (ev.move === 'slam' || ev.move === 'charge') burst(ev.x, 1.5, ev.z, 20, { color: 0xff3020, speed: 1.5, up: 2, life: 0.6, size: 0.35, gravity: -2 });
         break;
       case 'bossAdds':
+        // The half-health break. The boss's own change is a tint and a widening of whatever
+        // he carries loose (render/monsters.js); this is the moment it happens - a ring out
+        // from under him and embers off the floor, so it reads as a turn rather than a spawn.
         burst(ev.x, 1.5, ev.z, 40, { color: 0xa040ff, speed: 3, up: 3, life: 0.8, size: 0.4, gravity: -1 });
+        ring(ev.x, ev.z, { color: 0xc04a6a, radius: 4.2, life: 0.6 });
+        ring(ev.x, ev.z, { color: 0x8a30ff, radius: 2.6, life: 0.45, y: 0.12 });
+        burst(ev.x, 0.3, ev.z, 26, { color: 0xff3a50, speed: 2.2, up: 4.5, life: 1.0, size: 0.3, gravity: -1.5 });
+        flashLight.position.set(ev.x, 1.6, ev.z); flashLight.intensity = 22;
+        addShake(world, 0.55);
         break;
       case 'roomClear':
         burst(game.player.x, 1.2, game.player.z, 60, { color: 0xe8b64a, speed: 3, up: 5, life: 1.2, size: 0.35, gravity: 4 });

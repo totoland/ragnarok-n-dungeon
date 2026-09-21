@@ -332,6 +332,10 @@ export const MONSTERS = {
     cast: { windup: 0.7, dur: 0.45, cd: 6.0, shot: { kind: 'hellOrb', count: 3, speed: 9.0, life: 2.4, y: 1.4, lane: 1.5, dmg: 0.9 }, knock: [4, 1] },
     // Shardself: at half health the shards around him stop being decoration.
     adds: { at: 0.5, type: 'shardling', count: 2 },
+    // And he changes with them. Not a second model - a tint, which costs nothing to download
+    // and no shader of its own, plus the shards flying wide, which is the part the silhouette
+    // can actually show. The renderer eases into it off `addsDone` (render/monsters.js).
+    rage: { tint: 0x8c0f26, emissive: 0x5e0a18, grow: 1.06, shards: 1.2 },
     score: 1200,
   },
 };

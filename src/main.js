@@ -3,13 +3,15 @@
 import { SIM } from './config.js';
 import { TOWNS, SOAK } from './sim/data/dungeon.js';
 import { MONSTERS } from './sim/data/monsters.js';
-import { createGame, update as simUpdate, setGear } from './sim/game.js';
+import { createGame, update as simUpdate, setGear, loadRoom } from './sim/game.js';
 import { loadProfile, saveProfile, clearProfile, heroOf, isUnlocked, tierFor, prevTown, recordRun, dropFor, skillPointsLeft } from './profile.js';
 import { createCharacterUI } from './render/character-ui.js';
-import { itemName } from './sim/data/items.js';
+import { itemName, ITEMS } from './sim/data/items.js';
+import { xpAtLevel } from './sim/progress.js';
 import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
+import { createTestUI, testEnabled } from './render/test-ui.js';
 import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom, prewarmTick } from './render/scene.js';
 import { loadHeroAssets, createHeroView, showWeapon, restPose } from './render/heroes.js';
 import { auraTick, stripAura } from './render/aura.js';
@@ -68,6 +70,49 @@ document.getElementById('title-soak')?.addEventListener('click', () => {
   start();
 });
 
+// The test panel, off unless ?test=1 ever asked for it. Its host is the only surface it
+// gets: the profile, the pick, and start(). See render/test-ui.js.
+const testUI = testEnabled() ? createTestUI({
+  profile: () => profile,
+  game: () => game,
+  hero: () => selectedHero,
+  town: () => selectedTown,
+  room: () => testRoom,
+  setHero(h) { selectedHero = h; markSelected(); },
+  setTown(t) { selectedTown = t; testRoom = 0; markTown(); },
+  setRoom(i) { testRoom = i; },
+  levelOf: (h) => heroOf(profile, h).level,
+  setLevel(h, lv) { profile.heroes[h].xp = xpAtLevel(lv); saveProfile(profile); refreshTitle(); },
+  setSkill(h, id, lv) { profile.heroes[h].skills[id] = lv; saveProfile(profile); refreshTitle(); },
+  setEquip(h, slot, id) {
+    const row = profile.heroes[h];
+    if (id && !row.items[id]) row.items[id] = { plus: 0 };
+    row.equip[slot] = id;
+    saveProfile(profile); markSelected();
+  },
+  setRefine(h, id, plus) {
+    if (!id) return;
+    (profile.heroes[h].items[id] ||= { plus: 0 }).plus = plus;
+    saveProfile(profile); markSelected();
+  },
+  grantRolled(h, inst) {
+    const row = profile.heroes[h];
+    row.bag = [...(row.bag || []).filter((b) => b.uid !== row.equip.accessory), inst];
+    row.equip.accessory = inst.uid;
+    saveProfile(profile); markSelected();
+  },
+  grantAll(h) {
+    const row = profile.heroes[h];
+    for (const [id, it] of Object.entries(ITEMS)) {
+      if (it.slot === 'accessory' || (it.hero && it.hero !== h)) continue;
+      row.items[id] ||= { plus: 0 };
+    }
+    saveProfile(profile);
+  },
+  start() { testTown = selectedTown; soak = false; start(); },
+}) : null;
+if (testUI) document.getElementById('title-test').hidden = false;
+document.getElementById('title-test')?.addEventListener('click', () => testUI?.open());
 document.getElementById('title-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-resume').addEventListener('click', () => { paused = false; hud.showPause(false); });
@@ -172,13 +217,13 @@ function refreshTitle() {
   if (sub) sub.textContent = `${town.name} — ${town.rooms.length} rooms, one ${boss}.${tier ? ` New Game+${tier}: monsters ${Math.round(tier * 35)}% tougher.` : ''}`;
 }
 input.on('confirm', () => {
-  if (settingsUI.isOpen || characterUI.isOpen) return;
+  if (settingsUI.isOpen || characterUI.isOpen || testUI?.isOpen) return;
   sfx.init();
   if (!hud.el.title.hidden && assets) start();
   else if (!hud.el.end.hidden) endPrimary();
 });
 window.addEventListener('keydown', (e) => {
-  if (hud.el.title.hidden || !assets || settingsUI.isOpen || characterUI.isOpen) return;
+  if (hud.el.title.hidden || !assets || settingsUI.isOpen || characterUI.isOpen || testUI?.isOpen) return;
   const a = keyLookup[e.code];
   if (a === 'left' || a === 'right') { selectedHero = selectedHero === 'knight' ? 'hunter' : 'knight'; markSelected(); }
 });
@@ -187,7 +232,7 @@ input.on('mute', () => { sfx.init(); sfx.toggleMute(); });
 // the attack; say why the pad is dead, and that it came back.
 input.on('padStale', () => { if (game && !ended) hud.banner('Controller stalled', 'boss'); });
 input.on('padLive', () => { if (game && !ended) hud.banner('Controller back'); });
-input.on('pause', () => { if (!game || ended || settingsUI.isOpen || characterUI.isOpen) return; paused = !paused; hud.showPause(paused); });
+input.on('pause', () => { if (!game || ended || settingsUI.isOpen || characterUI.isOpen || testUI?.isOpen) return; paused = !paused; hud.showPause(paused); });
 hud.el.retry.addEventListener('click', () => start());
 hud.el.endContinue.addEventListener('click', () => continueRun());
 hud.el.endHome.addEventListener('click', () => toTitle());
@@ -296,13 +341,17 @@ function markSelected() {
   if (!hud.el.title.hidden) refreshTitle();
 }
 
+// The test panel sets these and start() honours them once: a town it may not have unlocked,
+// and a room part way in. Null in every ordinary run, which is the only reason start() is
+// allowed to read them at all.
+let testTown = null, testRoom = 0;
 function start() {
   if (!assets) return;
   disposePreview();
   if (heroView) heroView.dispose();
   monsters.clear();
   fx.clear();
-  if (!isUnlocked(profile, selectedTown)) selectedTown = 'prontera';
+  if (!testTown && !isUnlocked(profile, selectedTown)) selectedTown = 'prontera';
   // The run is a function of the profile at its start: the hero's lifetime xp sets the
   // level, the picked tier (the clear count by default) the difficulty, the wielded weapon
   // and spent skill points the loadout, the clear count whether the boss's drop is certain.
@@ -312,6 +361,7 @@ function start() {
     tier: pickedTier(), xp: me.xp, gear: me.gear, wear: me.wear, skills: { ...me.skills },
     drop: dropFor(profile, selectedHero, selectedTown),
   });
+  if (testTown) { testTown = null; if (testRoom > 0) loadRoom(game, Math.min(testRoom, game.dungeon.rooms.length - 1)); }
   if (!soak) { profile.last = { hero: selectedHero, town: selectedTown }; saveProfile(profile); }
   if (soak) {
     prewarmRoom(world, SOAK.rooms[0], 0);
