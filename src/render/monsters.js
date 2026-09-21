@@ -194,23 +194,27 @@ function buildOrcLord() {
 let bossModel = null;
 let moonModel = null;
 let sandModel = null;
+let dsModel = null;
 
 /** Injection seam for the loaded boss model. The render test uses it to supply a stand-in
  *  rig, since GLTFLoader cannot fetch a file in Node. */
 export function setBossModel(scene) { bossModel = scene; }
 export function setMoonrayaModel(scene) { moonModel = scene; }
 export function setSandmanModel(scene) { sandModel = scene; }
+export function setDarkSwordModel(scene) { dsModel = scene; }
 
 export async function loadMonsterAssets(base = 'assets/monsters/') {
   const loader = new GLTFLoader();
-  const [baph, moon, sand] = await Promise.all([
+  const [baph, moon, sand, ds] = await Promise.all([
     loader.loadAsync(base + 'baphomet.glb'),
     loader.loadAsync(base + 'moonraya.glb'),
     loader.loadAsync(base + 'sandman.glb'),
+    loader.loadAsync(base + 'darkSword.glb'),
   ]);
   setBossModel(baph.scene);
   setMoonrayaModel(moon.scene);
   setSandmanModel(sand.scene);
+  setDarkSwordModel(ds.scene);
   return bossModel;
 }
 
@@ -252,6 +256,11 @@ function buildMoonrayaGlb() {
 function buildSandmanGlb() {
   if (!sandModel) throw new Error('sandman.glb not loaded - call loadMonsterAssets() first');
   return rigFromGlb(sandModel);
+}
+
+function buildDarkSwordGlb() {
+  if (!dsModel) throw new Error('darkSword.glb not loaded - call loadMonsterAssets() first');
+  return rigFromGlb(dsModel);
 }
 
 // Per-type rest offsets, added to every pose, for a sculpt that does not stand the way the
@@ -743,6 +752,223 @@ function buildSorya() {
   });
 }
 
+// ------------------------------------------------------------------ Orvane
+//
+// The tower's four rooms and the demon dimension past the rift. The two halves are meant to
+// read apart at a glance: everything above ground is rune blue over pale stone, everything
+// beyond the rift is violet over pink, and the one that crosses over is the bat.
+
+// Flittern: a rune-lit bat, small and quick. Famiru is already a bat, so this one is built
+// the other way round - a bright core carrying dark wings, rather than fur with eyes in it.
+function buildFlittern() {
+  const root = new THREE.Group();
+  const body = node(0, 0.32, 0, root);
+  const dark = mat(0x1e2340, { roughness: 0.9 });
+  const core = mat(0x9ed4ff, { emissive: 0x6fb8ff, emissiveIntensity: 1.2, roughness: 0.4 });
+  mesh(new THREE.OctahedronGeometry(0.13, 0), core, 0, 0, 0, body);
+  mesh(new THREE.SphereGeometry(0.11, 10, 8), dark, 0, 0.02, 0.12, body).scale.set(1, 0.9, 1.2);
+  const wings = [];
+  for (const side of [-1, 1]) {
+    const w = node(side * 0.1, 0.04, -0.02, body);
+    // two membranes per side, the upper one longer: it reads as a flutter rather than a flap
+    for (const [len, lift] of [[0.34, 0.06], [0.24, -0.05]]) {
+      const web = mesh(new THREE.ConeGeometry(0.15, len, 3), dark, side * len * 0.5, lift, 0, w);
+      web.rotation.z = side * HALF; web.scale.set(1, 1, 0.18);
+    }
+    wings.push(w);
+    mesh(new THREE.SphereGeometry(0.022, 6, 6), core, side * 0.05, 0.04, 0.2, body);
+  }
+  return { root, body, ears: wings, kind: 'blob' };
+}
+
+// Hushling: a cloak with nobody in it. The hood is empty and the hands float free of the
+// sleeves, which is the whole idea - and it is what the fade will hang off when that lands.
+function buildHushling() {
+  const root = new THREE.Group();
+  const body = node(0, 0.86, 0, root);
+  const cloth = mat(0x2a3050, { roughness: 1, transparent: true, opacity: 0.93 });
+  const inner = mat(0x080a14, { roughness: 1 });
+  const glow = mat(0x8fd0ff, { emissive: 0x8fd0ff, emissiveIntensity: 1.1, roughness: 0.4 });
+  const hood = mesh(new THREE.SphereGeometry(0.28, 14, 12), cloth, 0, 0.2, 0, body);
+  hood.scale.set(1, 1.05, 0.95);
+  mesh(new THREE.SphereGeometry(0.2, 10, 8), inner, 0, 0.17, 0.14, body);        // the empty hood
+  mesh(new THREE.SphereGeometry(0.035, 8, 8), glow, 0, 0.19, 0.24, body);        // one eye, alone
+  const robe = mesh(new THREE.ConeGeometry(0.36, 1.0, 12, 1, true), cloth, 0, -0.38, 0, body);
+  robe.rotation.x = Math.PI;
+  for (const side of [-1, 1]) {
+    const cuff = mesh(new THREE.CylinderGeometry(0.09, 0.06, 0.2, 8), cloth, side * 0.3, 0.0, 0.05, body);
+    cuff.rotation.z = side * 0.6;
+    mesh(new THREE.SphereGeometry(0.055, 8, 8), glow, side * 0.42, -0.14, 0.1, body);   // a hand, floating
+  }
+  return { root, body, kind: 'blob' };
+}
+
+// Stringen: a wooden puppet held up by strings that go nowhere. Built as a humanoid so the
+// walk clip's stiffness works for it instead of against it.
+function buildStringen() {
+  const wood = mat(0x8a6a44, { roughness: 0.85 });
+  const dark = mat(0x4a3520, { roughness: 0.9 });
+  const cord = mat(0xd8d0bc, { roughness: 1, emissive: 0x6a7080, emissiveIntensity: 0.2 });
+  const paint = mat(0xc4425a, { roughness: 0.7 });
+  return humanoid({
+    scale: 1.0, hip: 0.92, torsoH: 0.66, shoulderW: 0.26, legW: 0.13,
+    buildTorso(t, h) {
+      mesh(new THREE.BoxGeometry(0.34, 0.2, 0.2), wood, 0, 0.06, 0, t);                 // pelvis block
+      mesh(new THREE.CylinderGeometry(0.05, 0.05, h * 0.5, 6), dark, 0, h * 0.4, 0, t); // exposed spine peg
+      mesh(new THREE.BoxGeometry(0.44, 0.4, 0.24), wood, 0, h - 0.2, 0, t);             // chest block
+      mesh(new THREE.BoxGeometry(0.46, 0.06, 0.26), paint, 0, h - 0.34, 0, t);
+      // the strings: four, rising out of the top of the frame into nothing
+      for (const sx of [-0.18, 0.18]) for (const sz of [-0.08, 0.08]) {
+        mesh(new THREE.CylinderGeometry(0.008, 0.008, 1.5, 3), cord, sx, h + 0.75, sz, t);
+      }
+    },
+    buildHead(hd) {
+      mesh(new THREE.BoxGeometry(0.3, 0.32, 0.28), wood, 0, 0.18, 0, hd);
+      mesh(new THREE.SphereGeometry(0.045, 8, 8), dark, -0.08, 0.22, 0.15, hd);
+      mesh(new THREE.SphereGeometry(0.045, 8, 8), dark, 0.08, 0.22, 0.15, hd);
+      mesh(new THREE.BoxGeometry(0.2, 0.03, 0.02), paint, 0, 0.1, 0.15, hd);            // a painted smile
+      mesh(new THREE.SphereGeometry(0.07, 8, 8), dark, 0, 0.36, 0, hd);                 // the string knot
+    },
+    buildArm(a, side) {
+      mesh(new THREE.SphereGeometry(0.07, 8, 8), dark, 0, 0, 0, a);                     // ball joint
+      mesh(new THREE.BoxGeometry(0.1, 0.34, 0.1), wood, side * 0.02, -0.22, 0, a);
+      mesh(new THREE.SphereGeometry(0.055, 8, 8), dark, side * 0.03, -0.4, 0, a);
+      mesh(new THREE.BoxGeometry(0.09, 0.3, 0.09), wood, side * 0.04, -0.56, 0, a);
+      mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), wood, side * 0.05, -0.76, 0, a);    // blocky fist
+    },
+    buildLeg(l) {
+      mesh(new THREE.SphereGeometry(0.07, 8, 8), dark, 0, 0, 0, l);
+      mesh(new THREE.BoxGeometry(0.12, 0.42, 0.12), wood, 0, -0.24, 0, l);
+      mesh(new THREE.SphereGeometry(0.06, 8, 8), dark, 0, -0.47, 0, l);
+      mesh(new THREE.BoxGeometry(0.11, 0.36, 0.11), wood, 0, -0.66, 0, l);
+      mesh(new THREE.BoxGeometry(0.14, 0.08, 0.22), dark, 0, -0.86, 0.04, l);
+    },
+  });
+}
+
+// Grinlit: a lantern for a head over an empty coat, green fire where the face should be.
+function buildGrinlit() {
+  const root = new THREE.Group();
+  const body = node(0, 0.8, 0, root);
+  const coat = mat(0x3a3020, { roughness: 1 });
+  const iron = mat(0x4a4a52, { roughness: 0.55, metalness: 0.6 });
+  const fire = mat(0x7dff9a, { emissive: 0x4cff7a, emissiveIntensity: 1.4, roughness: 0.3 });
+  const robe = mesh(new THREE.ConeGeometry(0.34, 0.92, 10, 1, true), coat, 0, -0.34, 0, body);
+  robe.rotation.x = Math.PI;
+  // the lantern: a glass drum in an iron cage, with the flame inside it
+  mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.3, 8), fire, 0, 0.26, 0, body);
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.34, 4), iron, Math.cos(a) * 0.2, 0.26, Math.sin(a) * 0.2, body);
+  }
+  mesh(new THREE.CylinderGeometry(0.23, 0.2, 0.06, 8), iron, 0, 0.44, 0, body);
+  mesh(new THREE.ConeGeometry(0.16, 0.14, 8), iron, 0, 0.52, 0, body);
+  mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.06, 8), iron, 0, 0.09, 0, body);
+  for (const side of [-1, 1]) {
+    const sleeve = mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.36, 8), coat, side * 0.28, -0.08, 0.03, body);
+    sleeve.rotation.z = side * 0.55;
+    mesh(new THREE.SphereGeometry(0.05, 8, 8), fire, side * 0.4, -0.26, 0.06, body);
+  }
+  return { root, body, kind: 'blob' };
+}
+
+// Velmara: past the rift. A winged thing that keeps closer than an archer should.
+function buildVelmara() {
+  const skinV = mat(0xb87ac4, { roughness: 0.85 });
+  const cloth = mat(0x40163f, { roughness: 0.9 });
+  const horn = mat(0x2a1230, { roughness: 0.7 });
+  const membrane = mat(0x6a2a68, { roughness: 1, transparent: true, opacity: 0.88 });
+  const glow = mat(0xff8ae0, { emissive: 0xff5ad0, emissiveIntensity: 1.1, roughness: 0.4 });
+  return humanoid({
+    scale: 1.0, hip: 0.92, torsoH: 0.62, shoulderW: 0.22, legW: 0.11,
+    buildTorso(t, h) {
+      mesh(new THREE.CapsuleGeometry(0.17, 0.3, 5, 10), skinV, 0, h * 0.55, 0, t);
+      mesh(new THREE.CylinderGeometry(0.19, 0.26, 0.5, 10), cloth, 0, h * 0.2 - 0.1, 0, t);   // skirt
+      mesh(new THREE.BoxGeometry(0.34, 0.16, 0.2), cloth, 0, h - 0.16, 0.02, t);              // bodice
+      // wings: two membranes a side, swept back, so the silhouette is wide without flapping
+      for (const side of [-1, 1]) {
+        for (const [len, ang, lift] of [[0.62, 0.5, 0.1], [0.44, 1.0, -0.06]]) {
+          const wing = mesh(new THREE.ConeGeometry(0.16, len, 3), membrane, side * 0.16, h - 0.1 + lift, -0.16, t);
+          wing.rotation.set(0, side * 0.7, side * (HALF - ang));
+          wing.scale.set(1, 1, 0.16);
+        }
+      }
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.18, 14, 12), skinV, 0, 0.16, 0, hd);
+      mesh(new THREE.SphereGeometry(0.2, 12, 10), cloth, 0, 0.19, -0.04, hd).scale.set(1, 0.95, 1);  // hair
+      for (const side of [-1, 1]) {
+        const h2 = mesh(new THREE.ConeGeometry(0.05, 0.26, 5), horn, side * 0.11, 0.3, -0.02, hd);
+        h2.rotation.set(-0.5, 0, -side * 0.35);
+        mesh(new THREE.SphereGeometry(0.032, 6, 6), glow, side * 0.07, 0.17, 0.15, hd);
+      }
+    },
+    buildArm(a, side) {
+      mesh(new THREE.CapsuleGeometry(0.052, 0.28, 4, 8), skinV, 0, -0.18, 0, a);
+      mesh(new THREE.CapsuleGeometry(0.046, 0.26, 4, 8), skinV, side * 0.03, -0.46, 0, a);
+      mesh(new THREE.SphereGeometry(0.07, 8, 8), glow, side * 0.05, -0.64, 0.02, a);      // the bolt in hand
+    },
+    buildLeg(l) {
+      mesh(new THREE.CapsuleGeometry(0.075, 0.36, 4, 8), skinV, 0, -0.26, 0, l);
+      mesh(new THREE.CapsuleGeometry(0.06, 0.32, 4, 8), skinV, 0, -0.62, 0, l);
+      mesh(new THREE.ConeGeometry(0.07, 0.16, 5), horn, 0, -0.84, 0.03, l).rotation.x = Math.PI;  // hoof
+    },
+  });
+}
+
+// Nyxmare: the heaviest thing in the town that is not the boss. A quadruped, so it is a blob
+// like the Fox Shade rather than a humanoid - the squash on a hop reads as a gallop.
+function buildNyxmare() {
+  const root = new THREE.Group();
+  const body = node(0, 0.86, 0, root);
+  const hide = mat(0x14121c, { roughness: 0.85 });
+  const smoke = mat(0x3a2a48, { roughness: 1, transparent: true, opacity: 0.6 });
+  const ember = mat(0xff4a3a, { emissive: 0xff3a24, emissiveIntensity: 1.3, roughness: 0.4 });
+  const barrel = mesh(new THREE.CapsuleGeometry(0.34, 0.66, 6, 12), hide, 0, 0, -0.06, body);
+  barrel.rotation.x = HALF;
+  const neck = mesh(new THREE.CylinderGeometry(0.19, 0.24, 0.5, 8), hide, 0, 0.26, 0.4, body);
+  neck.rotation.x = -0.7;
+  const head = mesh(new THREE.BoxGeometry(0.24, 0.24, 0.48), hide, 0, 0.44, 0.72, body);
+  head.rotation.x = 0.25;
+  mesh(new THREE.BoxGeometry(0.2, 0.16, 0.2), hide, 0, 0.36, 0.92, body);          // muzzle
+  for (const side of [-1, 1]) {
+    mesh(new THREE.SphereGeometry(0.05, 8, 8), ember, side * 0.11, 0.5, 0.82, body);
+    mesh(new THREE.ConeGeometry(0.05, 0.16, 4), hide, side * 0.09, 0.6, 0.6, body);   // ear
+    for (const fz of [0.34, -0.36]) {
+      mesh(new THREE.CylinderGeometry(0.075, 0.055, 0.56, 6), hide, side * 0.22, -0.44, fz, body);
+      mesh(new THREE.SphereGeometry(0.07, 6, 6), ember, side * 0.22, -0.72, fz, body).scale.set(1, 0.4, 1);
+    }
+  }
+  // mane and tail, in smoke rather than hair
+  for (let i = 0; i < 5; i++) {
+    const m = mesh(new THREE.ConeGeometry(0.1 - i * 0.012, 0.36, 5), smoke, 0, 0.5 - i * 0.07, 0.56 - i * 0.14, body);
+    m.rotation.x = -0.9;
+  }
+  const tail = mesh(new THREE.ConeGeometry(0.16, 0.7, 6), smoke, 0, 0.16, -0.56, body);
+  tail.rotation.x = -1.25;
+  return { root, body, kind: 'blob' };
+}
+
+// Shardling: what the Dark Sword breaks off himself. Not a small knight - a cluster of his
+// own armour held together by the same violet light, which is cheaper and reads better.
+function buildShardling() {
+  const root = new THREE.Group();
+  const body = node(0, 0.62, 0, root);
+  const obsidian = mat(0x14121e, { roughness: 0.35, metalness: 0.5 });
+  const core = mat(0xc07aff, { emissive: 0xa85aff, emissiveIntensity: 1.4, roughness: 0.3 });
+  mesh(new THREE.OctahedronGeometry(0.16, 0), core, 0, 0, 0, body);
+  // six shards orbiting the core at fixed angles: the pose code spins the body, not these
+  const ring = [[0.3, 0.16, 0.1], [-0.28, 0.2, -0.06], [0.1, 0.34, -0.22],
+                [-0.2, -0.16, 0.24], [0.24, -0.22, -0.18], [-0.06, -0.3, 0.02]];
+  for (let i = 0; i < ring.length; i++) {
+    const [x, y, z] = ring[i];
+    const sh = mesh(new THREE.OctahedronGeometry(0.15 - (i % 3) * 0.03, 0), obsidian, x, y, z, body);
+    sh.rotation.set(i * 0.7, i * 1.3, i * 0.4);
+    sh.scale.set(0.5, 1.5, 0.35);
+  }
+  return { root, body, kind: 'blob' };
+}
+
 // Moonraya - PLACEHOLDER. Toto is sculpting her, and this stands in so the fight can be
 // played and tuned meanwhile. When the sculpt lands it goes the way Baphomet did: exported
 // limb-segmented by tools/export_heroes.py to assets/monsters/moonraya.glb with an entry in
@@ -757,6 +983,11 @@ const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   munari: buildMunari, bonku: buildBonku, sorya: buildSorya,
   skelbow: () => buildSkeleton({ archer: true, boneColor: 0xcfd6c4, clothColor: 0x3f5b3a }),
   moonraya: buildMoonrayaGlb,
+  // Orvane. The tower above, the rift below, and the boss's own shards for his adds.
+  flittern: buildFlittern, hushling: buildHushling, stringen: buildStringen,
+  grinlit: buildGrinlit, velmara: buildVelmara, nyxmare: buildNyxmare,
+  shardling: buildShardling,
+  darkSword: buildDarkSwordGlb,
   // Morroc's boss. No legs: the pose rig simply leaves out what the sculpt does not have.
   sandman: buildSandmanGlb };
 

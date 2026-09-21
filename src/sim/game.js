@@ -140,6 +140,7 @@ function onEnemyHit(g, e, dmg, crit, killed, attackId) {
   g.combo.best = Math.max(g.combo.best, g.combo.count);
   pushEvent(g, { type: 'hit', target: 'enemy', id: e.id, monster: e.type, dmg, crit, x: e.x, z: e.z, y: e.y + e.hurtbox.h * 0.7, attack: attackId, launched: e.launched, combo: g.combo.count });
   rollPassive(g, e, attackId, killed);
+  rollGearProcs(g, e, attackId, killed);
   if (killed) {
     g.kills++;
     g.score += e.def.score * (1 + Math.min(2, g.combo.count / 20));
@@ -207,6 +208,38 @@ function rollPassive(g, e, attackId, killed) {
   }
 }
 
+// What Orvane's gear does. Three rates the resolve step already summed across the weapon and
+// every charm worn (sim/resolve.js), rolled here off the run's rng, once per landed hit, the
+// same way the hero's own passive is - so a proc is as reproducible as a crit.
+//
+// Each one is deliberately not allowed to feed itself: a meteor and a doubled hit both land
+// through onEnemyHit, and letting them roll again there is a loop that ends in a screenful of
+// meteors off one swing. `attackId` carries which is which.
+const PROC_FREE = new Set(['autoBlitz', 'autoMeteor', 'doubleAttack']);
+function rollGearProcs(g, e, attackId, killed) {
+  const p = g.player;
+  if (PROC_FREE.has(attackId)) return;
+  if (p.spDrain && g.rng.chance(p.spDrain)) {
+    const sp = Math.max(1, Math.round(p.mpMax * 0.01));
+    p.mp = Math.min(p.mpMax, p.mp + sp);
+    pushEvent(g, { type: 'drain', hp: 0, sp, x: p.x, z: p.z, y: p.y + 1.6 });
+  }
+  // A doubled hit is the same blow landing twice: same damage, no knockback of its own, and
+  // nothing if the first one already killed - there is nothing left to hit twice.
+  if (!killed && p.double && g.rng.chance(p.double)) {
+    const { dmg, crit } = rollDamage(p.atk, 1, g.rng, p.crit, p.critDmg);
+    const dir = Math.sign(e.x - p.x) || p.facing;
+    const dead = applyHit(e, dmg, 0, 0, dir, e.mass);
+    onEnemyHit(g, e, dmg, crit, dead, 'doubleAttack');
+  }
+  if (p.meteor && g.rng.chance(p.meteor)) {
+    // It falls, so it lands a moment later and on wherever the target is by then - which is
+    // the point of a meteor, and why it goes through the same queue the falcon does.
+    g.pending.push({ kind: 'autoMeteor', target: e.id, t: 0.55, x: e.x, z: e.z });
+    pushEvent(g, { type: 'autoMeteor', target: e.id, x: e.x, z: e.z, y: e.y });
+  }
+}
+
 function resolvePending(g, dt) {
   if (!g.pending.length) return;
   const p = g.player;
@@ -215,6 +248,18 @@ function resolvePending(g, dt) {
   if (!due.length) return;
   g.pending = g.pending.filter((j) => j.t > 0);
   for (const job of due) {
+    if (job.kind === 'autoMeteor') {
+      // Magic damage: a tenth of the hero's ATK, and it does not crit and does not knock -
+      // it is a star landing on a spot, not a blow the hero threw.
+      const dmg = Math.max(1, Math.round(p.atk * 0.1));
+      pushEvent(g, { type: 'meteor', x: job.x, z: job.z, y: 0, dmg });
+      for (const e of g.enemies) {
+        if (e.dead || Math.abs(e.x - job.x) > 1.6 || Math.abs(e.z - job.z) > 1.1) continue;
+        const dead = applyHit(e, dmg, 0, 0, Math.sign(e.x - job.x) || 1, e.mass);
+        onEnemyHit(g, e, dmg, false, dead, 'autoMeteor');
+      }
+      continue;
+    }
     if (job.kind !== 'autoBlitz') continue;
     const e = g.enemies.find((x) => x.id === job.target);
     if (!e || e.dead) continue;               // the bird finds nothing there; no hit, no proc

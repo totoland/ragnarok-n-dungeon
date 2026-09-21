@@ -22,7 +22,11 @@ export const BASE_MODS = { hp: 1, mp: 1, atk: 1, speed: 1, atkSpeed: 1, dodge: 0
 // A third kind, the *Add keys (accessories): flat ATK / MATK and rate bonuses that sum
 // across everything worn and land on top of whatever the weapon set.
 const MULT = new Set(['hp', 'mp', 'atk', 'matk', 'speed', 'atkSpeed']);
-const ADD = new Set(['atkAdd', 'matkAdd', 'critAdd', 'critDmgAdd', 'dodgeAdd']);
+// The *Add keys sum across everything worn. The last three are Orvane's: rates that fire
+// off a landed hit, so a weapon granting a chance and three charms adding to it all reach
+// rollPassive as one number (sim/game.js).
+const ADD = new Set(['atkAdd', 'matkAdd', 'critAdd', 'critDmgAdd', 'dodgeAdd',
+                     'meteorAdd', 'doubleAdd', 'spDrainAdd']);
 export function mergeMods(...sets) {
   const out = {};
   for (const s of sets) {
@@ -49,6 +53,11 @@ export function resolveHero(base, mods = {}) {
     dodge: Math.min(0.75, m.dodge + (m.dodgeAdd || 0)),
     crit: Math.min(1, m.crit + (m.critAdd || 0)),
     critDmg: m.critDmg + (m.critDmgAdd || 0),
+    // Gear procs. Capped at a half so a full set of one kind stays a surprise rather than
+    // the way the hero attacks.
+    meteor: Math.min(0.5, m.meteorAdd || 0),
+    double: Math.min(0.5, m.doubleAdd || 0),
+    spDrain: Math.min(0.5, m.spDrainAdd || 0),
     mods: m,
   };
 }

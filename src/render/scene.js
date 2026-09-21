@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CAMERA, FLOOR } from '../config.js';
-import { stoneFloor, brickWall, grassFloor, sandFloor, duneSky, pineSky } from './textures.js';
+import { stoneFloor, brickWall, grassFloor, sandFloor, duneSky, pineSky, runeSky } from './textures.js';
 
 const THEMES = {
   // Outdoor map. `bg` swaps the tiling brick wall for a painted backdrop plane, and
@@ -49,6 +49,33 @@ const THEMES = {
     fog: 0x18203a, hemi: [0xc6d8ff, 0x2a3450], torch: 0xbcd8ff, props: 'grove',
     bgMake: (i) => pineSky(i + 9, { moon: true }), bgH: 12, ground: 'grass', outdoor: true,
     sideWall: 0x4a5268, ledge: 0x3e4658, arch: 0x6a7288,
+  },
+  // Orvane: white stone and rune blue above ground, and everything past the rift in violet
+  // and demon pink. The palette is the map's one trick - four rooms walk down in blue and the
+  // fifth comes out somewhere that is plainly not the same world.
+  plaza: {
+    floor: '#b9bcc4', grout: '#7d8290', wall: '#c2c6ce', mortar: '#868c98',
+    fog: 0xc8d4e4, hemi: [0xe8f0ff, 0x7d8698], torch: 0x8ec4ff, props: 'runes',
+    bgMake: (i) => runeSky(i + 7), bgH: 12, outdoor: true,
+    sideWall: 0x9aa2b2, ledge: 0x868e9e, arch: 0xb4bcc8,
+  },
+  library: {
+    floor: '#6b5a48', grout: '#332a20', wall: '#4a3e30', mortar: '#241d16',
+    fog: 0x120e0a, hemi: [0xbcd0f0, 0x2e2820], torch: 0x9ec8ff, props: 'barrels',
+  },
+  undercroft: {
+    floor: '#4c4656', grout: '#1e1a26', wall: '#3e3850', mortar: '#1a1622',
+    fog: 0x0b0812, hemi: [0x9a8ecc, 0x201a30], torch: 0xa87aff, props: 'bones',
+  },
+  rift: {
+    floor: '#5e3560', grout: '#2c1430', wall: '#6a3a68', mortar: '#301636',
+    fog: 0x3a1040, hemi: [0xffc0f0, 0x4a1850], torch: 0xff86e0, props: 'runes', rune: true,
+    bgMake: (i) => runeSky(i + 13, { rift: true }), bgH: 12, outdoor: true,
+    sideWall: 0x522e58, ledge: 0x452648, arch: 0x7a4478,
+  },
+  mirrors: {
+    floor: '#3e3a52', grout: '#1a1726', wall: '#4a4460', mortar: '#201c2c',
+    fog: 0x0e0a18, hemi: [0xd0c4ff, 0x2a2240], torch: 0xc09cff, props: 'mirrors',
   },
   sewer: { floor: '#4f5a55', grout: '#1f2622', wall: '#3f4a48', mortar: '#1b211f', fog: 0x0a1210, hemi: [0x7d9a93, 0x1c2a24], torch: 0xffa040, props: 'barrels' },
   crypt: { floor: '#5a5560', grout: '#221f28', wall: '#4a4452', mortar: '#1e1a24', fog: 0x0d0a12, hemi: [0x8a80a8, 0x241c30], torch: 0x9fd0ff, props: 'bones' },
@@ -464,6 +491,85 @@ export function buildRoom(world, roomDef, index) {
     coffin.position.set(W / 2, 0.35, zBack + 1.0);
     coffin.castShadow = true; coffin.receiveShadow = true;
     g.add(coffin);
+  } else if (theme.props === 'runes') {
+    // Orvane. Above ground it is the tower's own rubble: broken column drums and worked stone,
+    // each with a rune still burning on it, because the spell in them did not stop when the
+    // building did. Past the rift the same stones are there in violet, which is the point -
+    // the other side is this place, read wrong.
+    const cut = new THREE.MeshStandardMaterial({ color: theme.rune ? 0x4a2a52 : 0x9aa0ac, roughness: 0.8 });
+    const glyph = new THREE.MeshStandardMaterial({
+      color: theme.torch, emissive: theme.torch, emissiveIntensity: 1.5, roughness: 0.4, toneMapped: false,
+    });
+    for (let i = 0; i < 7; i++) {
+      const x = 1.6 + i * (W / 7.2), z = zBack + 0.9 + (i % 3) * 0.4;
+      const tall = i % 3 === 0;
+      const drum = new THREE.Mesh(tall
+        ? new THREE.CylinderGeometry(0.34, 0.4, 1.3, 8)
+        : new THREE.BoxGeometry(0.7 + (i % 2) * 0.3, 0.46, 0.66), cut);
+      drum.position.set(x, tall ? 0.65 : 0.23, z);
+      drum.rotation.y = i * 0.7;
+      drum.castShadow = true; drum.receiveShadow = true;
+      g.add(drum);
+      // the rune: a thin bright band around the stone, the only light these carry
+      const band = new THREE.Mesh(new THREE.TorusGeometry(tall ? 0.38 : 0.3, 0.025, 6, 16), glyph);
+      band.position.set(x, tall ? 0.9 : 0.36, z);
+      band.rotation.x = Math.PI / 2;
+      g.add(band);
+    }
+    // and a few stones that never came down, hanging where the spell left them
+    for (let i = 0; i < 5; i++) {
+      const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.16 + (i % 3) * 0.06, 0), cut);
+      shard.position.set(2.5 + i * (W / 5.4), 2.2 + (i % 3) * 0.7, zBack + 1.4);
+      shard.rotation.set(i, i * 1.3, i * 0.6);
+      shard.scale.set(1, 0.6, 1);
+      g.add(shard);
+    }
+  } else if (theme.props === 'mirrors') {
+    // The boss room: standing mirrors down the back wall, every one of them cracked. The
+    // glass is emissive rather than reflective - a real reflection costs a second render of
+    // the whole room, and at this angle a cold sheet of light reads as glass anyway.
+    const frame = new THREE.MeshStandardMaterial({ color: 0x2e2a3e, roughness: 0.5, metalness: 0.5 });
+    const glass = new THREE.MeshStandardMaterial({
+      color: 0xbcc8f0, emissive: 0x6a74a8, emissiveIntensity: 0.55, roughness: 0.1, metalness: 0.9,
+    });
+    const crack = new THREE.MeshStandardMaterial({
+      color: 0xc09cff, emissive: 0xa85aff, emissiveIntensity: 1.3, roughness: 0.4, toneMapped: false,
+    });
+    for (let i = 0; i < 5; i++) {
+      const x = 2.0 + i * (W / 5.2), lean = (i % 2 ? 1 : -1) * 0.06;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(1.25, 3.0, 0.16), frame);
+      m.position.set(x, 1.5, zBack + 0.8);
+      m.rotation.z = lean;
+      m.castShadow = true; m.receiveShadow = true;
+      g.add(m);
+      // The pane shares the frame's origin, so the same lean puts it in the same place - an
+      // offset here only slides the glass out of its own frame.
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.7, 0.06), glass);
+      pane.position.set(x, 1.5, zBack + 0.89);
+      pane.rotation.z = lean;
+      g.add(pane);
+      // the crack: two thin bars meeting off-centre, short enough to stay on the glass once
+      // they are turned - a bar as long as the pane is taller than it across the diagonal
+      for (const [ang, len, ox, oy] of [[0.85, 1.5, 0.05, 0.15], [-0.55, 1.0, -0.18, -0.25]]) {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(0.035, len, 0.02), crack);
+        c.position.set(x + ox, 1.5 + oy, zBack + 0.93);
+        c.rotation.z = lean + ang;
+        g.add(c);
+      }
+    }
+    // braziers either side of the room, which is where the last two pooled lights go
+    for (const side of [-1, 1]) {
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.2, 0.8, 8), frame);
+      bowl.position.set(W / 2 + side * 4.0, 0.4, zBack + 1.7);
+      bowl.castShadow = true;
+      g.add(bowl);
+      const fire = takeLight();
+      if (!fire) continue;
+      fire.color.set(theme.torch);
+      fire.intensity = 16; fire.distance = 10; fire.decay = 1.6;
+      fire.position.set(W / 2 + side * 4.0, 1.3, zBack + 1.7);
+      world.torches.push({ light: fire, flame: null, base: 16, seed: side * 5 });
+    }
   } else if (theme.props === 'throne') {
     const stone = new THREE.MeshStandardMaterial({ color: 0x4a3030, roughness: 0.7 });
     const dais = new THREE.Mesh(new THREE.BoxGeometry(5, 0.5, 3), stone);

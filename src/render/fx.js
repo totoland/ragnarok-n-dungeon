@@ -337,10 +337,30 @@ export function createFx(world) {
       case 'autoBlitz':   // feathers as the bird launches; the strike itself is a normal hit
         burst(ev.x, ev.y + 1.4, ev.z, 6, { color: 0xf0e6d0, speed: 2, up: 2.5, life: 0.45, size: 0.22, gravity: 3 });
         break;
-      case 'drain': {     // Soul Drain: a green heal number and a red/blue pair of motes
-        number(ev.x, ev.y, ev.z, `+${ev.hp}`, '#7dff9a');
-        burst(ev.x, ev.y - 0.6, ev.z, 8, { color: 0xff6a6a, speed: 1.2, up: 2.2, life: 0.6, size: 0.24, gravity: -1 });
+      case 'drain': {     // Soul Drain: a green heal number and a red/blue pair of motes.
+        // Orvane's Mana Clasp takes only SP, so it sends the same event with hp 0 - and then
+        // the number is the SP, in the mana potion's blue, which warm() already has glyphs for.
+        if (ev.hp) {
+          number(ev.x, ev.y, ev.z, `+${ev.hp}`, '#7dff9a');
+          burst(ev.x, ev.y - 0.6, ev.z, 8, { color: 0xff6a6a, speed: 1.2, up: 2.2, life: 0.6, size: 0.24, gravity: -1 });
+        } else if (ev.sp) {
+          number(ev.x, ev.y, ev.z, `+${ev.sp}`, '#7db8ff');
+        }
         burst(ev.x, ev.y - 0.6, ev.z, 6, { color: 0x7fb0ff, speed: 1.2, up: 2.4, life: 0.6, size: 0.22, gravity: -1 });
+        break;
+      }
+      // Orvane's Auto Meteor, in two halves: the mark on the floor when it is called, and the
+      // star landing on that spot half a second later, wherever the target has got to.
+      case 'autoMeteor':
+        ring(ev.x, ev.z, { color: 0xb070ff, radius: 1.5, life: 0.5, y: 0.04 });
+        break;
+      case 'meteor': {
+        beam(ev.x, ev.z, { color: 0xc48aff, life: 0.5 });
+        ring(ev.x, ev.z, { color: 0xe0b0ff, radius: 2.0, life: 0.35, y: 0.06 });
+        burst(ev.x, 0.4, ev.z, 34, { color: 0xb070ff, speed: 5, up: 3.5, life: 0.5, size: 0.34, gravity: 5 });
+        burst(ev.x, 0.3, ev.z, 14, { color: 0xffffff, speed: 2.4, up: 2.2, life: 0.35, size: 0.2 });
+        flashLight.position.set(ev.x, 1.2, ev.z); flashLight.intensity = 18;
+        addShake(world, 0.3);
         break;
       }
       case 'dodge':

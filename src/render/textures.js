@@ -212,6 +212,81 @@ export function pineSky(seed = 3, { moon = false } = {}) {
   return t;
 }
 
+// Orvane's two skies, both painted here for the same reason the desert's is: the town ships
+// with no image files. `rift` is the other side - the tower's broken skyline swapped for the
+// demon dimension's, which is the same silhouette read in a colour that says you left.
+export function runeSky(seed = 7, { rift = false } = {}) {
+  const w = 1024, h = 440;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  let s = seed;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  const horizon = h * 0.8;
+  ctx.fillStyle = rift ? '#2a1038' : '#8fa6c4'; ctx.fillRect(0, 0, w, h);
+  const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+  if (rift) { sky.addColorStop(0, '#1a0724'); sky.addColorStop(0.45, '#3d0f4e'); sky.addColorStop(0.85, '#8e2a6e'); sky.addColorStop(1, '#c4568a'); }
+  else { sky.addColorStop(0, '#5b7fa8'); sky.addColorStop(0.45, '#8fb0cc'); sky.addColorStop(0.85, '#cfdce8'); sky.addColorStop(1, '#e4e8ec'); }
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, w, horizon + 2);
+  // The light: a low sun over the city, a torn hole over the rift.
+  const lx = w * (0.55 + rnd() * 0.26), ly = h * (rift ? 0.34 : 0.6);
+  const r = rift ? 170 : 130;
+  const glow = ctx.createRadialGradient(lx, ly, 6, lx, ly, r);
+  if (rift) { glow.addColorStop(0, 'rgba(255,214,255,0.95)'); glow.addColorStop(0.24, 'rgba(216,120,230,0.45)'); glow.addColorStop(1, 'rgba(150,60,180,0)'); }
+  else { glow.addColorStop(0, 'rgba(255,252,236,0.9)'); glow.addColorStop(0.25, 'rgba(216,232,250,0.4)'); glow.addColorStop(1, 'rgba(190,214,240,0)'); }
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = rift ? '#ffd6ff' : '#fffbe8';
+  ctx.beginPath(); ctx.arc(lx, ly, rift ? 30 : 20, 0, Math.PI * 2); ctx.fill();
+  // The skyline: spires, and one broken tower taller than the rest. Three ranks for depth.
+  const ranks = rift
+    ? [['#4a1a55', 0.76, 120, 108], ['#320f3c', 0.84, 150, 86], ['#1d0724', 0.93, 186, 64]]
+    : [['#9fb2c6', 0.76, 120, 108], ['#7d93ab', 0.84, 150, 86], ['#5a6e85', 0.93, 186, 64]];
+  for (let k = 0; k < ranks.length; k++) {
+    const [col, yk, tall, step] = ranks[k];
+    const y0 = h * yk;
+    ctx.fillStyle = col;
+    for (let x = -step; x <= w + step; x += step) {
+      const hgt = tall * (0.45 + rnd() * 0.8);
+      const half = step * (0.2 + rnd() * 0.16);
+      ctx.fillRect(x - half, y0 - hgt, half * 2, hgt + 8);
+      // a spire cap, so the skyline reads as a wizard's city rather than a row of blocks
+      ctx.beginPath();
+      ctx.moveTo(x - half, y0 - hgt);
+      ctx.lineTo(x, y0 - hgt - half * 1.6);
+      ctx.lineTo(x + half, y0 - hgt);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  // The tower itself, broken off partway up, on the rank nearest the camera.
+  const tx = w * (0.2 + rnd() * 0.12), tw = 46, th = h * 0.52;
+  ctx.fillStyle = rift ? '#160520' : '#4a5c72';
+  ctx.beginPath();
+  ctx.moveTo(tx - tw, h);
+  ctx.lineTo(tx - tw, h * 0.93 - th);
+  ctx.lineTo(tx - tw * 0.4, h * 0.93 - th + 26);   // the snapped-off top, on a slant
+  ctx.lineTo(tx + tw * 0.5, h * 0.93 - th + 8);
+  ctx.lineTo(tx + tw, h * 0.93 - th + 40);
+  ctx.lineTo(tx + tw, h);
+  ctx.closePath(); ctx.fill();
+  // Stones that stopped falling when the spell did, hanging where they were.
+  ctx.fillStyle = rift ? 'rgba(232,150,255,0.5)' : 'rgba(120,150,190,0.45)';
+  for (let i = 0; i < 26; i++) {
+    const x = rnd() * w, y = h * (0.25 + rnd() * 0.5), sz = 3 + rnd() * 9;
+    ctx.beginPath();
+    ctx.moveTo(x, y - sz); ctx.lineTo(x + sz * 0.7, y); ctx.lineTo(x, y + sz); ctx.lineTo(x - sz * 0.7, y);
+    ctx.closePath(); ctx.fill();
+  }
+  const haze = ctx.createLinearGradient(0, horizon - 50, 0, h);
+  haze.addColorStop(0, rift ? 'rgba(200,90,190,0)' : 'rgba(214,228,240,0)');
+  haze.addColorStop(1, rift ? 'rgba(190,80,170,0.4)' : 'rgba(214,228,240,0.5)');
+  ctx.fillStyle = haze; ctx.fillRect(0, horizon - 50, w, h - horizon + 50);
+  noise(ctx, w, h, 0.05, seed);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
 export function duneSky(seed = 5, { rocky = false } = {}) {
   const w = 1024, h = 440;
   const c = document.createElement('canvas');

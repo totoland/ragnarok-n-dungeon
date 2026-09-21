@@ -29,6 +29,14 @@ export const ATTRS = {
   hp: { name: 'HP', key: 'hp', min: 0.01, max: 0.03, step: 0.01, mult: true },
   sp: { name: 'SP', key: 'mp', min: 0.01, max: 0.03, step: 0.01, mult: true },
   aspd: { name: 'ASPD', key: 'atkSpeed', min: 0.05, max: 0.10, step: 0.01, mult: true },
+  // ---- Orvane. Three rates that fire off a landed hit (sim/game.js rollPassive), and a
+  // flat ATK roll five times the one above, because a fourth-town accessory sits on a hero
+  // whose own ATK is around forty. They sum across everything worn: the boss weapon grants a
+  // chance and each charm adds to the same number, which is what makes the set a set.
+  meteor: { name: 'Auto Meteor', key: 'meteorAdd', min: 0.01, max: 0.03, step: 0.01 },
+  twin: { name: 'Double Attack', key: 'doubleAdd', min: 0.01, max: 0.03, step: 0.01 },
+  drain: { name: 'SP Drain', key: 'spDrainAdd', min: 0.01, max: 0.03, step: 0.01 },
+  atkHi: { name: 'ATK', key: 'atkAdd', min: 5, max: 15, step: 1, flat: true },
 };
 export const ATTR_IDS = Object.keys(ATTRS);
 
@@ -52,6 +60,23 @@ export const ITEMS = {
   // just by being worn.
   moonveil: { name: 'Moonveil', slot: 'cape', mods: { speed: 1.06, dodgeAdd: 0.05 }, tip: '+6% move speed, +5% dodge' },
   robinHat: { name: 'Robin Hood Hat', slot: 'hat', mods: { atkAdd: 10 }, tip: '+10 ATK' },
+  // ---- Orvane, the mage city. Its drops are magic where every other town's are steel, and
+  // they share their numbers: the weapon grants a chance and the charms add to the same one.
+  // ATK here is flat and large on purpose - the fourth town is meant to be a step up, and the
+  // monsters carry the HP and ATK to match (data/monsters.js).
+  meteorEdge: {
+    name: 'Meteor Edge', slot: 'weapon', hero: 'knight', kind: 'sword',
+    mods: { atkAdd: 100, meteorAdd: 0.10 },
+    tip: '+100 ATK, 10% chance on hit: a meteor falls for 10% of ATK as magic',
+  },
+  twinshot: {
+    name: 'Twinshot', slot: 'weapon', hero: 'hunter', kind: 'bow',
+    mods: { atkAdd: 90, doubleAdd: 0.15 },
+    tip: '+90 ATK, 15% chance on hit: the shot lands twice',
+  },
+  runeSigil: { name: 'Rune Sigil', slot: 'accessory', main: 'meteor', secondary: ['atkHi', 'drain'], rarity: 'rare', tip: 'Main: Auto Meteor' },
+  echoBand: { name: 'Echo Band', slot: 'accessory', main: 'twin', secondary: ['atkHi', 'drain'], rarity: 'rare', tip: 'Main: Double Attack' },
+  manaClasp: { name: 'Mana Clasp', slot: 'accessory', main: 'drain', secondary: ['atkHi', 'meteor'], rarity: 'uncommon', tip: 'Main: SP Drain' },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS);
@@ -72,7 +97,10 @@ function rollValue(stat, rng) {
 export function rollItem(id, rng) {
   const def = ITEMS[id];
   const main = { stat: def.main, v: rollValue(def.main, rng) };
-  const pool = ATTR_IDS.filter((k) => k !== def.main);
+  // `secondary` narrows what the second roll can be. Without one an item draws from the whole
+  // pool, which is right for a Ring but not for a rune charm: Orvane's accessories are a set
+  // with a shape, and a dodge roll on one of them would read as a stray.
+  const pool = (def.secondary || ATTR_IDS).filter((k) => k !== def.main);
   const stat = pool[Math.min(pool.length - 1, Math.floor(rng.next() * pool.length))];
   return { id, main, sub: { stat, v: rollValue(stat, rng) } };
 }
@@ -103,6 +131,10 @@ export function itemMods(gear) {
   const mods = { ...ITEMS[gear.id].mods };
   if (ITEMS[gear.id].slot === 'weapon') {
     if (plus) mods.atk = (mods.atk ?? 1) * (1 + REFINE.atk * plus);
+    // A weapon whose ATK is flat rather than a multiplier refines on that instead, or
+    // Orvane's two would gain almost nothing from a duplicate: their own hundred is not in
+    // the base the multiplier scales.
+    if (plus && mods.atkAdd) mods.atkAdd *= (1 + REFINE.atk * plus);
     if (plus >= REFINE.glowAt) mods.critDmg = (mods.critDmg ?? BASE_MODS.critDmg) * (1 + REFINE.critDmg);
   } else if (plus) mods.hp = (mods.hp ?? 1) * (1 + REFINE.hp * plus);
   return mods;

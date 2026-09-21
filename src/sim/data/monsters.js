@@ -244,4 +244,94 @@ export const MONSTERS = {
     drops: [{ item: 'amulet', chance: 0.005 }],
     score: 60,
   },
+  // ---- Orvane, the mage city whose tower came down. The fourth town, and the first that is
+  // meant to feel like a step up rather than a variation: HP and ATK run half again above
+  // Phaelan's, because its drops do too (data/items.js - a hundred flat ATK on one sword).
+  // Past the rift in room four the roster changes completely, which is the moment the map is
+  // built around.
+  flittern: {
+    name: 'Flittern', ai: 'hopper',
+    hp: 72, atk: 20, speed: 6.0, mass: 0.4,
+    hurtbox: { r: 0.3, h: 0.6 },
+    // Frail and very fast, and never alone: the swarm is the monster, not the bat.
+    attack: { range: 1.3, windup: 0.18, dur: 0.2, cd: 0.85, box: { x0: -0.2, x1: 1.3, y0: 0.2, y1: 1.8 }, knock: [3, 1.5] },
+    hop: { period: 0.26, height: 0.8 },
+    drops: [{ item: 'clip', chance: 0.025 }],
+    score: 35,
+  },
+  stringen: {
+    name: 'Stringen', ai: 'walker',
+    hp: 235, atk: 28, speed: 2.2, mass: 1.2,
+    hurtbox: { r: 0.5, h: 1.8 },
+    // A puppet on strings from nothing: it walks in jerks, and the recoil after a swing is
+    // the string pulling it back upright.
+    attack: { range: 1.7, windup: 0.55, dur: 0.32, cd: 2.1, box: { x0: 0.0, x1: 1.9, y0: -0.2, y1: 2.2 }, knock: [5, 2] },
+    drops: [{ item: 'bell', chance: 0.02 }],
+    score: 70,
+  },
+  hushling: {
+    name: 'Hushling', ai: 'walker',
+    hp: 190, atk: 26, speed: 3.6, mass: 0.7,
+    hurtbox: { r: 0.42, h: 1.6 },
+    // An empty cloak. The fade that makes it untouchable for a beat is its own behaviour and
+    // still has to go into sim/enemies.js; this is the half of it that closes and swings, and
+    // it reads as the same threat without it.
+    attack: { range: 1.6, windup: 0.32, dur: 0.26, cd: 1.4, box: { x0: -0.1, x1: 1.7, y0: 0.0, y1: 2.0 }, knock: [4, 1] },
+    drops: [{ item: 'echoBand', chance: 0.035 }, { item: 'brooch', chance: 0.012 }],
+    score: 75,
+  },
+  grinlit: {
+    name: 'Grinlit', ai: 'archer',
+    hp: 165, atk: 22, speed: 1.9, mass: 0.8,
+    hurtbox: { r: 0.48, h: 1.5 },
+    // A lantern head on a cloak, spitting green fire. Slow, and helpless once reached.
+    attack: { range: 8.0, keep: 5.2, windup: 0.7, dur: 0.3, cd: 2.2, shot: { kind: 'foxfire', speed: 9.5, life: 1.7, y: 1.2 }, knock: [3, 0] },
+    drops: [{ item: 'runeSigil', chance: 0.035 }, { item: 'brooch', chance: 0.012 }],
+    score: 80,
+  },
+  velmara: {
+    name: 'Velmara', ai: 'archer',
+    hp: 215, atk: 27, speed: 2.3, mass: 1.0,
+    hurtbox: { r: 0.45, h: 1.75 },
+    // Past the rift. Keeps closer than an archer should and throws violet bolts that take
+    // what they hit - the drain is hers, not the player's.
+    attack: { range: 7.0, keep: 3.8, windup: 0.6, dur: 0.3, cd: 2.0, shot: { kind: 'hellOrb', speed: 10, life: 1.6, y: 1.3 }, knock: [3, 0] },
+    drops: [{ item: 'manaClasp', chance: 0.04 }, { item: 'amulet', chance: 0.01 }],
+    score: 95,
+  },
+  nyxmare: {
+    name: 'Nyxmare', ai: 'walker',
+    hp: 360, atk: 35, speed: 2.9, mass: 2.4,
+    hurtbox: { r: 0.72, h: 2.0 },
+    // The heaviest thing in the town that is not the boss: it does not stop when hit and it
+    // sends the player a long way when it connects.
+    attack: { range: 2.0, windup: 0.6, dur: 0.34, cd: 2.3, box: { x0: 0.0, x1: 2.3, y0: -0.3, y1: 2.4 }, knock: [8, 3] },
+    drops: [{ item: 'amulet', chance: 0.012 }],
+    score: 120,
+  },
+  shardling: {
+    name: 'Shardling', ai: 'walker',
+    hp: 120, atk: 22, speed: 4.4, mass: 0.6,
+    hurtbox: { r: 0.4, h: 1.3 },
+    // What the Dark Sword breaks off himself at half health: his own shape, small and quick.
+    attack: { range: 1.5, windup: 0.24, dur: 0.24, cd: 1.15, box: { x0: -0.1, x1: 1.6, y0: -0.2, y1: 1.7 }, knock: [4, 1.5] },
+    score: 55,
+  },
+  darkSword: {
+    name: 'Dark Sword', ai: 'boss', boss: true,
+    hp: 1800, atk: 24, speed: 2.6, mass: 5.5,
+    hurtbox: { r: 0.9, h: 2.9 },
+    // A duellist, not a colossus. He is the fastest boss in the game and the only one whose
+    // basic attack is the thing to fear: everything else is a tell.
+    attack: { range: 2.4, windup: 0.4, dur: 0.3, cd: 1.5, box: { x0: 0.0, x1: 2.7, y0: -0.3, y1: 2.8 }, knock: [6, 2] },
+    // Blink Step: he is not fast, he is simply already there.
+    charge: { windup: 0.5, dur: 0.5, speed: 16.0, cd: 8.0, box: { x0: -0.6, x1: 2.2, y0: -0.4, y1: 2.8 }, knock: [9, 3] },
+    // Shatterfall: the blade into the floor, and the floor answers on both sides.
+    slam: { windup: 0.9, dur: 0.45, cd: 7.5, box: { x0: -3.5, x1: 3.5, y0: -0.5, y1: 3.2, both: true }, knock: [6, 8], depth: 1.6 },
+    // Mirror Bolt: three reflections of himself down the lanes.
+    cast: { windup: 0.7, dur: 0.45, cd: 6.0, shot: { kind: 'hellOrb', count: 3, speed: 9.0, life: 2.4, y: 1.4, lane: 1.5, dmg: 0.9 }, knock: [4, 1] },
+    // Shardself: at half health the shards around him stop being decoration.
+    adds: { at: 0.5, type: 'shardling', count: 2 },
+    score: 1200,
+  },
 };

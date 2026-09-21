@@ -148,6 +148,55 @@ export const PHAELAN = {
 // the ones the real towns build up to, in a loop that climbs and starts again, so a long
 // session keeps meeting the same heavy moments instead of drifting into an easy one. Not a
 // place to play: no exit, no boss, no ending. `soak` is what game.js looks for.
+// Orvane, the mage city. The fourth town, and the only one that changes its own mind halfway
+// through: four rooms walk down a broken wizard's tower, and the fifth comes out under a
+// pink sky on the other side of the rift, where the roster is not the one that walked in.
+export const ORVANE = {
+  town: 'Orvane', name: 'Orvane, the Hollow Tower',
+  loot: { knight: 'meteorEdge', hunter: 'twinshot' },
+  rooms: [
+    {
+      name: 'Tower Yard', width: 18, theme: 'plaza',
+      waves: [
+        [{ type: 'flittern', count: 5 }],
+        [{ type: 'stringen', count: 2 }, { type: 'flittern', count: 4 }],
+      ],
+    },
+    {
+      name: 'Fallen Library', width: 20, theme: 'library',
+      waves: [
+        [{ type: 'stringen', count: 2 }, { type: 'hushling', count: 1 }],
+        [{ type: 'hushling', count: 3 }, { type: 'flittern', count: 4 }],
+        [{ type: 'stringen', count: 3 }, { type: 'hushling', count: 2 }],
+      ],
+    },
+    {
+      name: 'Tower Undercroft', width: 20, theme: 'undercroft',
+      waves: [
+        [{ type: 'grinlit', count: 2 }, { type: 'stringen', count: 2 }],
+        [{ type: 'hushling', count: 3 }, { type: 'grinlit', count: 2 }],
+        [{ type: 'stringen', count: 2 }, { type: 'grinlit', count: 3 }, { type: 'flittern', count: 4 }],
+      ],
+    },
+    {
+      // Through the rift. Nothing from the tower follows.
+      name: 'The Rift', width: 22, theme: 'rift',
+      waves: [
+        [{ type: 'velmara', count: 3 }],
+        [{ type: 'nyxmare', count: 2 }, { type: 'velmara', count: 2 }],
+        [{ type: 'nyxmare', count: 2 }, { type: 'velmara', count: 3 }, { type: 'flittern', count: 4 }],
+      ],
+    },
+    {
+      name: 'Hall of Mirrors', width: 22, theme: 'mirrors',
+      waves: [
+        [{ type: 'velmara', count: 2 }, { type: 'nyxmare', count: 2 }],
+        [{ type: 'darkSword', count: 1 }],
+      ],
+    },
+  ],
+};
+
 export const SOAK = {
   town: 'Soak', name: 'Proving Ground', soak: true,
   loot: { knight: 'katana', hunter: 'gakkung' },
@@ -166,4 +215,4 @@ export const SOAK = {
   ],
 };
 
-export const TOWNS = { prontera: DUNGEON, morroc: MORROC, phaelan: PHAELAN };
+export const TOWNS = { prontera: DUNGEON, morroc: MORROC, phaelan: PHAELAN, orvane: ORVANE };

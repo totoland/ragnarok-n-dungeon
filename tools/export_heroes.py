@@ -219,6 +219,36 @@ def classify_gear(group, name, cx):
     return "hat"
 
 
+def classify_dark_sword(group, name, cx):
+    """Orvane's boss, the obsidian knight. Sorted by collection like the other sculpts.
+
+    Two calls the collections do not make for themselves. The Magic collection holds both the
+    shards that orbit him and the violet fractures burning along his blade; the fractures have
+    to ride the weapon or they hang in the air where the sword used to be. And his pauldrons
+    ride the torso, not the arms - the same call the knight's do, because a shoulder dome that
+    swings with the elbow reads as a loose plate rather than armour.
+    """
+    if group.endswith("Sword"):
+        return "weapon"
+    if group.endswith("Magic"):
+        return "weapon" if name.startswith("Blade magic") else "torso"
+    if group.endswith("Helmet"):
+        return "head"
+    if group.endswith("Arms") or group.endswith("Hands"):
+        return "arm" + _side(cx)
+    if group.endswith("Legs"):
+        return "leg" + _side(cx)
+    if group.endswith("Foundation"):
+        if _has(name, "chausses"):
+            return "leg" + _side(cx)
+        if _has(name, "sleeve"):
+            return "arm" + _side(cx)
+        if _has(name, "Neck"):
+            return "head"
+        return "torso"                      # the padded torso under the cuirass
+    return "torso"                          # cuirass, tassets, belts, coat, cowl, pauldrons
+
+
 MODELS = {
     "knight": {
         "scene": "RO Knight | Studio",
@@ -358,6 +388,34 @@ MODELS = {
         "parent": {"hat": "root"},
         "pivot": {"root": (0, 0, 0), "hat": (0, 0, 0.0065)},
     },
+    "darkSword": {
+        "scene": "Dark Sword \u2022 Obsidian Knight",
+        "height": 3.1,                      # game units; hurtbox h is 2.9 in sim/data/monsters.js
+        "model_height": 7.43,               # Blender units, the crown of the helmet - the
+                                            # shards float above it and are meant to read that way
+        "classify": classify_dark_sword,
+        "collections": ["DS \u2022 Arms", "DS \u2022 Belts", "DS \u2022 Cloth",
+                        "DS \u2022 Cuirass", "DS \u2022 Foundation", "DS \u2022 Hands",
+                        "DS \u2022 Helmet", "DS \u2022 Legs", "DS \u2022 Magic",
+                        "DS \u2022 Shoulders", "DS \u2022 Sword"],
+        # A third of him is the torn coat, which is folds rather than shape and thins well.
+        # The sword and the magic are left alone: they are the silhouette and they are cheap.
+        "decimate": {"DS \u2022 Cloth": 0.22, "DS \u2022 Foundation": 0.4,
+                     "DS \u2022 Shoulders": 0.55, "DS \u2022 Legs": 0.6,
+                     "DS \u2022 Cuirass": 0.7, "DS \u2022 Helmet": 0.7,
+                     "DS \u2022 Hands": 0.5, "DS \u2022 Arms": 0.7, "*": 1},
+        "curve_res": (3, 1),
+        "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
+                   "weapon": "armL", "legL": "root", "legR": "root"},
+        "pivot": {
+            "root": (0, 0, 0),
+            "torso": (0, 0, 4.30),          # the waist, under the cuirass
+            "head": (0, 0, 6.10),           # neck, below the gorget
+            "armL": (-0.88, 0, 5.75), "armR": (0.88, 0, 5.75),
+            "weapon": (-1.13, -0.33, 3.54), # his left fist, closed on the grip
+            "legL": (-0.42, 0, 3.20), "legR": (0.42, 0, 3.20),
+        },
+    },
 }
 
 
@@ -410,8 +468,15 @@ def flatten_procedural_colour(mat):
     inp.default_value = (*col, 1)
 
 
+# What counts as model geometry. A curve with a bevel is geometry as much as a mesh is -
+# the Dark Sword's etching, blade edges and violet fractures are all curves, a fifth of the
+# model, and reading only meshes silently threw them away. bake_group evaluates whatever is
+# here through the depsgraph, which hands back a mesh either way.
+GEOMETRY = {"MESH", "CURVE", "SURFACE", "FONT"}
+
+
 def model_meshes(scene, collections=None):
-    """The meshes that make up the model, skipping anything hidden from render.
+    """The geometry that makes up the model, skipping anything hidden from render.
 
     Two ways a source file can say which those are, and which group each belongs to.
 
@@ -424,13 +489,13 @@ def model_meshes(scene, collections=None):
     if collections:
         wanted = set(collections)
         for o in scene.objects:
-            if o.type != "MESH" or o.hide_render:
+            if o.type not in GEOMETRY or o.hide_render:
                 continue
             if any(c.name in wanted for c in o.users_collection):
                 out.append(o)
         return out
     for o in scene.objects:
-        if o.type != "MESH" or o.hide_render:
+        if o.type not in GEOMETRY or o.hide_render:
             continue
         p, top = o.parent, None
         while p is not None:
@@ -508,6 +573,10 @@ def export(model_key, out_dir):
     # for a render sits a level or two above what the game draws. Capping the modifier is a
     # better trade than decimating afterwards: it never had the vertices to lose.
     sub = recipe.get("subsurf")
+    # (resolution_u, bevel_resolution) cap for curves - how finely a bevelled curve is walked
+    # along its path and around its ring. Authored for a render, both sit far above what a
+    # trim line needs at the size the game draws it.
+    res = recipe.get("curve_res")
     groups = {}
     for o in model_meshes(scene, cols):
         for slot in o.material_slots:
@@ -521,8 +590,13 @@ def export(model_key, out_dir):
             for m in o.modifiers:
                 if m.type == "SUBSURF":
                     m.levels = m.render_levels = min(m.render_levels, sub)
+        if o.type == "CURVE" and res:
+            o.data.resolution_u = min(o.data.resolution_u, res[0])
+            o.data.bevel_resolution = min(o.data.bevel_resolution, res[1])
         ratio = dec.get(g, dec.get("*", 1)) if isinstance(dec, dict) else dec
-        if ratio and ratio < 1:
+        # DECIMATE is a mesh modifier. A curve is thinned by dropping its resolution above,
+        # which is the same trade as capping a subdivision and costs less shape.
+        if ratio and ratio < 1 and o.type == "MESH":
             o.modifiers.new("__export_decimate", "DECIMATE").ratio = ratio
 
     for limb in recipe["parent"]:

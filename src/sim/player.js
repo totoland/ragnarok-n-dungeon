@@ -16,6 +16,7 @@ export function createPlayer(heroKey, mods, level = 1, skills = {}) {
     // shell folds them in at creation. gear is here for the renderer (a +5 glows).
     skillLv: skills, gear: null,
     crit: 0, critDmg: 0,
+    meteor: 0, double: 0, spDrain: 0,
     x: 1.5, z: 0, y: 0, vx: 0, vy: 0, facing: 1, grounded: true,
     hp: 0, hpMax: 0, mp: 0, mpMax: 0, atk: 0, speed: 0,
     hurtbox: null,
@@ -44,6 +45,9 @@ export function setLevel(p, level, mods) {
   p.def = def;
   p.hpMax = def.hp; p.mpMax = def.mp; p.atk = def.atk; p.speed = def.speed;
   p.crit = def.crit; p.critDmg = def.critDmg;
+  // Gear proc rates (Orvane). Copied onto the player like crit is, so sim/game.js rolls them
+  // without reaching through def - and so a level-up mid-run picks up a new charm's share.
+  p.meteor = def.meteor || 0; p.double = def.double || 0; p.spDrain = def.spDrain || 0;
   p.hurtbox = def.hurtbox;
   foldBuffs(p, 0);
 }
