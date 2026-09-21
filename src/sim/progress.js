@@ -32,10 +32,15 @@ export function levelProgress(xp) {
 
 // The modifiers a level grants, sparse: only the keys it changes, so merging with gear
 // later cannot double-apply a baseline. Level 1 is the empty set and resolves to the table.
+//
+// HP and SP are shares of the hero's table. ATK is not: it is `LEVEL.atk` points per level,
+// flat, landing in the same atkAdd that gear uses - so a level and a weapon add to one
+// number instead of one multiplying the other, and a hundred-ATK sword is worth the same
+// hundred whoever is holding it.
 export function levelMods(level) {
   const n = Math.max(0, (level | 0) - 1);
   if (!n) return {};
-  return { hp: 1 + LEVEL.hp * n, mp: 1 + LEVEL.mp * n, atk: 1 + LEVEL.atk * n };
+  return { hp: 1 + LEVEL.hp * n, mp: 1 + LEVEL.mp * n, atkAdd: LEVEL.atk * n };
 }
 
 export function skillPointsAt(level) { return Math.max(0, (level | 0) - 1); }

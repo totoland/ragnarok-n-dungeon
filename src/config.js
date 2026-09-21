@@ -59,6 +59,11 @@ export const SKILL_KEYS = ['skill1', 'skill2', 'skill3'];
 export const NGPLUS = { hp: 0.35, atk: 0.25, speed: 0.06, xp: 0.25, maxTier: 5 };
 
 // Levels. XP to go from level L to L+1 is base * L^exp; every level past the first adds a
-// flat share of the hero's table HP / SP / ATK and one skill point. A first Prontera clear
-// (~2,250 XP) lands around level 4; see sim/progress.js for the curve itself.
-export const LEVEL = { max: 50, base: 120, exp: 1.6, hp: 0.06, mp: 0.05, atk: 0.04 };
+// share of the hero's table HP / SP and one skill point. A first Prontera clear (~2,250 XP)
+// lands around level 4; see sim/progress.js for the curve itself.
+//
+// ATK is the exception and is flat: `atk` points of it per level, not a share. That is the
+// same absolute scale Orvane's weapons are already on (+100 on one sword) and the one RO
+// itself uses - a number a player can add up, rather than a percentage of a table they
+// cannot see. It moves the hero from 35 ATK at level 50 to 159.
+export const LEVEL = { max: 50, base: 120, exp: 1.6, hp: 0.06, mp: 0.05, atk: 3 };

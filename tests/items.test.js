@@ -7,7 +7,7 @@ import { MONSTERS } from '../src/sim/data/monsters.js';
 import { HEROES } from '../src/sim/data/heroes.js';
 import { TOWNS } from '../src/sim/data/dungeon.js';
 import { BASE_MODS } from '../src/sim/resolve.js';
-import { REFINE, SKILL } from '../src/config.js';
+import { REFINE, SKILL, LEVEL } from '../src/config.js';
 import { createGame, update, EMPTY_INPUT, setGear } from '../src/sim/game.js';
 import { createEnemy } from '../src/sim/enemies.js';
 import { xpAtLevel } from '../src/sim/progress.js';
@@ -44,7 +44,11 @@ test('a wielded weapon reaches the hero through the resolve step, merged with th
   const armed = createGame({ hero: 'knight', dungeon: quiet, xp: xpAtLevel(3), gear: { id: 'katana', plus: 2 } });
   assert.equal(armed.player.crit, 0.30); assert.equal(bare.player.crit, BASE_MODS.crit);
   assert.equal(armed.player.atkSpeed, 1.10);
-  assert.ok(Math.abs(armed.player.atk - bare.player.atk * (1 + REFINE.atk * 2)) < 1e-9, 'level share × refine share');
+  // ATK from a level is flat and ATK from a weapon multiplies the hero's own table, so the
+  // two no longer compound: the refine share is worth the table, not the whole number.
+  const table = HEROES.knight.atk;
+  assert.ok(Math.abs(bare.player.atk - (table + LEVEL.atk * 2)) < 1e-9, 'the level adds its points');
+  assert.ok(Math.abs(armed.player.atk - (table * (1 + REFINE.atk * 2) + LEVEL.atk * 2)) < 1e-9, 'refine scales the table');
   assert.deepEqual(armed.player.gear, { id: 'katana', plus: 2 }, 'the renderer can read the weapon off the player');
   // a level-up mid-run keeps the weapon
   armed.player.level = 1; armed.xp = 0;
@@ -106,7 +110,9 @@ test('setGear swaps the weapon mid-run: stats re-resolve, HP keeps its fraction,
   setGear(g, null);
   assert.equal(p.gear, null); assert.equal(g.gear, null);
   assert.equal(p.crit, BASE_MODS.crit); assert.equal(p.atkSpeed, 1);
-  assert.ok(Math.abs(p.atk - atkBefore / (1 + REFINE.atk * 2)) < 1e-9, 'the refine share comes off');
+  // Only the share the weapon put on the hero's own table comes off; the level's points stay.
+  const tbl = HEROES.knight.atk;
+  assert.ok(Math.abs(p.atk - (atkBefore - tbl * REFINE.atk * 2)) < 1e-9, 'the refine share comes off');
   assert.equal(p.hp, Math.round(p.hpMax / 2), 'half health stays half');
   assert.ok(g.events.some((ev) => ev.type === 'equip' && ev.item === null));
   setGear(g, { id: 'tsurugi', plus: 5 });

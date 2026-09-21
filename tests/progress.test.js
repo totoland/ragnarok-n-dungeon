@@ -45,11 +45,15 @@ test('level 1 is the table; each level adds its share; sparse mods merge with ge
   assert.deepEqual(levelMods(1), {});
   assert.deepEqual(resolveHero(HEROES.knight, levelMods(1)), resolveHero(HEROES.knight));
   const m = levelMods(6);
-  assert.equal(m.hp, 1 + LEVEL.hp * 5); assert.equal(m.atk, 1 + LEVEL.atk * 5);
+  assert.equal(m.hp, 1 + LEVEL.hp * 5);
+  // ATK is points, not a share, and lands in the same atkAdd gear uses.
+  assert.equal(m.atkAdd, LEVEL.atk * 5);
+  assert.equal(m.atk, undefined, 'the level no longer multiplies ATK');
   assert.equal(skillPointsAt(1), 0); assert.equal(skillPointsAt(6), 5);
   // a Katana-shaped set: multipliers multiply, rates replace
   const merged = mergeMods(levelMods(6), { atkSpeed: 1.1, crit: 0.3 }, { atk: 1.5 });
-  assert.equal(merged.atk, (1 + LEVEL.atk * 5) * 1.5);
+  assert.equal(merged.atk, 1.5, 'the weapon multiplies the table, the level adds to it');
+  assert.equal(merged.atkAdd, LEVEL.atk * 5);
   assert.equal(merged.atkSpeed, 1.1); assert.equal(merged.crit, 0.3);
   assert.equal(mergeMods(undefined, null, {}).hp, undefined, 'nothing named, nothing set');
 });

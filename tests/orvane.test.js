@@ -9,6 +9,8 @@ import { MONSTERS } from '../src/sim/data/monsters.js';
 import { ITEMS, ATTRS, rollItem, fits } from '../src/sim/data/items.js';
 import { createEnemy } from '../src/sim/enemies.js';
 import { resolveHero, mergeMods } from '../src/sim/resolve.js';
+import { xpAtLevel } from '../src/sim/progress.js';
+import { LEVEL } from '../src/config.js';
 import { itemMods, wearMods } from '../src/sim/data/items.js';
 import { HEROES } from '../src/sim/data/heroes.js';
 
@@ -16,7 +18,9 @@ const steps = (g, n, input = EMPTY_INPUT) => { for (let i = 0; i < n; i++) updat
 
 // Put one monster in reach and hit it, without waiting for a wave or walking anywhere.
 function rigged(gear, { rate = null } = {}) {
-  const g = createGame({ hero: 'knight', seed: 11, dungeon: ORVANE, gear });
+  // Capped level on purpose: a proc that reads ATK must not have ATK move under it, and the
+  // room's own wave would otherwise level the hero mid-swing - three flat points at a time.
+  const g = createGame({ hero: 'knight', seed: 11, dungeon: ORVANE, gear, xp: xpAtLevel(LEVEL.max) });
   steps(g, 2);
   if (rate) for (const k in rate) g.player[k] = rate[k];
   const e = createEnemy(g, 'stringen', g.player.x + 1.2, 0);
