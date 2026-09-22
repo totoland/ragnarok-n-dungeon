@@ -350,15 +350,30 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 @media (prefers-reduced-motion: reduce) { .skill.active { animation: none; } }
 
 /* Town picker under the heroes: same language, smaller, one line of blurb. */
-#towns { display: flex; gap: 12px; margin-top: 10px; }
-.town { width: 200px; padding: 10px 14px; border: 2px solid var(--edge); background: var(--panel); color: var(--ink); border-radius: 10px; cursor: pointer; text-align: left; transition: transform 120ms, border-color 120ms; }
-.town:hover, .town.selected { border-color: var(--gold); box-shadow: 0 0 16px rgba(232,182,74,0.3); }
-.town:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Wraps: there are four towns now and two more coming, and a row that cannot wrap is a
+   row that scrolls off the side of a phone. */
+#towns { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 10px; max-width: min(1000px, 94vw); }
+/* A town card carries its own colour (data/dungeon.js `accent`): a band across the top and,
+   when it is the one picked, a wash and a glow in that colour. Four towns that look like four
+   places beats four identical boxes with different words in them. */
+.town { --accent: var(--gold); position: relative; width: 200px; padding: 14px 14px 12px; border: 2px solid var(--edge); background: var(--panel); color: var(--ink); border-radius: 10px; cursor: pointer; text-align: left; overflow: hidden; transition: transform 140ms, border-color 140ms, box-shadow 140ms; }
+.town::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--accent); opacity: 0.75; }
+.town::after { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 0%, var(--accent), transparent 68%); opacity: 0.09; pointer-events: none; transition: opacity 140ms; }
+#towns .town:hover { transform: translateY(-3px); border-color: var(--accent); }
+#towns .town:hover::after { opacity: 0.2; }
+#towns .town.selected { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 0 22px -2px var(--accent), inset 0 0 40px -28px var(--accent); }
+#towns .town.selected::before { opacity: 1; height: 5px; }
+#towns .town.selected::after { opacity: 0.26; }
+#towns .town.selected strong { color: var(--accent); }
+/* Locked reads as locked: the colour drains out and a padlock sits where the tier would. */
+#towns .town:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.85); transform: none; }
+#towns .town:disabled::after { opacity: 0; }
+#towns .town:disabled strong::after { content: ' 🔒'; font-size: 11px; opacity: 0.7; }
 .town:disabled:hover { border-color: var(--edge); box-shadow: none; }
 .town .tier { color: var(--ink); opacity: 0.75; }
 .town strong { display: block; font-size: 15px; color: var(--gold); }
 .town em { font-style: normal; font-size: 11px; opacity: 0.8; }
-@media (max-width: 720px) { #towns { flex-direction: row; gap: 8px; } .town { width: min(150px, 42vw); padding: 8px 10px; } }
+@media (max-width: 720px) { #towns { gap: 8px; } .town { width: min(150px, 42vw); padding: 10px 10px 8px; } }
 
 /* Character panel: xp, weapon chips, skill rows. Shares the settings panel chrome. */
 #character .panel { width: min(760px, 94vw); }
@@ -498,3 +513,24 @@ body.touch #telemetry-badge { bottom: calc(110px + var(--safe-b)); right: calc(8
 #character .bpick.on .bname::after { content: ' ✓'; }
 #character .bpick .btip { font-size: 11px; opacity: 0.66; margin-top: 2px; line-height: 1.35; }
 @media (max-width: 560px) { #character .branch { grid-template-columns: 1fr; } }
+
+/* The way in. One gold button that is plainly the thing to press, with the key it answers to
+   on its right - the title used to leave "press Enter" to a line of grey text under
+   everything else, which is not how a game tells you where the start is. */
+.start { display: inline-flex; align-items: center; gap: 14px; margin-top: 16px; padding: 13px 26px; border-radius: 12px; border: 1px solid rgba(232,182,74,0.55); cursor: pointer; font: inherit; letter-spacing: 0.05em; color: #1a1206; background: linear-gradient(180deg, #f6d98a, var(--gold)); box-shadow: 0 10px 30px -10px rgba(232,182,74,0.8), inset 0 1px 0 rgba(255,255,255,0.45); transition: transform 120ms, box-shadow 120ms, filter 120ms; }
+.start .slabel { font-size: 17px; font-weight: 700; text-transform: uppercase; }
+.start .skey { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 6px; background: rgba(26,18,6,0.24); }
+.start:hover { transform: translateY(-2px); box-shadow: 0 14px 34px -10px rgba(232,182,74,0.95), inset 0 1px 0 rgba(255,255,255,0.5); }
+.start:active { transform: translateY(0); filter: brightness(0.96); }
+.start:disabled { opacity: 0.45; cursor: wait; box-shadow: none; transform: none; }
+
+/* Housekeeping: one quiet row, small, under the fold of attention. */
+#title-utils { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
+#title-utils .ghost { font-size: 12px; padding: 5px 12px; opacity: 0.6; }
+#title-utils .ghost:hover { opacity: 1; }
+
+@media (max-width: 720px) {
+  .start { padding: 11px 20px; margin-top: 12px; }
+  .start .slabel { font-size: 15px; }
+  #title-utils { gap: 6px; margin-top: 10px; }
+}

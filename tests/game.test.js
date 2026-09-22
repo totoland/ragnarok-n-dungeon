@@ -24,6 +24,20 @@ test('data is consistent: every hero skill and monster pattern references real t
   for (const town of Object.values(TOWNS)) for (const room of town.rooms) for (const wave of room.waves) for (const grp of wave) assert.ok(MONSTERS[grp.type], `${town.name}: ${grp.type}`);
 });
 
+test('every town is pickable and announces the right boss', () => {
+  for (const [key, town] of Object.entries(TOWNS)) {
+    // The title screen builds its picker and its blurb straight off this table, so what it
+    // needs has to be here: a name, a line, a colour, and a boss it can find. Orvane shipped
+    // once without a card at all and once calling itself after one of its own monsters.
+    assert.ok(town.town && town.name, `${key} is named`);
+    assert.ok(town.blurb, `${key} has a blurb for the card`);
+    assert.ok(/^#[0-9a-f]{6}$/i.test(town.accent || ''), `${key} has an accent colour`);
+    const last = town.rooms.at(-1);
+    const bosses = last.waves.flat().map((g) => g.type).filter((t) => MONSTERS[t]?.boss);
+    assert.equal(bosses.length, 1, `${key}: the last room ends on exactly one boss`);
+  }
+});
+
 test('first wave spawns after a beat and enters from off-stage', () => {
   const g = createGame({ hero: 'knight', seed: 3 });
   assert.equal(g.enemies.length, 0);

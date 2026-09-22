@@ -6,6 +6,11 @@
 
 export const DUNGEON = {
   town: 'Prontera', name: 'Culvert of Prontera',
+  // What the title screen shows for this town: the one line under its name, and the colour
+  // that tells it apart in the row. main.js builds the picker from this table, so a town added
+  // here appears there without anything else being touched.
+  blurb: 'Culvert of Prontera — Baphomet',
+  accent: '#7d9a52',
   loot: { knight: 'katana', hunter: 'gakkung' },     // what the boss drops, per hero (data/items.js)
   rooms: [
     {
@@ -53,6 +58,10 @@ export const DUNGEON = {
 // draw their own dune sky procedurally, so the town ships with no image at all.
 export const MORROC = {
   town: 'Morroc', name: 'Sograt Desert',
+  // The one line the title screen shows under the town's name (main.js builds the picker
+  // from this table, so a town added here appears there without anything else being touched).
+  blurb: 'Sograt Desert — the Sandman',
+  accent: '#d6b26f',
   loot: { knight: 'tsurugi', hunter: 'arbalest' },
   rooms: [
     {
@@ -108,6 +117,10 @@ export const MORROC = {
 // not here yet; the rooms below are the route and the fights.
 export const PHAELAN = {
   town: 'Phaelan', name: 'Phaelan Woods',
+  // The one line the title screen shows under the town's name (main.js builds the picker
+  // from this table, so a town added here appears there without anything else being touched).
+  blurb: 'Pine woods and the spirit graveyard — Moonraya',
+  accent: '#86b394',
   loot: { knight: 'crescentfang', hunter: 'moonstring' },   // the cape now drops from Sorya
   rooms: [
     {
@@ -153,6 +166,10 @@ export const PHAELAN = {
 // pink sky on the other side of the rift, where the roster is not the one that walked in.
 export const ORVANE = {
   town: 'Orvane', name: 'Orvane, the Hollow Tower',
+  // The one line the title screen shows under the town's name (main.js builds the picker
+  // from this table, so a town added here appears there without anything else being touched).
+  blurb: 'A mage city over a rift — the Dark Sword',
+  accent: '#9a7aff',
   loot: { knight: 'meteorEdge', hunter: 'twinshot' },
   rooms: [
     {

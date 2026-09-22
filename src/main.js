@@ -113,6 +113,10 @@ const testUI = testEnabled() ? createTestUI({
 }) : null;
 if (testUI) document.getElementById('title-test').hidden = false;
 document.getElementById('title-test')?.addEventListener('click', () => testUI?.open());
+// The way in. Enter still works - this is the same call, wearing a button.
+const startBtn = document.getElementById('title-start');
+startBtn.disabled = true;
+startBtn.addEventListener('click', () => { if (!startBtn.disabled) { soak = false; start(); } });
 document.getElementById('title-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-resume').addEventListener('click', () => { paused = false; hud.showPause(false); });
@@ -150,6 +154,24 @@ for (const b of heroButtons) {
 }
 // town selection - a click just marks it; the hero buttons / Enter still start the run.
 // A locked town is disabled until the one before it has been cleared by any hero.
+// The town picker is generated, not written out: every town in the table gets a card, in
+// the table's own unlock order. Orvane spent a release missing from the title screen because
+// the markup listed three towns by hand and nobody thought to add a fourth.
+const townsEl = document.getElementById('towns');
+for (const [key, t] of Object.entries(TOWNS)) {
+  const b = document.createElement('button');
+  b.className = 'town';
+  b.type = 'button';
+  b.dataset.town = key;
+  const name = document.createElement('strong');
+  name.textContent = t.town;
+  const blurb = document.createElement('em');
+  blurb.textContent = t.blurb || t.name;
+  // The town's own colour, so the row reads as four places rather than four boxes.
+  if (t.accent) b.style.setProperty('--accent', t.accent);
+  b.append(name, blurb);
+  townsEl.appendChild(b);
+}
 const townButtons = [...document.querySelectorAll('.town')];
 const townBlurb = new Map(townButtons.map((b) => [b.dataset.town, b.querySelector('em').textContent]));
 function markTown() {
@@ -211,7 +233,11 @@ function refreshTitle() {
   }
   const town = TOWNS[selectedTown];
   const last = town.rooms[town.rooms.length - 1];
-  const boss = MONSTERS[last.waves?.[0]?.[0]?.type]?.name || last.name;
+  // The thing flagged as a boss, wherever in the room it is queued - not the first monster
+  // of the first wave, which is what this used to read and why Orvane, whose boss room opens
+  // with a wave of its own, announced itself as "one Velmara".
+  const bossType = (last.waves || []).flat().map((g) => g.type).find((t) => MONSTERS[t]?.boss);
+  const boss = MONSTERS[bossType]?.name || MONSTERS[last.waves?.at(-1)?.[0]?.type]?.name || last.name;
   const tier = pickedTier();
   const sub = document.getElementById('title-sub');
   if (sub) sub.textContent = `${town.name} — ${town.rooms.length} rooms, one ${boss}.${tier ? ` New Game+${tier}: monsters ${Math.round(tier * 35)}% tougher.` : ''}`;
@@ -326,7 +352,8 @@ Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0);
   while (prewarmTick(world));   // the first room is drawn next; spreading it over frames it does not have would only defer the cost into them
   monsters.prebuild(TOWNS[selectedTown].rooms[0], MONSTERS);
-  hud.setLoading('Pick a hero, or press Enter for the Knight.');
+  hud.setLoading('Pick a hero and a town, then go.');
+  startBtn.disabled = false;
   for (const b of heroButtons) { b.disabled = false; b.addEventListener('mouseenter', () => { selectedHero = b.dataset.hero; markSelected(); }); }
   markTown();
   markSelected();

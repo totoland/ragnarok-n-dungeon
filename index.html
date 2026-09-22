@@ -72,25 +72,22 @@
       <div class="row" id="profile-row">
         <button id="title-character" class="primary" type="button">Profile</button>
       </div>
-      <div id="towns">
-        <button class="town selected" data-town="prontera" type="button">
-          <strong>Prontera</strong>
-          <em>Culvert of Prontera — Baphomet</em>
-        </button>
-        <button class="town" data-town="morroc" type="button">
-          <strong>Morroc</strong>
-          <em>Sograt Desert — the Sandman</em>
-        </button>
-        <button class="town" data-town="phaelan" type="button">
-          <strong>Phaelan</strong>
-          <em>Pine woods and the spirit graveyard — Moonraya</em>
-        </button>
-      </div>
+      <!-- Built from data/dungeon.js TOWNS at boot: a town added to the table appears here
+           without this file being touched, which is how Orvane came to be missing. -->
+      <div id="towns"></div>
+      <button id="title-start" class="start" type="button">
+        <span class="slabel">Enter the dungeon</span>
+        <span class="skey">Enter</span>
+      </button>
       <p class="controls" id="title-controls"></p>
-      <button id="title-settings" class="ghost" type="button">Settings &amp; controls</button>
-      <button id="title-soak" class="ghost" type="button">Soak test — endless waves, plays itself</button>
-      <button id="title-test" class="ghost" type="button" hidden>Test mode</button>
-      <button id="title-install" class="ghost" type="button" hidden>Install on this device</button>
+      <!-- Everything below is housekeeping, not the game: one quiet row so it cannot compete
+           with the hero, the town and the way in. -->
+      <div id="title-utils">
+        <button id="title-settings" class="ghost" type="button">Settings</button>
+        <button id="title-soak" class="ghost" type="button">Soak test</button>
+        <button id="title-test" class="ghost" type="button" hidden>Test mode</button>
+        <button id="title-install" class="ghost" type="button" hidden>Install</button>
+      </div>
       <p id="install-hint" class="sub" hidden></p>
       <p id="loading">Loading heroes…</p>
     </div>
