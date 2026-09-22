@@ -17,16 +17,17 @@ import { boxHits, rollDamage, applyHit } from './combat.js';
 //   xp      the hero's lifetime total - sets the level, grows per kill, written back by the shell
 //   gear    { id, plus } the wielded weapon (data/items.js), folded into the hero's mods
 //   wear    { cape, hat, accessory } the worn slots, each { id, plus } or null, folded the same
+//   branches { skillId: branchId } the upgrade picked on each skill that reached the cap
 //   skills  { skillId: level } spent skill points
 //   drop    { item, chance } what the town boss may drop this run; null for nothing
 //   mods    extra modifiers on top (tests, the harness); merged after the weapon's
-export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods, tier = 0, xp = 0, gear = null, wear = null, skills = {}, drop = null } = {}) {
+export function createGame({ hero = 'knight', seed = 1, dungeon = DUNGEON, mods, tier = 0, xp = 0, gear = null, wear = null, skills = {}, branches = null, drop = null } = {}) {
   const all = mergeMods(itemMods(gear), ...wearMods(wear), mods);
   const g = {
     t: 0, rng: createRng(seed), seed, dungeon,
     tier, xp, xpStart: xp, mods: all, extMods: mods, gear, wear, drop,
     loot: [],             // what dropped this run: item ids, or rolled instances; the shell banks them
-    player: createPlayer(hero, all, levelFromXp(xp), skills),
+    player: createPlayer(hero, all, levelFromXp(xp), skills, branches),
     roomIndex: -1, room: null, bounds: { xMin: 0, xMax: 16 },
     waveIndex: -1, spawnQueue: [], enemies: [], projectiles: [], pickups: [],
     events: [], nextId: 1,

@@ -49,8 +49,20 @@ export const DROPS = {
 export const REFINE = { max: 10, atk: 0.03, hp: 0.02, glowAt: 5, critDmg: 0.05 };
 
 // Skill points: each level on a skill adds a share of damage (attack skills) or of duration
-// (buff skills). Points come one per hero level (see LEVEL), spent in the character panel.
-export const SKILL = { maxLevel: 5, dmg: 0.10, buffDur: 0.15 };
+// (buff skills), and a skill taken all the way to `maxLevel` offers a branch - one of two
+// upgrades that changes what the skill does rather than how big it is (data/heroes.js
+// `branch`). Points come `perLevel` per hero level, spent in the character panel.
+//
+// Two per level, not one, because the branch has to be reachable. A full clear of all four
+// towns lands at hero level 9: at one point per level that is 8 points, and a ten-point
+// skill would never be finished by anyone. At two it is 16 - one skill taken to its branch
+// and six points to spread, so the first run ends on a real choice of which branch to own,
+// and New Game+ opens the rest.
+// `buffDur` came down from 0.15 when the cap went from 5 to 10: at the old cap a buff ran
+// +75% long, and leaving the share alone would have made it +150% - Quicken's 15 seconds
+// becoming 37 on an 18-second cooldown, which is not a window any more, it is a passive.
+// 0.08 lands a maxed buff at +80%, where the old cap had it.
+export const SKILL = { maxLevel: 10, perLevel: 2, dmg: 0.10, buffDur: 0.08 };
 
 export const SKILL_KEYS = ['skill1', 'skill2', 'skill3'];
 

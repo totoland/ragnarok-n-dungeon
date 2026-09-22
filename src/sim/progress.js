@@ -4,7 +4,7 @@
 //
 // Level 1 is 0 XP. XP is cumulative and never spent, so a hero's level is a function of one
 // integer the profile stores; skill points are (level - 1) minus whatever has been allocated.
-import { LEVEL, NGPLUS } from '../config.js';
+import { LEVEL, NGPLUS, SKILL } from '../config.js';
 
 // XP needed to go from `level` to `level + 1`; 0 past the cap.
 export function xpToNext(level) {
@@ -43,7 +43,7 @@ export function levelMods(level) {
   return { hp: 1 + LEVEL.hp * n, mp: 1 + LEVEL.mp * n, atkAdd: LEVEL.atk * n };
 }
 
-export function skillPointsAt(level) { return Math.max(0, (level | 0) - 1); }
+export function skillPointsAt(level) { return Math.max(0, (level | 0) - 1) * SKILL.perLevel; }
 
 // XP for a kill: the monster's `xp` if it has one, its score otherwise (score is already the
 // per-monster difficulty number), plus a share per New Game+ tier so coming back to farm a

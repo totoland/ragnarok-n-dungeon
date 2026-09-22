@@ -2,12 +2,12 @@
 // hero's inventory - a grid of slots drawn from the real models - with a turntable of the
 // hero wielding whatever is selected, and one Equip button. Owns no game state: it edits
 // the profile, persists it, and calls back so the title and a live run pick the change up.
-import { HEROES, SKILL_INFO, PASSIVE_INFO } from '../sim/data/heroes.js';
+import { HEROES, SKILL_INFO, PASSIVE_INFO, SKILL_BRANCH, branchesOf } from '../sim/data/heroes.js';
 import { ITEMS, itemName, DEFAULT_WEAPON, SLOTS, SLOT_INFO, slotOf, fits, auraOf, attrText } from '../sim/data/items.js';
 import { MONSTERS } from '../sim/data/monsters.js';
 import { TOWNS } from '../sim/data/dungeon.js';
 import { xpAtLevel, xpToNext } from '../sim/progress.js';
-import { heroOf, skillPointsLeft, spendSkillPoint, setEquip, discard, saveProfile } from '../profile.js';
+import { heroOf, skillPointsLeft, spendSkillPoint, setBranch, setEquip, discard, saveProfile } from '../profile.js';
 import { SKILL, REFINE } from '../config.js';
 import { createPreview } from './preview.js';
 
@@ -98,11 +98,28 @@ export function createCharacterUI({ input, getProfile, onChange }) {
       right.append(el('span', 'seffect', lv ? effect : 'Lv 0'), plus);
       row.append(name, pips, right);
       rows.appendChild(row);
+      // At the cap the skill offers a branch: two upgrades, one of them owned. Shown under
+      // the row it belongs to rather than on a tab of its own, so the thing being chosen and
+      // the thing it changes are never on separate screens.
+      const picks = branchesOf(id);
+      if (lv >= SKILL.maxLevel && picks.length) {
+        const chosen = h.branches?.[id] || null;
+        const tier = el('div', 'branch');
+        for (const key of picks) {
+          const b = SKILL_BRANCH[id][key];
+          const card = el('button', `bpick${chosen === key ? ' on' : ''}`);
+          card.type = 'button';
+          card.append(el('div', 'bname', b.name), el('div', 'btip', b.tip));
+          card.addEventListener('click', () => { if (setBranch(profile, hero, id, key)) { commit(); keepFocus(render); } });
+          tier.appendChild(card);
+        }
+        rows.appendChild(tier);
+      }
     }
     body.appendChild(rows);
     const pv = def.passive && PASSIVE_INFO[def.passive.id];
     if (pv) body.appendChild(el('p', 'tip', `Passive: ${pv.name} — ${pv.tip}`));
-    note.textContent = 'One skill point per level; + raises a skill at once, even mid-run. Points stay where you put them.';
+    note.textContent = `${SKILL.perLevel} skill points per level; + raises a skill at once, even mid-run. A skill at ${SKILL.maxLevel} picks a branch, and the pick can be changed at any time.`;
   }
 
   // ---------------------------------------------------------------- equipment

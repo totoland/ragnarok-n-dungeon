@@ -18,7 +18,7 @@ test('a fresh profile: every hero at level 1, only the first town open, tier 0 e
   const p = defaultProfile();
   assert.deepEqual(Object.keys(p.heroes), HERO_KEYS);
   for (const h of HERO_KEYS) {
-    assert.deepEqual(heroOf(p, h), { xp: 0, level: 1, skillPoints: 0, towns: p.heroes[h].towns, items: {}, bag: [], skills: p.heroes[h].skills, equip: p.heroes[h].equip, gear: null, wear: { cape: null, hat: null, accessory: null } });
+    assert.deepEqual(heroOf(p, h), { xp: 0, level: 1, skillPoints: 0, towns: p.heroes[h].towns, items: {}, bag: [], skills: p.heroes[h].skills, branches: {}, equip: p.heroes[h].equip, gear: null, wear: { cape: null, hat: null, accessory: null } });
     assert.deepEqual(p.heroes[h].equip, { weapon: null, cape: null, hat: null, accessory: null });
     for (const t of TOWN_KEYS) assert.equal(tierFor(p, h, t), 0);
   }
@@ -63,7 +63,7 @@ test('load / save round-trip through a store; garbage and no store fall back', (
 test('a won run: xp banked, the town cleared, the next one unlocked once, tier climbs to the cap', () => {
   const p = defaultProfile();
   const r = recordRun(p, finished('won', xpAtLevel(4) + 10), { hero: 'knight', town: 'prontera' });
-  assert.deepEqual([r.xpGained, r.levelBefore, r.levelAfter, r.skillPoints], [xpAtLevel(4) + 10, 1, 4, 3]);
+  assert.deepEqual([r.xpGained, r.levelBefore, r.levelAfter, r.skillPoints], [xpAtLevel(4) + 10, 1, 4, 3 * SKILL.perLevel]);
   assert.equal(r.won, true); assert.equal(r.firstClear, true); assert.equal(r.unlocked, 'morroc'); assert.equal(r.next, 'morroc');
   assert.equal(r.tier, 1, 'the next Prontera run is NG+1');
   assert.equal(heroOf(p, 'knight').level, 4);
@@ -155,22 +155,22 @@ test('slots: a worn item goes in its own slot, can be taken off, and a drop fill
   } finally { delete ITEMS.testCape; delete ITEMS.testRing; }
 });
 
-test('skill points: one per level, spent one at a time, capped per skill, refunded if the save is over budget', () => {
+test('skill points: two per level, spent one at a time, capped per skill, refunded if the save is over budget', () => {
   const p = defaultProfile();
   assert.equal(skillPointsLeft(p, 'knight'), 0);
   assert.equal(spendSkillPoint(p, 'knight', 'quicken'), false, 'nothing to spend at level 1');
   p.heroes.knight.xp = xpAtLevel(4);
-  assert.equal(skillPointsLeft(p, 'knight'), 3);
-  assert.equal(spendSkillPoint(p, 'knight', 'quicken'), true);
+  assert.equal(skillPointsLeft(p, 'knight'), 3 * SKILL.perLevel);
+  for (let i = 0; i < 3 * SKILL.perLevel; i++) {
+    assert.equal(spendSkillPoint(p, 'knight', i < 4 ? 'quicken' : 'magnumBreak'), true, `point ${i + 1}`);
+  }
   assert.equal(spendSkillPoint(p, 'knight', 'bash'), false, 'not one of the hero\'s slotted skills');
-  assert.equal(spendSkillPoint(p, 'knight', 'quicken'), true);
-  assert.equal(spendSkillPoint(p, 'knight', 'magnumBreak'), true);
   assert.equal(spendSkillPoint(p, 'knight', 'magnumBreak'), false, 'out of points');
-  assert.deepEqual(heroOf(p, 'knight').skills, { quicken: 2, magnumBreak: 1, bowlingBash: 0 });
+  assert.deepEqual(heroOf(p, 'knight').skills, { quicken: 4, magnumBreak: 2, bowlingBash: 0 });
   p.heroes.knight.xp = xpAtLevel(30);
-  for (let i = 0; i < 9; i++) spendSkillPoint(p, 'knight', 'quicken');
+  for (let i = 0; i < 20; i++) spendSkillPoint(p, 'knight', 'quicken');
   assert.equal(p.heroes.knight.skills.quicken, SKILL.maxLevel);
-  const over = normalize({ heroes: { hunter: { xp: xpAtLevel(2), skills: { windWalk: 3, arrowShower: 2 } } } });
+  const over = normalize({ heroes: { hunter: { xp: xpAtLevel(2), skills: { windWalk: 9, arrowShower: 8 } } } });
   assert.deepEqual(over.heroes.hunter.skills, { windWalk: 0, arrowShower: 0, blitzBeat: 0 }, 'over budget → refunded');
   const ok = normalize({ heroes: { hunter: { xp: xpAtLevel(6), skills: { windWalk: 3, arrowShower: 2, bogus: 4 } } } });
   assert.deepEqual(ok.heroes.hunter.skills, { windWalk: 3, arrowShower: 2, blitzBeat: 0 });

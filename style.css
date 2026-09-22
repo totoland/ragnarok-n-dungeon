@@ -379,9 +379,11 @@ button.ghost:hover { border-color: var(--gold); color: var(--gold); }
 .pts.has { color: var(--gold); opacity: 1; font-weight: 700; }
 .skills { display: flex; flex-direction: column; }
 .srow.skillrow { grid-template-columns: 1fr 96px 170px; }
-.pips { display: flex; gap: 4px; }
-.pip { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--edge); background: rgba(0,0,0,0.5); }
-.pip.on { background: var(--gold); box-shadow: 0 0 6px rgba(232,182,74,0.7); }
+/* Ten of these now, not five. Deliberately two ranks of five rather than one row of ten:
+   at this size a row of ten cannot be counted at a glance, and two fives can. */
+.pips { display: flex; gap: 3px; flex-wrap: wrap; width: 62px; }
+.pip { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--edge); background: rgba(0,0,0,0.5); }
+.pip.on { background: var(--gold); box-shadow: 0 0 5px rgba(232,182,74,0.7); }
 .sright { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .seffect { font-size: 12px; opacity: 0.85; }
 .plus { width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--gold); background: rgba(232,182,74,0.15); color: var(--gold); font-size: 18px; font-weight: 700; cursor: pointer; line-height: 1; }
@@ -486,3 +488,13 @@ body.touch #telemetry-badge { bottom: calc(110px + var(--safe-b)); right: calc(8
 #test-body button.on { background: rgba(232,182,74,0.28); border-color: var(--gold); }
 #test-body .hint { font-size: 11px; opacity: 0.5; margin: 0; }
 #test-note { margin: 0; font-size: 12px; opacity: 0.7; }
+
+/* A skill's branch tier: the two upgrades a maxed skill chooses between, under its own row. */
+#character .branch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -2px 0 10px 0; }
+#character .bpick { text-align: left; background: rgba(255,255,255,0.04); border: 1px solid var(--edge); border-radius: 8px; padding: 8px 10px; color: inherit; font: inherit; cursor: pointer; }
+#character .bpick:hover { background: rgba(232,182,74,0.12); }
+#character .bpick.on { background: rgba(232,182,74,0.2); border-color: var(--gold); }
+#character .bpick .bname { font-size: 13px; color: var(--gold); letter-spacing: 0.02em; }
+#character .bpick.on .bname::after { content: ' ✓'; }
+#character .bpick .btip { font-size: 11px; opacity: 0.66; margin-top: 2px; line-height: 1.35; }
+@media (max-width: 560px) { #character .branch { grid-template-columns: 1fr; } }

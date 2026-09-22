@@ -358,7 +358,7 @@ function start() {
   const me = heroOf(profile, selectedHero);
   game = createGame({
     hero: selectedHero, seed: (Date.now() % 100000) | 0, dungeon: soak ? SOAK : (TOWNS[selectedTown] || TOWNS.prontera),
-    tier: pickedTier(), xp: me.xp, gear: me.gear, wear: me.wear, skills: { ...me.skills },
+    tier: pickedTier(), xp: me.xp, gear: me.gear, wear: me.wear, skills: { ...me.skills }, branches: { ...me.branches },
     drop: dropFor(profile, selectedHero, selectedTown),
   });
   if (testTown) { testTown = null; if (testRoom > 0) loadRoom(game, Math.min(testRoom, game.dungeon.rooms.length - 1)); }

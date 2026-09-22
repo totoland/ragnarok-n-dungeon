@@ -122,6 +122,114 @@ export const PASSIVE_INFO = {
   autoBlitz: { name: 'Auto Blitz', tip: '3% on hit: the falcon strikes that enemy' },
 };
 
+
+// A skill taken all the way to SKILL.maxLevel offers a branch: one of two upgrades, picked
+// once, that changes what the skill does rather than how big its number is. Each is a sparse
+// patch over the attack (sim/player.js folds it in at resolve time), so a branch is data and
+// costs the sim nothing until a hero has actually earned one.
+//
+// Every branch here is expressible as hits and buff fields the engine already reads. That is
+// deliberate: the point of the tier is the decision, and a decision made of numbers the game
+// can already draw is one that can ship now and be tuned in the test panel.
+export const SKILL_BRANCH = {
+  bowlingBash: {
+    breaker: {
+      name: 'Breaker', tip: 'The charge lands twice - through them, then back across',
+      attack: {
+        hits: [
+          { at: 0.1, until: 0.34, box: { x0: -0.2, x1: 1.8, y0: -0.4, y1: 2.4 }, dmg: 2.2, knock: [7, 3], stun: 0.6 },
+          { at: 0.42, until: 0.62, box: { x0: -1.8, x1: 0.6, y0: -0.4, y1: 2.4 }, dmg: 2.4, knock: [9, 4], stun: 0.9 },
+        ],
+      },
+    },
+    sweep: {
+      name: 'Sweep', tip: 'Wider, and everything it catches goes up',
+      attack: {
+        hits: [{ at: 0.1, until: 0.5, box: { x0: -0.6, x1: 3.2, y0: -0.4, y1: 3.0 }, dmg: 3.4, knock: [9, 9], stun: 1.1, depth: 1.6 }],
+      },
+    },
+  },
+  magnumBreak: {
+    ember: {
+      name: 'Ember', tip: 'The fire hangs in the air and catches them again',
+      attack: {
+        hits: [
+          { at: 0.3, until: 0.42, box: { x0: -2.4, x1: 2.4, y0: -0.5, y1: 2.6, both: true }, dmg: 2.4, knock: [4, 7.5], stun: 0.8 },
+          { at: 0.75, until: 0.9, box: { x0: -2.4, x1: 2.4, y0: -0.5, y1: 2.6, both: true }, dmg: 1.5, knock: [1, 1], stun: 0.3 },
+        ],
+        dur: 1.05, cancelAt: 0.95,
+      },
+    },
+    shockwave: {
+      name: 'Shockwave', tip: 'Half the room, and it sends them out of it',
+      attack: {
+        hits: [{ at: 0.3, until: 0.44, box: { x0: -3.8, x1: 3.8, y0: -0.5, y1: 3.0, both: true }, dmg: 2.4, knock: [9, 8], stun: 1.0 }],
+      },
+    },
+  },
+  quicken: {
+    haste: {
+      name: 'Haste', tip: 'The aura lasts almost twice as long',
+      attack: { buff: { id: 'quicken', dur: 26, atkSpeed: 1.30 } },
+    },
+    edge: {
+      name: 'Edge', tip: 'Slower to fade, and the blade finds the gaps',
+      attack: { buff: { id: 'quicken', dur: 18, atkSpeed: 1.30, crit: 0.25 } },
+    },
+  },
+  arrowShower: {
+    volley: {
+      name: 'Volley', tip: 'A second rain, right behind the first',
+      attack: {
+        hits: [
+          { at: 0.42, until: 0.5, box: { x0: 1.0, x1: 5.0, y0: -0.5, y1: 3 }, dmg: 1.8, knock: [2, 5], stun: 0.6, depth: 2.0 },
+          { at: 0.72, until: 0.8, box: { x0: 1.0, x1: 5.0, y0: -0.5, y1: 3 }, dmg: 1.8, knock: [2, 6.5], stun: 0.8, depth: 2.0 },
+        ],
+        dur: 1.0, cancelAt: 0.9,
+      },
+    },
+    pierce: {
+      name: 'Pierce', tip: 'Reaches the back of the lane, and the depth of it',
+      attack: {
+        hits: [{ at: 0.42, until: 0.5, box: { x0: 1.0, x1: 8.0, y0: -0.5, y1: 3 }, dmg: 2.6, knock: [2, 6.5], stun: 0.8, depth: 4.0 }],
+      },
+    },
+  },
+  blitzBeat: {
+    flock: {
+      name: 'Flock', tip: 'The falcon does not stop at three',
+      attack: {
+        hits: [
+          { at: 0.3, until: 0.35, box: { x0: -7, x1: 7, y0: -1, y1: 4, both: true, nearest: true }, dmg: 1.2, knock: [1, 0], stun: 0.3, depth: 9 },
+          { at: 0.44, until: 0.49, box: { x0: -7, x1: 7, y0: -1, y1: 4, both: true, nearest: true }, dmg: 1.2, knock: [1, 0], stun: 0.3, depth: 9 },
+          { at: 0.58, until: 0.63, box: { x0: -7, x1: 7, y0: -1, y1: 4, both: true, nearest: true }, dmg: 1.2, knock: [1, 0], stun: 0.3, depth: 9 },
+          { at: 0.72, until: 0.77, box: { x0: -7, x1: 7, y0: -1, y1: 4, both: true, nearest: true }, dmg: 1.8, knock: [5, 5], stun: 0.6, depth: 9 },
+        ],
+        dur: 1.05, cancelAt: 0.95,
+      },
+    },
+    talon: {
+      name: 'Talon', tip: 'One dive, all of it at once, and they stay down',
+      attack: {
+        hits: [{ at: 0.45, until: 0.55, box: { x0: -7, x1: 7, y0: -1, y1: 4, both: true, nearest: true }, dmg: 4.6, knock: [7, 6], stun: 1.4, depth: 9 }],
+      },
+    },
+  },
+  windWalk: {
+    gale: {
+      name: 'Gale', tip: 'The wind stays with you almost twice as long',
+      attack: { buff: { id: 'windWalk', dur: 26, atkSpeed: 1.15, dodge: 0.20 } },
+    },
+    ghost: {
+      name: 'Ghost', tip: 'Shorter, and most of what is thrown goes through you',
+      attack: { buff: { id: 'windWalk', dur: 15, atkSpeed: 1.15, dodge: 0.38 } },
+    },
+  },
+};
+
+// The two branch ids a skill offers, in the order the panel should show them.
+export const branchesOf = (skill) => Object.keys(SKILL_BRANCH[skill] || {});
+
 export const SKILL_INFO = {
   quicken: { name: 'Quicken Sword', key: 'U', tip: 'Aura of speed: attack 30% faster for 15s' },
   bash: { name: 'Bash', key: 'U', tip: 'Heavy single strike, huge knockback' },

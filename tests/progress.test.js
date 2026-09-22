@@ -5,7 +5,7 @@ import { resolveHero, mergeMods } from '../src/sim/resolve.js';
 import { HEROES } from '../src/sim/data/heroes.js';
 import { MONSTERS } from '../src/sim/data/monsters.js';
 import { DUNGEON } from '../src/sim/data/dungeon.js';
-import { LEVEL, NGPLUS } from '../src/config.js';
+import { LEVEL, NGPLUS, SKILL } from '../src/config.js';
 import { createGame, update } from '../src/sim/game.js';
 import { createEnemy } from '../src/sim/enemies.js';
 
@@ -49,7 +49,7 @@ test('level 1 is the table; each level adds its share; sparse mods merge with ge
   // ATK is points, not a share, and lands in the same atkAdd gear uses.
   assert.equal(m.atkAdd, LEVEL.atk * 5);
   assert.equal(m.atk, undefined, 'the level no longer multiplies ATK');
-  assert.equal(skillPointsAt(1), 0); assert.equal(skillPointsAt(6), 5);
+  assert.equal(skillPointsAt(1), 0); assert.equal(skillPointsAt(6), 5 * SKILL.perLevel);
   // a Katana-shaped set: multipliers multiply, rates replace
   const merged = mergeMods(levelMods(6), { atkSpeed: 1.1, crit: 0.3 }, { atk: 1.5 });
   assert.equal(merged.atk, 1.5, 'the weapon multiplies the table, the level adds to it');

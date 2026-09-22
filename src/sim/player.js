@@ -4,17 +4,17 @@
 // after `cancelAt` chains into `next`. Skills can cancel a basic attack from `cancelAt` too,
 // which is what makes the combos feel like a belt-scroller instead of a queue.
 import { SIM, FLOOR, PLAYER, SKILL_KEYS, SKILL } from '../config.js';
-import { HEROES } from './data/heroes.js';
+import { HEROES, SKILL_BRANCH } from './data/heroes.js';
 import { boxHits, rollDamage, applyHit } from './combat.js';
 import { resolveHero, mergeMods } from './resolve.js';
 import { levelMods } from './progress.js';
 
-export function createPlayer(heroKey, mods, level = 1, skills = {}) {
+export function createPlayer(heroKey, mods, level = 1, skills = {}, branches = null) {
   const p = {
     kind: 'player', hero: heroKey, level: 1, def: null,
     // Skill levels by id (0 when unset) and the weapon, both read-only in the sim: the
     // shell folds them in at creation. gear is here for the renderer (a +5 glows).
-    skillLv: skills, gear: null,
+    skillLv: skills, skillBranch: null, gear: null,
     crit: 0, critDmg: 0,
     meteor: 0, double: 0, spDrain: 0,
     x: 1.5, z: 0, y: 0, vx: 0, vy: 0, facing: 1, grounded: true,
@@ -30,6 +30,7 @@ export function createPlayer(heroKey, mods, level = 1, skills = {}) {
     // - a buff now, equipment later - so there is exactly one place they combine.
     buffs: {}, atkSpeed: 1, dodge: 0,
   };
+  p.skillBranch = branches;
   setLevel(p, level, mods);
   p.hp = p.hpMax; p.mp = p.mpMax;
   return p;
@@ -39,8 +40,23 @@ export function createPlayer(heroKey, mods, level = 1, skills = {}) {
 // gear, skill points - and are folded with the level's share here, once, so the rest of the
 // sim keeps reading a def-shaped object (see resolve.js). Called at creation and again on a
 // level-up mid-run; it sets the maxima and leaves hp / mp to the caller.
+// Fold in whatever branches the hero has actually earned: a branch counts only once its
+// skill is at the cap, so a respec or a half-spent tree simply resolves to the base attack.
+// The patched map is built here, once per resolve, rather than checked on every cast.
+function withBranches(def, skillLv, branch) {
+  if (!branch) return def;
+  let attacks = null;
+  for (const id in branch) {
+    const pick = SKILL_BRANCH[id]?.[branch[id]];
+    if (!pick || !def.attacks[id] || (skillLv?.[id] || 0) < SKILL.maxLevel) continue;
+    attacks ||= { ...def.attacks };
+    attacks[id] = { ...def.attacks[id], ...pick.attack };
+  }
+  return attacks ? { ...def, attacks } : def;
+}
+
 export function setLevel(p, level, mods) {
-  const def = resolveHero(HEROES[p.hero], mergeMods(levelMods(level), mods));
+  const def = withBranches(resolveHero(HEROES[p.hero], mergeMods(levelMods(level), mods)), p.skillLv, p.skillBranch);
   p.level = level;
   p.def = def;
   p.hpMax = def.hp; p.mpMax = def.mp; p.atk = def.atk; p.speed = def.speed;
@@ -58,7 +74,7 @@ export const skillDmg = (p, id) => 1 + SKILL.dmg * (p.skillLv?.[id] || 0);
 const skillDur = (p, id) => 1 + SKILL.buffDur * (p.skillLv?.[id] || 0);
 
 function applyBuff(p, b, dur = b.dur) {
-  p.buffs[b.id] = { t: dur, dur, atkSpeed: b.atkSpeed || 1, dodge: b.dodge || 0 };   // recast refreshes
+  p.buffs[b.id] = { t: dur, dur, atkSpeed: b.atkSpeed || 1, dodge: b.dodge || 0, crit: b.crit || 0 };   // recast refreshes
   // Fold now rather than on the next tick's timers: the cast that grants a buff should be
   // under it from its first frame, not from 33 ms later.
   foldBuffs(p, 0);
@@ -67,16 +83,18 @@ function applyBuff(p, b, dur = b.dur) {
 function foldBuffs(p, dt) {
   // Start from the resolved baseline (gear, level) and fold the timed buffs on top: a Katana's
   // +10% and Quicken's +30% multiply here and nowhere else.
-  let atkSpeed = p.def.atkSpeed ?? 1, miss = 1 - (p.def.dodge ?? 0);
+  let atkSpeed = p.def.atkSpeed ?? 1, miss = 1 - (p.def.dodge ?? 0), crit = p.def.crit ?? 0;
   for (const id in p.buffs) {
     const b = p.buffs[id];
     b.t -= dt;
     if (b.t <= 0) { delete p.buffs[id]; continue; }
     atkSpeed *= b.atkSpeed;
     miss *= 1 - b.dodge;             // independent dodge chances stack as 1 - prod(1 - p)
+    crit += b.crit;                  // Quicken's Edge branch; zero on every other buff
   }
   p.atkSpeed = atkSpeed;
   p.dodge = 1 - miss;
+  p.crit = Math.min(1, crit);
 }
 
 const cost = (p, atk) => atk.mp || 0;

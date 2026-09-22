@@ -10,7 +10,7 @@
 // level 1 on tier 0 and grows into the towns. Unlocking a town is account-wide though - one
 // clear of Prontera by anyone opens Morroc for everyone, so a second hero is not sent back
 // through the culvert just to see the desert.
-import { HEROES } from './sim/data/heroes.js';
+import { HEROES, branchesOf } from './sim/data/heroes.js';
 import { TOWNS } from './sim/data/dungeon.js';
 import { ITEMS, ATTRS, SLOTS, slotOf, fits, isRolled } from './sim/data/items.js';
 import { NGPLUS, DROPS, REFINE, SKILL } from './config.js';
@@ -31,6 +31,8 @@ const heroRow = (hero) => ({
   towns: Object.fromEntries(TOWN_KEYS.map((t) => [t, townRow()])),
   items: {}, bag: [], seq: 0, equip: emptyEquip(),
   skills: Object.fromEntries((HEROES[hero]?.skills || []).map((id) => [id, 0])),
+  // { skillId: branchId } - only meaningful for a skill standing at SKILL.maxLevel.
+  branches: {},
 });
 const ROLLED_SLOTS = new Set(['accessory']);
 
@@ -98,6 +100,14 @@ export function normalize(raw) {
     if (src.skills && typeof src.skills === 'object') {
       for (const id of Object.keys(row.skills)) row.skills[id] = int(src.skills[id], SKILL.maxLevel);
     }
+    // A branch is kept only where the skill it belongs to is still at the cap and the id is
+    // one the skill actually offers - so a save written before a rebalance cannot smuggle in
+    // an upgrade the hero has not earned.
+    if (src.branches && typeof src.branches === 'object') {
+      for (const [id, pick] of Object.entries(src.branches)) {
+        if (row.skills[id] >= SKILL.maxLevel && branchesOf(id).includes(pick)) row.branches[id] = pick;
+      }
+    }
     if (skillPointsLeft(p, h) < 0) for (const id of Object.keys(row.skills)) row.skills[id] = 0;
   }
   if (HERO_KEYS.includes(raw.last?.hero)) p.last.hero = raw.last.hero;
@@ -147,7 +157,7 @@ export function heroOf(profile, hero) {
   };
   return {
     xp: row.xp, level, skillPoints: skillPointsAt(level), towns: row.towns,
-    items: row.items, bag: row.bag, skills: row.skills, equip: row.equip,
+    items: row.items, bag: row.bag, skills: row.skills, branches: row.branches, equip: row.equip,
     gear: worn('weapon'),
     wear: Object.fromEntries(SLOTS.filter((s) => s !== 'weapon').map((s) => [s, worn(s)])),
   };
@@ -166,6 +176,17 @@ export function spendSkillPoint(profile, hero, skill) {
   if (!row || !(skill in row.skills)) return false;
   if (skillPointsLeft(profile, hero) <= 0 || row.skills[skill] >= SKILL.maxLevel) return false;
   row.skills[skill]++;
+  return true;
+}
+
+// Pick the branch on a skill that has reached the cap. One choice per skill, and it can be
+// changed freely: the tier is meant to be a build decision, not a trap a player walks into
+// once and regrets for the rest of the file.
+export function setBranch(profile, hero, skill, pick) {
+  const row = profile.heroes[hero];
+  if (!row || (row.skills[skill] | 0) < SKILL.maxLevel) return false;
+  if (!branchesOf(skill).includes(pick)) return false;
+  row.branches[skill] = pick;
   return true;
 }
 
