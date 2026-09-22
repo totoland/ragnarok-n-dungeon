@@ -293,5 +293,54 @@
         "verts": 574
       }
     }
+  },
+  "nerakos": {
+    "height": 3.5,
+    "front": "+z",
+    "pivot": {
+      "root": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "torso": [
+        0.0,
+        1.1179,
+        -0.0203
+      ],
+      "head": [
+        0.0,
+        2.6016,
+        0.0081
+      ],
+      "weapon": [
+        -0.7317,
+        2.2154,
+        0.1463
+      ],
+      "tentacles": [
+        0.0,
+        1.4634,
+        -0.2033
+      ]
+    },
+    "parts": {
+      "torso": {
+        "meshes": 238,
+        "verts": 34094
+      },
+      "head": {
+        "meshes": 76,
+        "verts": 9944
+      },
+      "tentacles": {
+        "meshes": 132,
+        "verts": 10819
+      },
+      "weapon": {
+        "meshes": 27,
+        "verts": 6642
+      }
+    }
   }
 }

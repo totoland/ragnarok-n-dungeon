@@ -198,6 +198,7 @@ let bossModel = null;
 let moonModel = null;
 let sandModel = null;
 let dsModel = null;
+let nerModel = null;
 
 /** Injection seam for the loaded boss model. The render test uses it to supply a stand-in
  *  rig, since GLTFLoader cannot fetch a file in Node. */
@@ -205,19 +206,22 @@ export function setBossModel(scene) { bossModel = scene; }
 export function setMoonrayaModel(scene) { moonModel = scene; }
 export function setSandmanModel(scene) { sandModel = scene; }
 export function setDarkSwordModel(scene) { dsModel = scene; }
+export function setNerakosModel(scene) { nerModel = scene; }
 
 export async function loadMonsterAssets(base = 'assets/monsters/') {
   const loader = new GLTFLoader();
-  const [baph, moon, sand, ds] = await Promise.all([
+  const [baph, moon, sand, ds, ner] = await Promise.all([
     loader.loadAsync(base + 'baphomet.glb'),
     loader.loadAsync(base + 'moonraya.glb'),
     loader.loadAsync(base + 'sandman.glb'),
     loader.loadAsync(base + 'darkSword.glb'),
+    loader.loadAsync(base + 'nerakos.glb'),
   ]);
   setBossModel(baph.scene);
   setMoonrayaModel(moon.scene);
   setSandmanModel(sand.scene);
   setDarkSwordModel(ds.scene);
+  setNerakosModel(ner.scene);
   return bossModel;
 }
 
@@ -235,7 +239,7 @@ function rigFromGlb(model, { scale = 1, darken = 0 } = {}) {
     if (darken) o.material.color.multiplyScalar(1 - darken);
   });
   const rig = { root };
-  for (const name of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'weapon', 'shards']) {
+  for (const name of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'weapon', 'shards', 'tentacles']) {
     const n = root.getObjectByName(name);
     if (n) rig[name] = n;
   }
@@ -266,6 +270,11 @@ function buildDarkSwordGlb() {
   return rigFromGlb(dsModel);
 }
 
+function buildNerakosGlb() {
+  if (!nerModel) throw new Error('nerakos.glb not loaded - call loadMonsterAssets() first');
+  return rigFromGlb(nerModel);
+}
+
 // Per-type rest offsets, added to every pose, for a sculpt that does not stand the way the
 // clips assume. The old Baphomet was modelled crouched and hunched and needed the lean taken
 // back out of him; the ram samurai that replaced him stands upright like everything else, so
@@ -277,6 +286,39 @@ const REST = {};
 // Baphomet's scythe is parented to armL, so those clips swung an empty arm and the attack
 // read as no animation at all. These drive the arm that actually holds the weapon.
 export const CLIPS_BY_TYPE = {
+  // Nerakos. Every other boss is posed through his arms; this one has none, so the motion
+  // is the trunk, the head, and the trident turning about the fist that never lets go of it.
+  // The numbers are small on purpose: his torso pivot is the waist of a figure whose legs
+  // are welded to it, so a lean is the whole body tipping and 0.2 is already a long way.
+  nerakos: {
+    // The thrust. He drops his weight onto the leading side and drives the fork out; the
+    // trident turns about the grip, which is exactly what a hand holding a haft does.
+    windup: [[0, {}], [1, { tx: -0.16, tyaw: 0.24, ty: 0.06, hx: -0.14, wx: -0.30, wz: 0.10 }]],
+    attack: [
+      [0, { tx: -0.16, tyaw: 0.24, ty: 0.06, hx: -0.14, wx: -0.30, wz: 0.10 }],
+      [0.35, { tx: 0.20, tyaw: -0.14, ty: -0.05, hx: 0.16, wx: 0.55, wz: -0.06 }],
+      [1, { tx: 0.15, tyaw: -0.10, ty: -0.03, hx: 0.12, wx: 0.46, wz: -0.04 }],
+    ],
+    // The temple sweep is the tentacles, which are driven in update() - here the body only
+    // has to look like it is throwing them: gather down and low, then rise through it.
+    slamWindup: [[0, {}], [1, { tx: -0.20, ty: -0.22, hx: -0.26, wx: -0.16 }]],
+    slam: [
+      [0, { tx: -0.20, ty: -0.22, hx: -0.26, wx: -0.16 }],
+      [0.4, { tx: 0.10, ty: 0.20, hx: 0.22, wx: 0.12, tz: 0.06 }],
+      [1, { tx: 0.06, ty: 0.12, hx: 0.16, wx: 0.08 }],
+    ],
+    // The drowned bell. He lifts the haft and shakes it, and the bell chained under the fork
+    // does the rest - so the tell is a raised trident and a head thrown back, not a swing.
+    castWindup: [[0, {}], [1, { ty: 0.16, hx: -0.34, wx: -0.22, wz: 0.16 }]],
+    cast: [
+      [0, { ty: 0.16, hx: -0.34, wx: -0.22, wz: 0.16 }],
+      [0.3, { ty: 0.20, hx: -0.20, wx: -0.10, wz: -0.14 }],
+      [0.6, { ty: 0.18, hx: -0.24, wx: -0.18, wz: 0.12 }],
+      [1, { ty: 0.10, hx: -0.12, wx: -0.12, wz: -0.04 }],
+    ],
+    chargeWindup: [[0, {}], [1, { tx: -0.22, ty: -0.10, hx: -0.16, wx: -0.24 }]],
+    charge: [[0, { tx: 0.26, hx: 0.12, wx: 0.30 }], [1, { tx: 0.30, hx: 0.14, wx: 0.34 }]],
+  },
   baphomet: {
     // Mixamo "Standing Melee Attack Downward", frames 7:33, gain legs=0.6,hy=0.25,tz=0.4,tyaw=0.55.
     // The scythe goes up over the shoulder while the torso winds the other way, then the
@@ -1116,53 +1158,6 @@ function buildShellora() {
   return { root, body, kind: 'blob' };
 }
 
-// Nerakos - PLACEHOLDER, the same way Moonraya was one. A man on tentacles with a trident,
-// enough to fight and tune against until Toto's sculpt lands, at which point this is replaced
-// by a GLB build like the other four bosses.
-function buildNerakos() {
-  const skinN = mat(0x2f5f9a, { roughness: 0.7 });
-  const armourN = mat(0xd8a86a, { roughness: 0.5, metalness: 0.4 });
-  const limbN = mat(0x27507f, { roughness: 0.8 });
-  const bellN = mat(0xe0c07a, { emissive: 0x8a6a1a, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.6 });
-  const eyeN = mat(0x8fe8ff, { emissive: 0x4fc8ff, emissiveIntensity: 1.4 });
-  return humanoid({
-    scale: 1.55, hip: 1.15, torsoH: 0.86, shoulderW: 0.42, legW: 0.2,
-    buildTorso(t, h) {
-      mesh(new THREE.CapsuleGeometry(0.34, 0.5, 6, 12), skinN, 0, h * 0.55, 0, t);
-      mesh(new THREE.SphereGeometry(0.36, 12, 10), armourN, 0, h - 0.18, 0.06, t).scale.set(1.25, 0.8, 0.7);
-      // six tentacles instead of a lower body, splayed around the hips
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        const arm = mesh(new THREE.ConeGeometry(0.17, 1.5, 6), limbN,
-          Math.cos(a) * 0.3, -0.24, Math.sin(a) * 0.3, t);
-        arm.rotation.set(Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9);
-      }
-    },
-    buildHead(hd) {
-      mesh(new THREE.SphereGeometry(0.26, 14, 12), skinN, 0, 0.2, 0, hd);
-      // a crown of broken shell
-      for (let i = 0; i < 5; i++) {
-        const a = -1.1 + (i / 4) * 2.2;
-        const pt = mesh(new THREE.ConeGeometry(0.06, 0.24 + (i % 2) * 0.12, 4), armourN,
-          Math.sin(a) * 0.24, 0.42, Math.cos(a) * 0.18, hd);
-        pt.rotation.z = -Math.sin(a) * 0.5;
-      }
-      for (const side of [-1, 1]) mesh(new THREE.SphereGeometry(0.055, 8, 8), eyeN, side * 0.11, 0.22, 0.21, hd);
-    },
-    buildArm(a, side) {
-      mesh(new THREE.CapsuleGeometry(0.1, 0.38, 5, 10), skinN, 0, -0.24, 0, a);
-      mesh(new THREE.CapsuleGeometry(0.085, 0.34, 5, 10), skinN, side * 0.04, -0.62, 0, a);
-      if (side < 0) {
-        const haft = mesh(new THREE.CylinderGeometry(0.045, 0.045, 2.6, 7), armourN, -0.1, -0.5, 0.1, a);
-        haft.rotation.x = 0.12;
-        for (const px of [-0.16, 0, 0.16]) mesh(new THREE.ConeGeometry(0.07, 0.42, 5), armourN, -0.1 + px, 0.9, 0.08, a);
-        mesh(new THREE.SphereGeometry(0.11, 10, 10), bellN, -0.1, 0.5, 0.1, a);   // the little bell
-      }
-    },
-    buildLeg() { /* no legs: the tentacles are the lower body, built on the torso */ },
-  });
-}
-
 // Moonraya - PLACEHOLDER. Toto is sculpting her, and this stands in so the fight can be
 // played and tuned meanwhile. When the sculpt lands it goes the way Baphomet did: exported
 // limb-segmented by tools/export_heroes.py to assets/monsters/moonraya.glb with an entry in
@@ -1182,9 +1177,10 @@ const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   grinlit: buildGrinlit, velmara: buildVelmara, nyxmare: buildNyxmare,
   shardling: buildShardling,
   darkSword: buildDarkSwordGlb,
-  // Bairune. Nerakos is a stand-in until the sculpt arrives, the way Moonraya was.
+  // Bairune. Nerakos is the fifth sculpt: one continuous body, so no arms and no legs in
+  // his rig - the six dorsal tentacles are the limb that moves.
   craboon: buildCraboon, hydrella: buildHydrella, jellune: buildJellune,
-  marinox: buildMarinox, shellora: buildShellora, nerakos: buildNerakos,
+  marinox: buildMarinox, shellora: buildShellora, nerakos: buildNerakosGlb,
   // Morroc's boss. No legs: the pose rig simply leaves out what the sculpt does not have.
   sandman: buildSandmanGlb };
 
@@ -1255,7 +1251,9 @@ export function createMonsterViews(world) {
     }
     // The build comes off a shelf, so anything the last owner left on it is reset here: a
     // boss that died raging would otherwise hand the next one his flung-out shards.
-    if (built.rig?.shards) { built.rig.shards.scale.setScalar(1); built.rig.shards.rotation.set(0, 0, 0); }
+    for (const limb of ['shards', 'tentacles']) {
+      if (built.rig?.[limb]) { built.rig[limb].scale.setScalar(1); built.rig[limb].rotation.set(0, 0, 0); }
+    }
     group.scale.setScalar(1);
     const v = { id: e.id, type: e.type, group, built, materials, cur: {}, scratch: {}, walkPhase: 0, yaw: e.facing * HALF, t: Math.random() * 10, dead: false, rageT: 0, shardSpin: 0 };
     views.set(e.id, v);
@@ -1423,19 +1421,43 @@ export function createMonsterViews(world) {
         // slowly while he is whole and fast once he is not - and in the second half they fly
         // out wide, which is the only part of a phase change the silhouette can show.
         const rage = e.def.rage, raging = rage && e.addsDone && !e.dead;
+        // The second phase's ramp. Everything phase 2 shows is derived from it - the tint and
+        // the growth as much as the shards - so it is raised here rather than inside the
+        // shards branch, where it used to sit. A boss with no shards node never entered that
+        // branch, so his rageT stayed at 0 and he crossed half health without changing at
+        // all: Nerakos, who is tentacles where the Dark Sword is obsidian.
+        //
+        // Clamped at BOTH ends. Only the top was, so a boss that spent a minute below the
+        // threshold eased its way down to -180 instead of resting at 0 - and the moment it
+        // crossed into its second phase every value derived from this went with it: the
+        // group scaled by -9.8, which is a boss inside out and ten times too big, which is
+        // a boss you cannot see.
+        if (rage) v.rageT = Math.max(0, Math.min(1, (v.rageT || 0) + (raging ? dt * 1.6 : -dt * 3)));
         if (v.built.rig?.shards) {
-          // Clamped at BOTH ends. Only the top was, so a boss that spent a minute below the
-          // threshold eased its way down to -180 instead of resting at 0 - and the moment it
-          // crossed into its second phase every value derived from this went with it: the
-          // group scaled by -9.8, which is a boss inside out and ten times too big, which is
-          // a boss you cannot see. This is the disappearing Dark Sword.
-          v.rageT = Math.max(0, Math.min(1, (v.rageT || 0) + (raging ? dt * 1.6 : -dt * 3)));
           const sh = v.built.rig.shards;
           v.shardSpin = (v.shardSpin || 0) + dt * (0.5 + 2.6 * v.rageT);
           sh.rotation.y = v.shardSpin;
           sh.rotation.z = Math.sin(v.t * 0.7) * 0.1;
           const out = 1 + (rage ? (rage.shards - 1) * v.rageT : 0);
           sh.scale.setScalar(out);
+        }
+
+        // Nerakos' six dorsal tentacles are a limb of their own, and the only one he has -
+        // his body is a single mesh, so there is no arm to swing and no leg to step. They
+        // drift with the water while he stands, draw back through a windup and surge on the
+        // strike, which is where the weight of every one of his moves has to come from.
+        // applyPose never touches this node, so it is driven here rather than keyed: a clip
+        // would be overwritten by the next frame's pose.
+        if (v.built.rig?.tentacles) {
+          const tn = v.built.rig.tentacles;
+          const drive = e.dead ? -0.7 : e.state === 'windup' ? -1 : e.state === 'attack' ? 1.7 : 0;
+          v.tent = (v.tent ?? 0) + (drive - (v.tent ?? 0)) * Math.min(1, 9 * dt);
+          tn.rotation.x = Math.sin(v.t * 1.3) * 0.07 + v.tent * 0.20;
+          tn.rotation.y = Math.sin(v.t * 0.7) * 0.06 + v.tent * 0.08;
+          tn.rotation.z = Math.sin(v.t * 0.9 + 1.2) * 0.05;
+          // and they lengthen with the second phase, which is where his `rage.shards` goes:
+          // the same number the Dark Sword throws his obsidian out by.
+          tn.scale.setScalar(1 + (rage ? (rage.shards - 1) * v.rageT : 0));
         }
 
         // hit flash, and the dead sink into the floor and fade

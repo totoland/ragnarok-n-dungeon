@@ -38,6 +38,9 @@ export const ATTRS = {
   drain: { name: 'SP Drain', key: 'spDrainAdd', min: 0.01, max: 0.03, step: 0.01 },
   pull: { name: 'Undertow', key: 'pullAdd', min: 0.01, max: 0.03, step: 0.01 },
   atkHi: { name: 'ATK', key: 'atkAdd', min: 5, max: 15, step: 1, flat: true },
+  // Bairune's own rate, and the second spell in the game: a shaft of ice on the spot the
+  // blow landed. It shares the meteor's machinery and sums the same way.
+  bolt: { name: 'Auto Cold Bolt', key: 'boltAdd', min: 0.01, max: 0.03, step: 0.01 },
 };
 export const ATTR_IDS = Object.keys(ATTRS);
 
@@ -99,6 +102,14 @@ export const ITEMS = {
     name: 'Everwave Mantle', slot: 'cape',
     mods: { speed: 1.08, dodgeAdd: 0.06, hp: 1.05 },
     tip: '+8% move speed, +6% dodge, +5% HP',
+  },
+  // Not a boss reward: a drowned blade found in the sunken quarter, which is the first
+  // weapon in the game that is looted rather than won. It sits below Orvane's 55 on the ATK
+  // curve on purpose - what it sells is speed and the bolt, not points.
+  underWaterSword: {
+    name: 'Under Water Sword', slot: 'weapon', hero: 'knight', kind: 'sword',
+    mods: { atkAdd: 40, atkSpeed: 1.10, boltAdd: 0.10 },
+    tip: '+40 ATK, attack 10% faster, 10% chance on hit: a shaft of ice falls for 10% of ATK as magic',
   },
   tidecleaver: {
     name: 'Tidecleaver', slot: 'weapon', hero: 'knight', kind: 'sword',

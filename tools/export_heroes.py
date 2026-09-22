@@ -208,6 +208,41 @@ def classify_goat_samurai(group, name, cx):
     return "torso"                                      # body, neck, throat
 
 
+def classify_nerakos(group, name, cx):
+    """Bairune's boss, the tidal warden. Sorted by collection like the other sculpts.
+
+    He is one continuous body mesh from the talons to the neck - no seam to cut an arm or a
+    leg out of - so the rig is the short one the Sandman uses: a torso that is the whole
+    figure, a head, and the weapon. What carries the motion instead is the six dorsal
+    tentacles, which ARE separable and become a limb of their own so the game can surge them.
+    Their suckers ride with them; welded into the torso they would slide off the arms they sit
+    on the moment the tentacles moved.
+
+    The trident is parented to the torso rather than to an arm, because there is no arm node
+    to hang it from - and that is the right answer here anyway: his hand never leaves the
+    shaft, so a weapon fixed relative to the body is exactly what the sculpt shows, and the
+    attack turns the trident about the grip, which is what the hand itself would do.
+    """
+    if group.endswith("Trident"):
+        return "weapon"                     # haft, fork, and the drowned bell chained to it
+    if group.endswith("Tentacles") or group.endswith("Suckers"):
+        return "tentacles"
+    if group.endswith("Crown") or group.endswith("Face"):
+        return "head"
+    if group.endswith("Fins"):
+        # The ear fans and the chin barbels are on the head; every other fin hangs off a
+        # shoulder, a hip or a calf, all of which are body.
+        if name.startswith(("Ear \u2022", "Chin \u2022")):
+            return "head"
+        return "torso"
+    if group.endswith("Luminescence"):
+        if name.startswith(("Crown \u2022", "Face \u2022")):
+            return "head"
+        return "torso"
+    # Anatomy (body, hands, talons) and Ridges (relief lines, the neck gills) are all body.
+    return "torso"
+
+
 def classify_gear(group, name, cx):
     """Worn gear is one rigid piece: there is nothing to segment, so every mesh is the part.
 
@@ -393,6 +428,39 @@ MODELS = {
         "parent": {"hat": "root"},
         "pivot": {"root": (0, 0, 0), "hat": (0, 0, 0.0065)},
     },
+    # Bairune's boss. One body mesh, so no arms and no legs - the tentacles are the rig.
+    "nerakos": {
+        "scene": "Abyssal Trident \u2022 Tidal Warden",
+        "height": 3.5,                      # game units; hurtbox h is 3.0 in sim/data/monsters.js
+        "model_height": 8.61,               # Blender units, the coral crown's tallest blade -
+                                            # the trident reaches past it and is meant to
+        "classify": classify_nerakos,
+        "collections": ["AT \u2022 Anatomy", "AT \u2022 Crown", "AT \u2022 Face",
+                        "AT \u2022 Fins", "AT \u2022 Luminescence", "AT \u2022 Ridges",
+                        "AT \u2022 Suckers", "AT \u2022 Tentacles", "AT \u2022 Trident"],
+        # 452k verts arrive, and 282k of them are the ten fin membranes - sheets, which is
+        # the one thing decimation costs nothing on. The trident and the light organs are
+        # left alone: they are small, they are already cheap, and they are what reads.
+        "decimate": {"AT \u2022 Fins": 0.03, "AT \u2022 Anatomy": 0.10,
+                     "AT \u2022 Face": 0.14, "AT \u2022 Tentacles": 0.22,
+                     "AT \u2022 Suckers": 0.08, "AT \u2022 Crown": 0.22, "*": 1},
+        # A tenth of him is bevelled curve - the glow streams down the body, the relief lines,
+        # the sucker rims, the trident's collars - and they arrive authored barely above this,
+        # so (3, 1) that was enough for the Dark Sword took almost nothing off. At (2, 0) a
+        # glow line is a four-sided tube walked half as often, which at the size it is drawn
+        # is the same line for a third of the vertices.
+        "curve_res": (2, 0),
+        "parent": {"torso": "root", "head": "torso", "weapon": "torso", "tentacles": "torso"},
+        "pivot": {
+            "root": (0, 0, 0),
+            "torso": (0, 0.05, 2.75),       # the waist, the narrowest slab of the trunk
+            "head": (0, -0.02, 6.40),       # the neck, under the jaw and above the gills
+            "weapon": (-1.80, -0.36, 5.45), # his fist, closed on the shaft
+            # the middle of where the six tentacles leave his back, so turning the node
+            # surges them together instead of sweeping them off to one side
+            "tentacles": (0, 0.50, 3.60),
+        },
+    },
     "darkSword": {
         "scene": "Dark Sword \u2022 Obsidian Knight",
         "height": 3.1,                      # game units; hurtbox h is 2.9 in sim/data/monsters.js
@@ -429,25 +497,15 @@ MODELS = {
 
 # --------------------------------------------------------------------------------------
 
-def flatten_procedural_colour(mat):
-    """Give a procedurally-coloured material a flat base colour glTF can carry.
+def _flatten_socket(mat, inp, pick="mean"):
+    """Resolve one linked colour socket to the single flat colour glTF can carry.
 
-    A stripe pattern or a sand noise lives in a node tree, and glTF has nowhere to put one,
-    so the material exports with its base colour untouched - which is white. That is how the
-    Sandman arrived in the game as a white statue: his shirt, his sand and both weapons are
-    ramps, while his skin and eyes are plain colours and came through fine.
-
-    Baking each one to a texture would be the faithful answer, but nothing else in this game
-    is textured - it is flat colours on flat shading throughout - so a single colour is the
-    right answer here and the cheap one. The author left a sensible colour sitting under each
-    link, so use that; if it is white too, average the ramp stops feeding it instead.
+    `pick` says what to do with the stops when the fallback colour is white and the tree has
+    to be read. "mean" averages them, which is right for a base colour: every stop describes
+    the same surface and the flat answer is somewhere between them. "dark" takes the dimmest,
+    which is right for emission: a glow ramp exists to pick a *fraction* of the surface out,
+    and the average paints the whole body with what was meant for the veins.
     """
-    if not mat or not mat.use_nodes:
-        return
-    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
-    if not bsdf:
-        return
-    inp = bsdf.inputs.get("Base Color")
     if not inp or not inp.is_linked:
         return
     col = list(inp.default_value)[:3]
@@ -470,10 +528,47 @@ def flatten_procedural_colour(mat):
                 elif i.type == "RGBA" and hasattr(i, "default_value"):
                     stops.append(list(i.default_value)[:3])
         if stops:
-            col = [sum(c[i] for c in stops) / len(stops) for i in range(3)]
+            col = (min(stops, key=sum) if pick == "dark"
+                   else [sum(c[i] for c in stops) / len(stops) for i in range(3)])
     for link in list(inp.links):
         mat.node_tree.links.remove(link)
     inp.default_value = (*col, 1)
+
+
+def flatten_procedural_colour(mat):
+    """Give a procedurally-coloured material the flat colours glTF can carry.
+
+    A stripe pattern or a sand noise lives in a node tree, and glTF has nowhere to put one,
+    so the material exports with its colour untouched - which is white. That is how the
+    Sandman arrived in the game as a white statue: his shirt, his sand and both weapons are
+    ramps, while his skin and eyes are plain colours and came through fine.
+
+    Baking each one to a texture would be the faithful answer, but nothing else in this game
+    is textured - it is flat colours on flat shading throughout - so a single colour is the
+    right answer here and the cheap one. The author left a sensible colour sitting under each
+    link, so use that; if it is white too, average the ramp stops feeding it instead.
+
+    Emission needs the same treatment and is the worse of the two when it is missed. An
+    unresolved base colour exports white and is lit like anything else; an unresolved
+    emission exports white AND ignores the light, so the part glows. Nerakos' skin is a dark
+    blue noise with a green bioluminescent ramp on the emission at strength 1.8 - flattening
+    only the base colour left a white figure that no amount of tinting could darken, because
+    the white was not coming from the light.
+
+    It does not want the same *rule*, though. Averaging that ramp turned him from a white
+    figure into a uniformly glowing green one, because the ramp is mostly black and only its
+    crest is emerald: on the sculpt that is a vein, and flat it is the whole body. Emission
+    therefore takes the dimmest stop, and the glow comes from where it is actually modelled -
+    the light organs and the glow curves, which are their own objects with their own
+    materials.
+    """
+    if not mat or not mat.use_nodes:
+        return
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if not bsdf:
+        return
+    _flatten_socket(mat, bsdf.inputs.get("Base Color"))
+    _flatten_socket(mat, bsdf.inputs.get("Emission Color"), pick="dark")
 
 
 # What counts as model geometry. A curve with a bevel is geometry as much as a mesh is -

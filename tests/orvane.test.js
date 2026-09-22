@@ -112,7 +112,7 @@ test('Double Attack lands a second hit on the same target for the same blow', ()
 });
 
 test('Auto Meteor is queued on the hit and lands a beat later, as magic', () => {
-  const { g } = rigged({ id: 'meteorEdge', plus: 0 }, { rate: { meteor: 1, double: 0, spDrain: 0 } });
+  const { g, e } = rigged({ id: 'meteorEdge', plus: 0 }, { rate: { meteor: 1, double: 0, spDrain: 0 } });
   const events = swing(g, 120);
   const called = events.filter((e) => e.type === 'autoMeteor');
   const landed = events.filter((e) => e.type === 'meteor');
@@ -122,6 +122,9 @@ test('Auto Meteor is queued on the hit and lands a beat later, as magic', () => 
   const expected = Math.max(1, Math.round(g.player.atk * 0.1));
   for (const m of landed) assert.equal(m.dmg, expected);
   for (const h of events.filter((e) => e.attack === 'autoMeteor')) assert.equal(h.crit, false);
+  // And it leaves the thing it hit somewhere. A meteor carries no knockback, which used to
+  // mean a NaN in vx and a monster drawn at no position at all (see tests/combat.test.js).
+  assert.ok(Number.isFinite(e.x) && Number.isFinite(e.vx), `x ${e.x}, vx ${e.vx}`);
 });
 
 test('SP Drain returns SP on a hit and never overfills', () => {
@@ -180,6 +183,34 @@ test('Bairune is a complete town: five monsters, a boss, five hats and a cape', 
     assert.ok(fits(id, hero));
     assert.equal(ITEMS[id].mods.atkAdd, 95, 'on the flat curve: 6, 16, 30, 55, 95');
   }
+});
+
+test('the Under Water Sword is looted, not won, and its Cold Bolt lands as magic', async () => {
+  const { BAIRUNE } = await import('../src/sim/data/dungeon.js');
+  const { MONSTERS } = await import('../src/sim/data/monsters.js');
+  // The first weapon in the game on a monster's drop table rather than a boss's payout.
+  const from = Object.entries(MONSTERS).filter(([, m]) => (m.drops || []).some((d) => d.item === 'underWaterSword'));
+  assert.equal(from.length, 1, 'exactly one monster drops it');
+  assert.ok(!Object.values(BAIRUNE.loot).includes('underWaterSword'), 'and the boss does not');
+
+  const g = createGame({ hero: 'knight', seed: 7, dungeon: BAIRUNE, xp: xpAtLevel(LEVEL.max), gear: { id: 'underWaterSword', plus: 0 } });
+  assert.equal(g.player.bolt, 0.10, 'the sword grants the rate');
+  g.player.bolt = 1; g.player.pull = 0; g.player.meteor = 0; g.player.double = 0; g.player.spDrain = 0;
+  steps(g, 2);
+  const { createEnemy: mk } = await import('../src/sim/enemies.js');
+  const e = mk(g, 'craboon', g.player.x + 1.2, 0);
+  e.hp = 1e6;
+  g.enemies.push(e);
+  const events = swing(g, 120);
+  const called = events.filter((ev) => ev.type === 'autoBolt');
+  const landed = events.filter((ev) => ev.type === 'coldBolt');
+  assert.ok(called.length > 0, 'a bolt was called');
+  assert.ok(landed.length > 0, 'a bolt landed');
+  const expected = Math.max(1, Math.round(g.player.atk * 0.1));
+  for (const b of landed) assert.equal(b.dmg, expected);
+  // Magic: it never crits, and it never rolls another one off its own hit.
+  for (const h of events.filter((ev) => ev.attack === 'autoBolt')) assert.equal(h.crit, false);
+  assert.ok(landed.length <= called.length, `${landed.length} landed from ${called.length} called`);
 });
 
 test('Undertow drags what it hits back towards the hero', async () => {

@@ -407,6 +407,20 @@ export function createFx(world) {
       case 'autoMeteor':
         ring(ev.x, ev.z, { color: 0xb070ff, radius: 1.5, life: 0.5, y: 0.04 });
         break;
+      case 'autoBolt':   // the water above freezing: a tight mark on the spot it will land
+        ring(ev.x, ev.z, { color: 0x50c0ff, radius: 0.9, life: 0.32, y: 0.04 });
+        break;
+      case 'coldBolt': {
+        beam(ev.x, ev.z, { color: 0x9fe8ff, life: 0.34 });
+        ring(ev.x, ev.z, { color: 0xd8f4ff, radius: 1.2, life: 0.28, y: 0.06 });
+        // Shards rather than a bloom: ice breaks where a meteor scatters, so the particles
+        // are fewer, faster and fall back down hard.
+        burst(ev.x, 0.4, ev.z, 20, { color: 0x7fd8ff, speed: 4.5, up: 3, life: 0.4, size: 0.24, gravity: 9 });
+        burst(ev.x, 0.3, ev.z, 8, { color: 0xffffff, speed: 2, up: 1.8, life: 0.3, size: 0.16 });
+        flashLight.position.set(ev.x, 1.2, ev.z); flashLight.intensity = 11;
+        addShake(world, 0.14);
+        break;
+      }
       case 'meteor': {
         beam(ev.x, ev.z, { color: 0xc48aff, life: 0.5 });
         ring(ev.x, ev.z, { color: 0xe0b0ff, radius: 2.0, life: 0.35, y: 0.06 });

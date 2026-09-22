@@ -395,7 +395,10 @@ export const MONSTERS = {
     // Slow and heavy. It spits and then shuts, and the shut is when hitting it is wasted -
     // the closing is its own behaviour and still has to go into sim/enemies.js.
     attack: { range: 3.4, windup: 0.7, dur: 0.35, cd: 2.6, box: { x0: 0.0, x1: 3.6, y0: -0.3, y1: 1.8 }, knock: [5, 3] },
-    drops: [{ item: 'pearlDiadem', chance: 0.05 }, { item: 'amulet', chance: 0.012 }],
+    // The drowned sword is hers: a shell in a wreck closes over what sank into it, and it
+    // is the only weapon in the game that is found rather than paid out by a boss.
+    drops: [{ item: 'pearlDiadem', chance: 0.05 }, { item: 'underWaterSword', chance: 0.04 },
+            { item: 'amulet', chance: 0.012 }],
     score: 130,
   },
   nerakos: {
@@ -412,8 +415,13 @@ export const MONSTERS = {
     cast: { windup: 0.8, dur: 0.5, cd: 6.5, shot: { kind: 'tide', count: 3, speed: 8.5, life: 2.6, y: 1.4, lane: 1.5, dmg: 0.9 }, knock: [4, 1] },
     // The bell rings hard and the water answers.
     adds: { at: 0.45, type: 'jellune', count: 3 },
-    // And he lights up with it: the eyes and the marks along the tentacles.
-    rage: { tint: 0x1060a8, emissive: 0x0a4a90, grow: 1.05, shards: 1.15 },
+    // And he lights up with it. Green, not blue: he was blue before the sculpt arrived and
+    // blue-on-blue in a blue room is a boss who simply gets brighter and loses every line on
+    // him. The sculpt carries its own bioluminescence in emerald - the light organs, the
+    // streams down the body, the ridges of the crown - so the second phase is that flooding,
+    // which reads against both the room and the way he looked a moment ago.
+    // `shards` has no shard node to move here; it lengthens the tentacles instead.
+    rage: { tint: 0x0b4a3a, emissive: 0x0e6b2e, grow: 1.05, shards: 1.15 },
     score: 1400,
   },
 };

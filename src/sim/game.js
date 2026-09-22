@@ -216,7 +216,7 @@ function rollPassive(g, e, attackId, killed) {
 // Each one is deliberately not allowed to feed itself: a meteor and a doubled hit both land
 // through onEnemyHit, and letting them roll again there is a loop that ends in a screenful of
 // meteors off one swing. `attackId` carries which is which.
-const PROC_FREE = new Set(['autoBlitz', 'autoMeteor', 'doubleAttack']);
+const PROC_FREE = new Set(['autoBlitz', 'autoMeteor', 'autoBolt', 'doubleAttack']);
 function rollGearProcs(g, e, attackId, killed) {
   const p = g.player;
   if (PROC_FREE.has(attackId)) return;
@@ -247,6 +247,13 @@ function rollGearProcs(g, e, attackId, killed) {
     g.pending.push({ kind: 'autoMeteor', target: e.id, t: 0.55, x: e.x, z: e.z });
     pushEvent(g, { type: 'autoMeteor', target: e.id, x: e.x, z: e.z, y: e.y });
   }
+  // Cold Bolt: the same spell shape in a different element. An icicle is a smaller thing
+  // falling a shorter way than a star, so it arrives sooner and covers less ground - which
+  // is the whole difference between them at the same tenth of ATK.
+  if (p.bolt && g.rng.chance(p.bolt)) {
+    g.pending.push({ kind: 'autoBolt', target: e.id, t: 0.32, x: e.x, z: e.z });
+    pushEvent(g, { type: 'autoBolt', target: e.id, x: e.x, z: e.z, y: e.y });
+  }
 }
 
 function resolvePending(g, dt) {
@@ -257,15 +264,18 @@ function resolvePending(g, dt) {
   if (!due.length) return;
   g.pending = g.pending.filter((j) => j.t > 0);
   for (const job of due) {
-    if (job.kind === 'autoMeteor') {
+    if (job.kind === 'autoMeteor' || job.kind === 'autoBolt') {
       // Magic damage: a tenth of the hero's ATK, and it does not crit and does not knock -
-      // it is a star landing on a spot, not a blow the hero threw.
+      // it is a star landing on a spot, not a blow the hero threw. The bolt is the same
+      // spell through a narrower hole.
+      const ice = job.kind === 'autoBolt';
       const dmg = Math.max(1, Math.round(p.atk * 0.1));
-      pushEvent(g, { type: 'meteor', x: job.x, z: job.z, y: 0, dmg });
+      pushEvent(g, { type: ice ? 'coldBolt' : 'meteor', x: job.x, z: job.z, y: 0, dmg });
+      const rx = ice ? 0.9 : 1.6, rz = ice ? 0.8 : 1.1;
       for (const e of g.enemies) {
-        if (e.dead || Math.abs(e.x - job.x) > 1.6 || Math.abs(e.z - job.z) > 1.1) continue;
+        if (e.dead || Math.abs(e.x - job.x) > rx || Math.abs(e.z - job.z) > rz) continue;
         const dead = applyHit(e, dmg, 0, 0, Math.sign(e.x - job.x) || 1, e.mass);
-        onEnemyHit(g, e, dmg, false, dead, 'autoMeteor');
+        onEnemyHit(g, e, dmg, false, dead, job.kind);
       }
       continue;
     }

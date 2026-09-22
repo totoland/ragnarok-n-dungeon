@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { createGame, update } from '../src/sim/game.js';
 import { createEnemy } from '../src/sim/enemies.js';
 import { MONSTERS } from '../src/sim/data/monsters.js';
-import { createMonsterViews, setBossModel, setMoonrayaModel, setSandmanModel, setDarkSwordModel, CLIPS_BY_TYPE } from '../src/render/monsters.js';
+import { createMonsterViews, setBossModel, setMoonrayaModel, setSandmanModel, setDarkSwordModel, setNerakosModel, CLIPS_BY_TYPE } from '../src/render/monsters.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from '../src/render/anim.js';
 
 const world = () => ({ scene: new THREE.Scene() });
@@ -14,15 +14,17 @@ const world = () => ({ scene: new THREE.Scene() });
 // The boss view is backed by assets/monsters/baphomet.glb, and GLTFLoader cannot fetch a
 // file in Node. Stand in a rig with the same node names and joint hierarchy so the builder,
 // the pose rig and the dispose path all get exercised for real.
+function stubNode(name, parent, y = 0) {
+  const g = new THREE.Group();
+  g.name = name;
+  g.position.y = y;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshStandardMaterial()));
+  parent.add(g);
+  return g;
+}
+
 function stubBossModel() {
-  const mk = (name, parent, y = 0) => {
-    const g = new THREE.Group();
-    g.name = name;
-    g.position.y = y;
-    g.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshStandardMaterial()));
-    parent.add(g);
-    return g;
-  };
+  const mk = stubNode;
   const root = new THREE.Group();
   root.name = 'root';
   const torso = mk('torso', root, 1.5);
@@ -34,6 +36,19 @@ function stubBossModel() {
   mk('legR', root, 1.5);
   return root;
 }
+
+// Nerakos is the odd rig: one continuous body mesh, so no arms and no legs, and a limb no
+// other sculpt has. The plain stand-in would pass this test while leaving the tentacle
+// branch in update() unreached, which is the only part of him worth guarding.
+function stubNerakosModel() {
+  const root = new THREE.Group();
+  root.name = 'root';
+  const torso = stubNode('torso', root, 1.1);
+  stubNode('head', torso, 1.5);
+  stubNode('weapon', torso, 1.1);
+  stubNode('tentacles', torso, 0.35);
+  return root;
+}
 setBossModel(stubBossModel());
 // Moonraya is a sculpt too, and has the same limb names, so the same stand-in serves.
 setMoonrayaModel(stubBossModel());
@@ -42,6 +57,7 @@ setMoonrayaModel(stubBossModel());
 setSandmanModel(stubBossModel());
 // Orvane's boss is a sculpt with the full set of limbs, so the plain stand-in covers him.
 setDarkSwordModel(stubBossModel());
+setNerakosModel(stubNerakosModel());
 
 test('every monster type builds, walks, winds up, attacks, gets hurt, launched and dies without throwing', () => {
   const w = world();
@@ -62,6 +78,30 @@ test('every monster type builds, walks, winds up, attacks, gets hurt, launched a
   assert.ok(w.scene.children.length >= 1, 'boss view still in the scene');
   views.clear();
   assert.equal(w.scene.children.length, 0, 'clear() removes every view');
+});
+
+test('every boss with a second phase actually shows it', () => {
+  // The ramp that drives the tint, the growth and the shards used to be raised inside the
+  // shards branch, so a boss sculpted without them crossed half health and changed nothing:
+  // same size, same colour, no tell at all that the fight had turned.
+  const w = world();
+  const views = createMonsterViews(w);
+  const withRage = Object.entries(MONSTERS).filter(([, m]) => m.rage).map(([t]) => t);
+  assert.ok(withRage.length >= 2, 'more than one boss has a second phase');
+  for (const type of withRage) {
+    const g = createGame({ hero: 'knight', dungeon: { rooms: [{ name: 't', width: 22, waves: [] }] } });
+    const boss = createEnemy(g, type, 9, 0);
+    boss.state = 'chase';
+    g.enemies.push(boss);
+    views.update(g, 1 / 60);
+    const view = [...w.scene.children].find((o) => o.children.length);
+    const before = view.scale.x;
+    boss.hp = boss.hpMax * 0.4;
+    boss.addsDone = true;
+    for (let i = 0; i < 60 * 4; i++) { update(g, { held: {}, pressed: {} }); views.update(g, 1 / 60); }
+    assert.ok(view.scale.x > before * 1.01, `${type} grew into its second phase (${before} -> ${view.scale.x})`);
+    views.clear();
+  }
 });
 
 test('a boss stays the right way up and the right size through its second phase', () => {
