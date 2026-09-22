@@ -233,6 +233,14 @@ function rollGearProcs(g, e, attackId, killed) {
     const dead = applyHit(e, dmg, 0, 0, dir, e.mass);
     onEnemyHit(g, e, dmg, crit, dead, 'doubleAttack');
   }
+  // Undertow: the sea pulling it back down. A knockback with the sign flipped, so it costs
+  // the sim nothing new - and no damage of its own, because the point is where the monster
+  // ends up, not what it has left.
+  if (!killed && p.pull && g.rng.chance(p.pull)) {
+    const dir = Math.sign(e.x - p.x) || p.facing;
+    applyHit(e, 0, [6, 0], 0.2, -dir, e.mass);
+    pushEvent(g, { type: 'undertow', id: e.id, x: e.x, z: e.z, y: e.y + 0.4 });
+  }
   if (p.meteor && g.rng.chance(p.meteor)) {
     // It falls, so it lands a moment later and on wherever the target is by then - which is
     // the point of a meteor, and why it goes through the same queue the falcon does.

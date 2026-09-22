@@ -26,7 +26,7 @@ const MULT = new Set(['hp', 'mp', 'atk', 'matk', 'speed', 'atkSpeed']);
 // off a landed hit, so a weapon granting a chance and three charms adding to it all reach
 // rollPassive as one number (sim/game.js).
 const ADD = new Set(['atkAdd', 'matkAdd', 'critAdd', 'critDmgAdd', 'dodgeAdd',
-                     'meteorAdd', 'doubleAdd', 'spDrainAdd']);
+                     'meteorAdd', 'doubleAdd', 'spDrainAdd', 'pullAdd']);
 export function mergeMods(...sets) {
   const out = {};
   for (const s of sets) {
@@ -58,6 +58,7 @@ export function resolveHero(base, mods = {}) {
     meteor: Math.min(0.5, m.meteorAdd || 0),
     double: Math.min(0.5, m.doubleAdd || 0),
     spDrain: Math.min(0.5, m.spDrainAdd || 0),
+    pull: Math.min(0.5, m.pullAdd || 0),
     mods: m,
   };
 }

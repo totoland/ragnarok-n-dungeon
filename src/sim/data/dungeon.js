@@ -214,6 +214,53 @@ export const ORVANE = {
   ],
 };
 
+// Bairune, the drowned temple. Toto's brief: an island whose city went under, where the bell
+// in the temple still rings every night, and everything that hears it becomes a guard and
+// drags whoever came looking down to the floor of the sea.
+//
+// The hero walks and fights on the sea bed as he does anywhere else - the water is bubbles,
+// light and a backdrop, not a change to how the game moves. The route goes down: white sand
+// and bright water, then a coral tunnel, then the city itself, then the floor of the temple
+// under the bell with the dark open sea past its edge.
+export const BAIRUNE = {
+  town: 'Bairune', name: 'Bairune, the Drowned Temple',
+  blurb: 'A city under the sea \u2014 Nerakos',
+  accent: '#3fb8d8',
+  loot: { knight: 'tidecleaver', hunter: 'coralbow' },
+  rooms: [
+    {
+      name: 'Moonshell Beach', width: 18, theme: 'shore',
+      waves: [
+        [{ type: 'craboon', count: 4 }],
+        [{ type: 'craboon', count: 4 }, { type: 'jellune', count: 2 }],
+      ],
+    },
+    {
+      name: 'Indigo Coral Cave', width: 20, theme: 'coral',
+      waves: [
+        [{ type: 'jellune', count: 3 }, { type: 'hydrella', count: 1 }],
+        [{ type: 'craboon', count: 3 }, { type: 'hydrella', count: 2 }],
+        [{ type: 'jellune', count: 3 }, { type: 'hydrella', count: 2 }, { type: 'shellora', count: 1 }],
+      ],
+    },
+    {
+      name: 'The Sunken City', width: 22, theme: 'sunken',
+      waves: [
+        [{ type: 'marinox', count: 2 }, { type: 'jellune', count: 2 }],
+        [{ type: 'shellora', count: 2 }, { type: 'hydrella', count: 2 }],
+        [{ type: 'marinox', count: 2 }, { type: 'shellora', count: 1 }, { type: 'jellune', count: 3 }],
+      ],
+    },
+    {
+      name: 'Deep Bell Temple', width: 22, theme: 'bell',
+      waves: [
+        [{ type: 'marinox', count: 3 }, { type: 'jellune', count: 2 }],
+        [{ type: 'nerakos', count: 1 }],
+      ],
+    },
+  ],
+};
+
 // The soak: the game playing itself, forever, for a tablet to be left running while the
 // telemetry watches. One room of the same monsters told us nothing about the things that
 // actually cost frames - building and tearing down rooms, every theme's materials, the
@@ -234,5 +281,5 @@ export const SOAK = {
   get rooms() { return this._rooms || (this._rooms = soakRooms()); },
 };
 
-export const TOWNS = { prontera: DUNGEON, morroc: MORROC, phaelan: PHAELAN, orvane: ORVANE };
+export const TOWNS = { prontera: DUNGEON, morroc: MORROC, phaelan: PHAELAN, orvane: ORVANE, bairune: BAIRUNE };
 const TOWNS_ORDER = TOWNS;

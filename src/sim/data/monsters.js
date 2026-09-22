@@ -340,4 +340,80 @@ export const MONSTERS = {
     rage: { tint: 0x8c0f26, emissive: 0x5e0a18, grow: 1.06, shards: 1.2 },
     score: 1200,
   },
+  // ---- Bairune, the drowned temple. Toto's brief: an island whose city sank, where the
+  // temple bell still rings at night and everything that hears it becomes a guard. Five
+  // monsters, each carrying a hat - which is the town that finally fills the hat slot the
+  // game has had since Phaelan and only ever put one thing in.
+  //
+  // HP and ATK continue the curve the earlier towns are actually on, not the one they should
+  // be on. At the hero's real ATK here a boss at the correct difficulty would need about
+  // 5,800 HP, more than three times Orvane's, and a town that arrives three times harder
+  // than the one before it reads as a wall rather than a step. The balance pass has to lift
+  // every town together; until then this one sits where it can be played.
+  craboon: {
+    name: 'Craboon', ai: 'hopper',
+    hp: 260, atk: 30, speed: 3.0, mass: 1.6,
+    hurtbox: { r: 0.5, h: 0.9 },
+    // The big claw goes up before it comes down, which is the whole tell.
+    attack: { range: 1.5, windup: 0.5, dur: 0.3, cd: 1.8, box: { x0: 0.0, x1: 1.7, y0: -0.3, y1: 1.5 }, knock: [6, 2] },
+    hop: { period: 0.55, height: 0.4 },
+    drops: [{ item: 'clawHat', chance: 0.05 }, { item: 'ring', chance: 0.03 }],
+    score: 90,
+  },
+  hydrella: {
+    name: 'Hydrella', ai: 'archer',
+    hp: 220, atk: 28, speed: 1.1, mass: 1.2,
+    hurtbox: { r: 0.5, h: 1.3 },
+    // Rooted: it shoots from where it grew and barely closes, so the lane it covers is the
+    // threat rather than the creature.
+    attack: { range: 8.5, keep: 6.5, windup: 0.65, dur: 0.3, cd: 2.0, shot: { kind: 'tide', speed: 11, life: 1.8, y: 1.1 }, knock: [3, 0] },
+    drops: [{ item: 'coralCrown', chance: 0.05 }, { item: 'brooch', chance: 0.012 }],
+    score: 95,
+  },
+  jellune: {
+    name: 'Jellune', ai: 'walker',
+    hp: 200, atk: 32, speed: 2.6, mass: 0.7,
+    hurtbox: { r: 0.45, h: 1.2 },
+    // Drifts in and discharges. Frail, and the damage is in touching it at all.
+    attack: { range: 1.3, windup: 0.3, dur: 0.3, cd: 1.3, box: { x0: -0.4, x1: 1.4, y0: -0.3, y1: 1.9, both: true }, knock: [4, 2] },
+    drops: [{ item: 'jellyCap', chance: 0.05 }, { item: 'clip', chance: 0.025 }],
+    score: 100,
+  },
+  marinox: {
+    name: 'Marinox', ai: 'walker',
+    hp: 420, atk: 38, speed: 2.5, mass: 2.0,
+    hurtbox: { r: 0.55, h: 1.9 },
+    // The elite of the town: a soldier with reach, and the one carrying the cape.
+    attack: { range: 2.2, windup: 0.55, dur: 0.32, cd: 2.0, box: { x0: 0.0, x1: 2.5, y0: -0.2, y1: 2.2 }, knock: [7, 2.5] },
+    drops: [{ item: 'everwave', chance: 0.05 }, { item: 'tidefin', chance: 0.05 }, { item: 'amulet', chance: 0.012 }],
+    score: 140,
+  },
+  shellora: {
+    name: 'Shellora', ai: 'walker',
+    hp: 480, atk: 26, speed: 1.4, mass: 2.6,
+    hurtbox: { r: 0.6, h: 1.4 },
+    // Slow and heavy. It spits and then shuts, and the shut is when hitting it is wasted -
+    // the closing is its own behaviour and still has to go into sim/enemies.js.
+    attack: { range: 3.4, windup: 0.7, dur: 0.35, cd: 2.6, box: { x0: 0.0, x1: 3.6, y0: -0.3, y1: 1.8 }, knock: [5, 3] },
+    drops: [{ item: 'pearlDiadem', chance: 0.05 }, { item: 'amulet', chance: 0.012 }],
+    score: 130,
+  },
+  nerakos: {
+    name: 'Nerakos', ai: 'boss', boss: true,
+    hp: 2800, atk: 30, speed: 2.2, mass: 5.8,
+    hurtbox: { r: 1.2, h: 3.0 },
+    // Trident thrust: long, and it comes with the reach of the haft.
+    attack: { range: 2.8, windup: 0.5, dur: 0.34, cd: 1.7, box: { x0: 0.0, x1: 3.2, y0: -0.3, y1: 2.9 }, knock: [7, 2] },
+    // He does not run; he surges, and the tentacles carry him.
+    charge: { windup: 0.6, dur: 0.55, speed: 13.0, cd: 8.5, box: { x0: -0.6, x1: 2.4, y0: -0.4, y1: 2.9 }, knock: [9, 3] },
+    // Temple sweep: six tentacles, both sides at once, the widest thing in the game.
+    slam: { windup: 1.0, dur: 0.5, cd: 7.5, box: { x0: -4.0, x1: 4.0, y0: -0.5, y1: 3.2, both: true }, knock: [6, 8], depth: 1.8 },
+    // The drowned bell: three rings of water down the lanes.
+    cast: { windup: 0.8, dur: 0.5, cd: 6.5, shot: { kind: 'tide', count: 3, speed: 8.5, life: 2.6, y: 1.4, lane: 1.5, dmg: 0.9 }, knock: [4, 1] },
+    // The bell rings hard and the water answers.
+    adds: { at: 0.45, type: 'jellune', count: 3 },
+    // And he lights up with it: the eyes and the marks along the tentacles.
+    rage: { tint: 0x1060a8, emissive: 0x0a4a90, grow: 1.05, shards: 1.15 },
+    score: 1400,
+  },
 };

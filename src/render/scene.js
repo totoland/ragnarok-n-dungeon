@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CAMERA, FLOOR } from '../config.js';
-import { stoneFloor, brickWall, grassFloor, sandFloor, duneSky, pineSky, runeSky } from './textures.js';
+import { stoneFloor, brickWall, grassFloor, sandFloor, duneSky, pineSky, runeSky, seaSky } from './textures.js';
 
 const THEMES = {
   // Outdoor map. `bg` swaps the tiling brick wall for a painted backdrop plane, and
@@ -76,6 +76,28 @@ const THEMES = {
   mirrors: {
     floor: '#3e3a52', grout: '#1a1726', wall: '#4a4460', mortar: '#201c2c',
     fog: 0x0e0a18, hemi: [0xd0c4ff, 0x2a2240], torch: 0xc09cff, props: 'mirrors',
+  },
+  // Bairune: bright shallow water that gets darker and colder the further down the route
+  // goes, ending on the temple floor with the open sea past its edge.
+  shore: {
+    floor: '#e6dcc0', grout: '#c2b590', wall: '#cfe6ee', mortar: '#9dc2d2',
+    fog: 0x8fd4e6, hemi: [0xdff6ff, 0x5f96ac], torch: 0x7fe8ff, props: 'shells',
+    bgMake: (i) => seaSky(i + 11), bgH: 12, ground: 'sand', outdoor: true,
+    sideWall: 0xa8c8d4, ledge: 0x8fb0bc, arch: 0xc4dce6,
+  },
+  coral: {
+    floor: '#6a5f6e', grout: '#332c38', wall: '#7a4a62', mortar: '#3a2230',
+    fog: 0x123044, hemi: [0x9fe0f0, 0x2a4a5c], torch: 0xff8ac0, props: 'bones',
+  },
+  sunken: {
+    floor: '#8e9aa0', grout: '#4a565c', wall: '#7f8c94', mortar: '#3e4a50',
+    fog: 0x123c52, hemi: [0xbfe8f4, 0x27505f], torch: 0x6fd8ff, props: 'runes',
+    bgMake: (i) => seaSky(i + 19, { deep: true }), bgH: 12, outdoor: true,
+    sideWall: 0x6e7a82, ledge: 0x5c666e, arch: 0x93a0a8,
+  },
+  bell: {
+    floor: '#6f7a80', grout: '#333c42', wall: '#5e6a72', mortar: '#2a3238',
+    fog: 0x04121e, hemi: [0x8fd0e8, 0x18303e], torch: 0x5fc8ff, props: 'greatbell',
   },
   sewer: { floor: '#4f5a55', grout: '#1f2622', wall: '#3f4a48', mortar: '#1b211f', fog: 0x0a1210, hemi: [0x7d9a93, 0x1c2a24], torch: 0xffa040, props: 'barrels' },
   crypt: { floor: '#5a5560', grout: '#221f28', wall: '#4a4452', mortar: '#1e1a24', fog: 0x0d0a12, hemi: [0x8a80a8, 0x241c30], torch: 0x9fd0ff, props: 'bones' },
@@ -573,6 +595,98 @@ export function buildRoom(world, roomDef, index) {
     coffin.position.set(W / 2, 0.35, zBack + 1.0);
     coffin.castShadow = true; coffin.receiveShadow = true;
     g.add(coffin);
+  } else if (theme.props === 'greatbell') {
+    // The floor of the temple: the bell hanging over the middle of it, wrapped in what came
+    // up out of the dark to take it, and braziers either side. The room was borrowing
+    // Orvane's cracked mirrors, which belong to another town entirely.
+    const bronze = new THREE.MeshStandardMaterial({ color: 0xb08a3a, roughness: 0.42, metalness: 0.65 });
+    const patina = new THREE.MeshStandardMaterial({ color: 0x3f7a6a, roughness: 0.8 });
+    const limb = new THREE.MeshStandardMaterial({ color: 0x27507f, roughness: 0.85 });
+    const cx = W / 2, cz = FLOOR.zMin + 0.4;
+    // the bell, high enough to hang over the fight rather than sit in it
+    // Low enough that its rim sits at the top of the frame and high enough to be over the
+    // fight rather than in it. The camera looks at y 1.5 from 4.6 and sees to about 5, so a
+    // bell at 8 is a bell nobody ever sees and one at 5.6 covered the boss.
+    const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.5, 2.2, 18, 1, true), bronze);
+    bell.position.set(cx, 5.1, cz);
+    bell.castShadow = true;
+    g.add(bell);
+    const crownB = new THREE.Mesh(new THREE.SphereGeometry(0.95, 16, 9, 0, Math.PI * 2, 0, Math.PI / 2), bronze);
+    crownB.position.set(cx, 6.2, cz);
+    g.add(crownB);
+    const yoke = new THREE.Mesh(new THREE.BoxGeometry(0.34, 2.2, 0.34), patina);
+    yoke.position.set(cx, 7.3, cz);
+    g.add(yoke);
+    const clapper = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), patina);
+    clapper.position.set(cx, 4.2, cz);
+    g.add(clapper);
+    // bands around the skirt
+    for (const y of [4.3, 5.1, 5.9]) {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(y < 4.7 ? 1.45 : y < 5.5 ? 1.25 : 1.05, 0.05, 6, 20), patina);
+      band.position.set(cx, y, cz); band.rotation.x = Math.PI / 2;
+      g.add(band);
+    }
+    // tentacles up the outside of it, which is the image the brief is built on
+    for (let i = 0; i < 4; i++) {
+      const a = -1.1 + i * 0.75;
+      const arm = new THREE.Mesh(new THREE.ConeGeometry(0.13, 3.0, 6), limb);
+      arm.position.set(cx + Math.sin(a) * 1.25, 4.9, cz + Math.cos(a) * 0.6);
+      arm.rotation.set(0.2, 0, -Math.sin(a) * 0.45);
+      arm.castShadow = true;
+      g.add(arm);
+    }
+    // and the last two pooled lights, as braziers on the floor
+    for (const side of [-1, 1]) {
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.22, 0.85, 8), patina);
+      bowl.position.set(cx + side * 4.4, 0.42, zBack + 1.7);
+      bowl.castShadow = true;
+      g.add(bowl);
+      const fire = takeLight();
+      if (!fire) continue;
+      fire.color.set(theme.torch);
+      fire.intensity = 16; fire.distance = 11; fire.decay = 1.6;
+      fire.position.set(cx + side * 4.4, 1.35, zBack + 1.7);
+      world.torches.push({ light: fire, flame: null, base: 16, seed: side * 7 });
+    }
+  } else if (theme.props === 'shells') {
+    // Bairune's beach: what the sea left. Big shells, driftwood, and the ribs of a boat that
+    // did not make it - the desert's props were standing in here and brought cacti with them.
+    const shellP = new THREE.MeshStandardMaterial({ color: 0xf0e2d0, roughness: 0.45 });
+    const drift = new THREE.MeshStandardMaterial({ color: 0x8a7a66, roughness: 0.95 });
+    const weed = new THREE.MeshStandardMaterial({ color: 0x3f6b58, roughness: 0.9 });
+    for (let i = 0; i < 6; i++) {
+      const x = 1.8 + i * (W / 6.2), z = zBack + 0.9 + (i % 3) * 0.45;
+      if (i % 3 === 0) {
+        // a fan shell, half buried and leaning
+        const sh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), shellP);
+        sh.position.set(x, 0.06, z);
+        sh.rotation.set(-0.5 + (i % 2) * 0.3, i, 0.3);
+        sh.scale.set(1, 0.55, 0.8);
+        sh.castShadow = true; sh.receiveShadow = true;
+        g.add(sh);
+      } else if (i % 3 === 1) {
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.11, 1.5, 7), drift);
+        log.position.set(x, 0.13, z);
+        log.rotation.set(0, i * 0.7, Math.PI / 2 + 0.12);
+        log.castShadow = true; log.receiveShadow = true;
+        g.add(log);
+      } else {
+        for (let k = 0; k < 4; k++) {
+          const frond = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.55, 4), weed);
+          frond.position.set(x + (k - 1.5) * 0.12, 0.26, z);
+          frond.rotation.z = (k - 1.5) * 0.24;
+          g.add(frond);
+        }
+      }
+    }
+    // the wreck: a curve of ribs out of the sand
+    for (let i = 0; i < 5; i++) {
+      const rib = new THREE.Mesh(new THREE.TorusGeometry(0.8 - i * 0.06, 0.05, 5, 12, Math.PI * 0.85), drift);
+      rib.position.set(W * 0.72 + i * 0.34, 0.05, zBack + 1.5);
+      rib.rotation.set(0, 0.25, Math.PI);
+      rib.castShadow = true;
+      g.add(rib);
+    }
   } else if (theme.props === 'runes') {
     // Orvane. Above ground it is the tower's own rubble: broken column drums and worked stone,
     // each with a rune still burning on it, because the spell in them did not stop when the

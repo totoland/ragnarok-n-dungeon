@@ -8,6 +8,8 @@ import { addShake } from './scene.js';
 
 const MAX_PARTICLES = 1500;
 
+const HALF_PI = Math.PI / 2;
+
 export function createFx(world) {
   const scene = world.scene;
 
@@ -148,6 +150,36 @@ export function createFx(world) {
   const flashLight = new THREE.PointLight(0xffb060, 0, 9, 1.5);
   scene.add(flashLight);
 
+  // Glows for projectiles and drops, pooled - the same lesson the room's torches taught, in
+  // the one place it was still being ignored. A light added to the scene changes the light
+  // count every material's shader is compiled against, so an orb cast of three used to
+  // invalidate every program on screen, and a potion dropping did it again on the way out.
+  // Three is a full cast, or three drops; anything past that goes without, which nobody can
+  // see because the things themselves are emissive.
+  const FX_LIGHTS = 3;
+  const fxLights = [];
+  for (let i = 0; i < FX_LIGHTS; i++) {
+    const l = new THREE.PointLight(0xffffff, 0, 5, 2);
+    l.position.set(0, -60, 0);
+    scene.add(l);
+    fxLights.push(l);
+  }
+  // Hand them out to whatever is asking this frame, and park the rest.
+  function placeFxLights() {
+    let n = 0;
+    const give = (m) => {
+      const want = m.userData.glow;
+      if (!want || n >= FX_LIGHTS) return;
+      const l = fxLights[n++];
+      l.color.set(want.color); l.intensity = want.intensity; l.distance = want.distance;
+      m.getWorldPosition(l.position);
+      l.position.y += want.y || 0;
+    };
+    for (const m of projectiles.values()) give(m);
+    for (const m of pickups.values()) give(m);
+    for (; n < FX_LIGHTS; n++) { fxLights[n].intensity = 0; fxLights[n].position.set(0, -60, 0); }
+  }
+
   // ---- projectiles (sim-owned, mirrored here by id)
   const projectiles = new Map();
   const arrowGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.85, 5);
@@ -171,8 +203,7 @@ export function createFx(world) {
     const g = new THREE.Group();
     g.add(new THREE.Mesh(orbCoreGeo, orbCoreMat));
     g.add(new THREE.Mesh(orbShellGeo, orbShellMat));
-    const light = new THREE.PointLight(0xff5a1e, 6, 4.5, 2);
-    g.add(light);
+    g.userData.glow = { color: 0xff5a1e, intensity: 6, distance: 4.5 };
     return g;
   }
 
@@ -180,11 +211,27 @@ export function createFx(world) {
   // flame rather than the hell orb's ember.
   const foxCoreMat = new THREE.MeshBasicMaterial({ color: 0xd8f4ff, toneMapped: false });
   const foxShellMat = new THREE.MeshBasicMaterial({ color: 0x3fd0ff, transparent: true, opacity: 0.45, toneMapped: false });
+  // Bairune's water bolt: a pale core in a deep blue shell, with a ring of foam around it so
+  // it reads as a thing the sea threw rather than another orb.
+  const tideCoreMat = new THREE.MeshBasicMaterial({ color: 0xeafaff, toneMapped: false });
+  const tideShellMat = new THREE.MeshBasicMaterial({ color: 0x2f9fd8, transparent: true, opacity: 0.5, toneMapped: false });
+  const foamGeo = new THREE.TorusGeometry(0.28, 0.05, 5, 12);
+  function makeTide() {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(orbCoreGeo, tideCoreMat));
+    g.add(new THREE.Mesh(orbShellGeo, tideShellMat));
+    const foam = new THREE.Mesh(foamGeo, tideShellMat);
+    foam.rotation.y = HALF_PI;
+    g.add(foam);
+    g.userData.glow = { color: 0x4fc8ff, intensity: 5, distance: 4 };
+    return g;
+  }
+
   function makeFoxfire() {
     const g = new THREE.Group();
     g.add(new THREE.Mesh(orbCoreGeo, foxCoreMat));
     g.add(new THREE.Mesh(orbShellGeo, foxShellMat));
-    g.add(new THREE.PointLight(0x5ac8ff, 6, 4.5, 2));
+    g.userData.glow = { color: 0x5ac8ff, intensity: 6, distance: 4.5 };
     return g;
   }
 
@@ -211,6 +258,7 @@ export function createFx(world) {
   function makeArrow(kind) {
     if (kind === 'hellOrb') return makeOrb();
     if (kind === 'foxfire') return makeFoxfire();
+    if (kind === 'tide') return makeTide();
     if (kind === 'sandBall') return makeSandBall();
     if (kind === 'rock') return makeRock();
     const g = new THREE.Group();
@@ -241,7 +289,7 @@ export function createFx(world) {
     g.add(body);
     const neck = new THREE.Mesh(neckGeo, body.material); neck.position.y = 0.31; g.add(neck);
     const cork = new THREE.Mesh(corkGeo, corkMat); cork.position.y = 0.39; g.add(cork);
-    const glow = new THREE.PointLight(c, 3, 2.5, 2); glow.position.y = 0.3; g.add(glow);
+    g.userData.glow = { color: c, intensity: 3, distance: 2.5, y: 0.3 };
     return g;
   }
 
@@ -352,6 +400,10 @@ export function createFx(world) {
       }
       // Orvane's Auto Meteor, in two halves: the mark on the floor when it is called, and the
       // star landing on that spot half a second later, wherever the target has got to.
+      case 'undertow':   // the sea taking hold: a tight ring and foam dragged inwards
+        ring(ev.x, ev.z, { color: 0x3fc8f0, radius: 1.1, life: 0.3, y: 0.06 });
+        burst(ev.x, ev.y, ev.z, 10, { color: 0x9fe4ff, speed: 1.6, up: 1.2, life: 0.35, size: 0.22, gravity: 2 });
+        break;
       case 'autoMeteor':
         ring(ev.x, ev.z, { color: 0xb070ff, radius: 1.5, life: 0.5, y: 0.04 });
         break;
@@ -522,6 +574,7 @@ export function createFx(world) {
       m.visible = left > 3 || Math.floor(world.t * 8) % 2 === 0;
     }
     for (const [id, m] of pickups) if (!seenP.has(id)) { scene.remove(m); pickups.delete(id); }
+    placeFxLights();   // after both lists have settled, so nothing holds a light it no longer owns
 
     // falling arrows
     for (let i = rain.length - 1; i >= 0; i--) {
@@ -576,7 +629,7 @@ export function createFx(world) {
     number(WARM_X, 1, WARM_Z, '99', '#fff', true); number(WARM_X, 1, WARM_Z, '99', '#fff', false, true);
     slash(WARM_X, 0, WARM_Z, 1); ring(WARM_X, WARM_Z, { life: 9 }); beam(WARM_X, WARM_Z, { life: 9 });
     let id = -1;
-    for (const kind of ['arrow', 'hellOrb', 'foxfire', 'sandBall', 'rock']) { const m = makeArrow(kind); m.position.set(WARM_X, 1, WARM_Z); scene.add(m); projectiles.set(id--, m); }
+    for (const kind of ['arrow', 'hellOrb', 'foxfire', 'tide', 'sandBall', 'rock']) { const m = makeArrow(kind); m.position.set(WARM_X, 1, WARM_Z); scene.add(m); projectiles.set(id--, m); }
     for (const kind of ['hp', 'mp']) { const m = makePotion(kind); m.position.set(WARM_X, 0, WARM_Z); scene.add(m); pickups.set(id--, m); }
   }
   return { update, clear, burst, number, warm };

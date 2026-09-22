@@ -972,6 +972,197 @@ function buildShardling() {
   return { root, body, kind: 'blob' };
 }
 
+// ------------------------------------------------------------------ Bairune
+//
+// The drowned temple. Everything here is built for a silhouette read against bright water:
+// wide low shapes on the beach, drifting ones in the caves, and upright ones once the city
+// starts. Nothing is transparent except the jellyfish, which is the one that should be.
+
+// Craboon: orange, wide, and asymmetric - one claw is the monster.
+function buildCraboon() {
+  const root = new THREE.Group();
+  const body = node(0, 0.32, 0, root);
+  const shellC = mat(0xe8703a, { roughness: 0.55 });
+  const under = mat(0xf6c49a, { roughness: 0.8 });
+  const eyeC = mat(0x201418, { roughness: 0.3 });
+  const carapace = mesh(new THREE.SphereGeometry(0.42, 14, 10), shellC, 0, 0, 0, body);
+  carapace.scale.set(1.25, 0.6, 1);
+  mesh(new THREE.SphereGeometry(0.34, 12, 8), under, 0, -0.1, 0.06, body).scale.set(1.1, 0.35, 0.9);
+  for (const side of [-1, 1]) {
+    // eye stalks
+    mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.18, 5), under, side * 0.13, 0.2, 0.2, body);
+    mesh(new THREE.SphereGeometry(0.06, 8, 8), eyeC, side * 0.13, 0.3, 0.22, body);
+    // four legs a side, splayed
+    for (let i = 0; i < 4; i++) {
+      const leg = mesh(new THREE.CylinderGeometry(0.035, 0.02, 0.38, 5), shellC, side * 0.4, -0.12, 0.22 - i * 0.16, body);
+      leg.rotation.z = side * 1.05;
+    }
+  }
+  // the big claw, and a small one to make it look big
+  const bigArm = mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.3, 6), shellC, -0.45, 0.02, 0.24, body);
+  bigArm.rotation.z = 0.7;
+  const claw = mesh(new THREE.SphereGeometry(0.22, 10, 8), shellC, -0.62, 0.16, 0.3, body);
+  claw.scale.set(1.3, 0.9, 0.7);
+  mesh(new THREE.BoxGeometry(0.26, 0.07, 0.16), under, -0.74, 0.2, 0.3, body).rotation.z = -0.25;
+  mesh(new THREE.SphereGeometry(0.11, 8, 8), shellC, 0.5, 0.0, 0.26, body).scale.set(1.2, 0.9, 0.7);
+  return { root, body, kind: 'blob' };
+}
+
+// Hydrella: an anemone that shoots. It does not really walk, so the drift is all it has.
+function buildHydrella() {
+  const root = new THREE.Group();
+  const body = node(0, 0.5, 0, root);
+  const stalk = mat(0x7a3f86, { roughness: 0.9 });
+  const frond = mat(0xc06ad0, { roughness: 0.85 });
+  const bud = mat(0xffc2f0, { emissive: 0xff7ad8, emissiveIntensity: 0.9, roughness: 0.4 });
+  mesh(new THREE.CylinderGeometry(0.16, 0.3, 0.6, 9), stalk, 0, -0.2, 0, body);
+  mesh(new THREE.SphereGeometry(0.26, 12, 10), stalk, 0, 0.15, 0, body).scale.set(1, 0.8, 1);
+  // a crown of tentacles, leaning out
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2;
+    const t = mesh(new THREE.ConeGeometry(0.05, 0.46, 5), frond,
+      Math.cos(a) * 0.2, 0.34, Math.sin(a) * 0.2, body);
+    t.rotation.set(Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7);
+  }
+  mesh(new THREE.SphereGeometry(0.1, 10, 10), bud, 0, 0.36, 0.06, body);
+  return { root, body, kind: 'blob' };
+}
+
+// Jellune: the only transparent thing in the town, and the only one with its light inside.
+function buildJellune() {
+  const root = new THREE.Group();
+  const body = node(0, 0.72, 0, root);
+  const bellM = mat(0x8fd8ff, { roughness: 0.25, transparent: true, opacity: 0.45 });
+  const core = mat(0xdff6ff, { emissive: 0x4fc8ff, emissiveIntensity: 1.5, roughness: 0.3 });
+  const tendril = mat(0xbfe8ff, { roughness: 0.6, transparent: true, opacity: 0.6 });
+  const bell = mesh(new THREE.SphereGeometry(0.34, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), bellM, 0, 0.1, 0, body);
+  bell.scale.set(1, 1.05, 1);
+  mesh(new THREE.SphereGeometry(0.11, 10, 10), core, 0, 0.06, 0, body);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2, r = 0.2 + (i % 2) * 0.07;
+    mesh(new THREE.CylinderGeometry(0.018, 0.008, 0.6 + (i % 3) * 0.18, 4), tendril,
+      Math.cos(a) * r, -0.32 - (i % 3) * 0.08, Math.sin(a) * r, body);
+  }
+  return { root, body, kind: 'blob' };
+}
+
+// Marinox: the town's soldier, and the first upright thing in it.
+function buildMarinox() {
+  const scaleM = mat(0x3f8a72, { roughness: 0.65 });
+  const paleM = mat(0xbfe0c8, { roughness: 0.8 });
+  const finM = mat(0x5fc8b0, { roughness: 0.55, transparent: true, opacity: 0.85 });
+  const shellM = mat(0xe4d8b8, { roughness: 0.6 });
+  const eyeM = mat(0xffd24a, { emissive: 0xffa81a, emissiveIntensity: 0.8 });
+  return humanoid({
+    scale: 1.0, hip: 0.95, torsoH: 0.66, shoulderW: 0.27, legW: 0.14,
+    buildTorso(t, h) {
+      mesh(new THREE.CapsuleGeometry(0.2, 0.34, 5, 10), scaleM, 0, h * 0.55, 0, t);
+      mesh(new THREE.SphereGeometry(0.17, 10, 8), paleM, 0, h * 0.42, 0.11, t).scale.set(1, 1.5, 0.5);
+      // a dorsal fin down the spine
+      for (let i = 0; i < 3; i++) {
+        const f = mesh(new THREE.ConeGeometry(0.09 - i * 0.02, 0.24, 3), finM, 0, h - 0.12 - i * 0.18, -0.18, t);
+        f.rotation.x = -0.4; f.scale.set(1, 1, 0.2);
+      }
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.19, 12, 10), scaleM, 0, 0.16, 0, hd).scale.set(1, 1, 1.25);
+      mesh(new THREE.ConeGeometry(0.12, 0.26, 7), scaleM, 0, 0.12, 0.2, hd).rotation.x = HALF;   // snout
+      for (const side of [-1, 1]) {
+        mesh(new THREE.SphereGeometry(0.05, 8, 8), eyeM, side * 0.11, 0.21, 0.13, hd);
+        // the cheek fins from the brief
+        const gill = mesh(new THREE.ConeGeometry(0.1, 0.3, 3), finM, side * 0.18, 0.12, -0.04, hd);
+        gill.rotation.set(0, 0, -side * 1.2); gill.scale.set(1, 1, 0.22);
+      }
+    },
+    buildArm(a, side) {
+      mesh(new THREE.CapsuleGeometry(0.058, 0.3, 4, 8), scaleM, 0, -0.2, 0, a);
+      mesh(new THREE.CapsuleGeometry(0.05, 0.28, 4, 8), scaleM, side * 0.03, -0.5, 0, a);
+      if (side < 0) {   // the shell spear rides the weapon-side arm
+        const haft = mesh(new THREE.CylinderGeometry(0.028, 0.028, 1.9, 6), shellM, -0.06, -0.55, 0.08, a);
+        haft.rotation.x = 0.18;
+        mesh(new THREE.ConeGeometry(0.09, 0.34, 7), shellM, -0.06, 0.3, 0.02, a);
+      }
+    },
+    buildLeg(l) {
+      mesh(new THREE.CapsuleGeometry(0.075, 0.34, 4, 8), scaleM, 0, -0.25, 0, l);
+      mesh(new THREE.CapsuleGeometry(0.06, 0.3, 4, 8), scaleM, 0, -0.6, 0, l);
+      mesh(new THREE.BoxGeometry(0.16, 0.06, 0.3), finM, 0, -0.8, 0.07, l);   // webbed foot
+    },
+  });
+}
+
+// Shellora: two shells and a pearl. Wide and low, so it reads as cover rather than a creature.
+function buildShellora() {
+  const root = new THREE.Group();
+  const body = node(0, 0.42, 0, root);
+  const shellS = mat(0x9a8fa8, { roughness: 0.45 });
+  const innerS = mat(0xffe8f4, { roughness: 0.2, metalness: 0.3 });
+  const pearl = mat(0xfff4fa, { emissive: 0xffd8ee, emissiveIntensity: 0.7, roughness: 0.1, metalness: 0.4 });
+  for (const [sign, tilt] of [[1, -0.5], [-1, 0.32]]) {
+    const half = mesh(new THREE.SphereGeometry(0.52, 14, 9, 0, Math.PI * 2, 0, Math.PI / 2), shellS, 0, 0.02, 0, body);
+    half.rotation.z = Math.PI * (sign > 0 ? 0 : 1) + tilt * sign;
+    half.scale.set(1, 0.55, 0.85);
+    const lip = mesh(new THREE.TorusGeometry(0.5, 0.035, 6, 18), innerS, 0, 0.02, 0, body);
+    lip.rotation.x = HALF; lip.rotation.z = tilt * sign * 0.4;
+    lip.scale.set(1, 0.85, 1);
+  }
+  mesh(new THREE.SphereGeometry(0.15, 12, 12), pearl, 0, 0.06, 0.02, body);
+  // the ribs that make a shell a shell
+  for (let i = 0; i < 6; i++) {
+    const a = -0.9 + (i / 5) * 1.8;
+    const rib = mesh(new THREE.BoxGeometry(0.04, 0.04, 0.9), shellS, Math.sin(a) * 0.3, 0.16, 0, body);
+    rib.rotation.y = a * 0.4;
+  }
+  return { root, body, kind: 'blob' };
+}
+
+// Nerakos - PLACEHOLDER, the same way Moonraya was one. A man on tentacles with a trident,
+// enough to fight and tune against until Toto's sculpt lands, at which point this is replaced
+// by a GLB build like the other four bosses.
+function buildNerakos() {
+  const skinN = mat(0x2f5f9a, { roughness: 0.7 });
+  const armourN = mat(0xd8a86a, { roughness: 0.5, metalness: 0.4 });
+  const limbN = mat(0x27507f, { roughness: 0.8 });
+  const bellN = mat(0xe0c07a, { emissive: 0x8a6a1a, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.6 });
+  const eyeN = mat(0x8fe8ff, { emissive: 0x4fc8ff, emissiveIntensity: 1.4 });
+  return humanoid({
+    scale: 1.55, hip: 1.15, torsoH: 0.86, shoulderW: 0.42, legW: 0.2,
+    buildTorso(t, h) {
+      mesh(new THREE.CapsuleGeometry(0.34, 0.5, 6, 12), skinN, 0, h * 0.55, 0, t);
+      mesh(new THREE.SphereGeometry(0.36, 12, 10), armourN, 0, h - 0.18, 0.06, t).scale.set(1.25, 0.8, 0.7);
+      // six tentacles instead of a lower body, splayed around the hips
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const arm = mesh(new THREE.ConeGeometry(0.17, 1.5, 6), limbN,
+          Math.cos(a) * 0.3, -0.24, Math.sin(a) * 0.3, t);
+        arm.rotation.set(Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9);
+      }
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.26, 14, 12), skinN, 0, 0.2, 0, hd);
+      // a crown of broken shell
+      for (let i = 0; i < 5; i++) {
+        const a = -1.1 + (i / 4) * 2.2;
+        const pt = mesh(new THREE.ConeGeometry(0.06, 0.24 + (i % 2) * 0.12, 4), armourN,
+          Math.sin(a) * 0.24, 0.42, Math.cos(a) * 0.18, hd);
+        pt.rotation.z = -Math.sin(a) * 0.5;
+      }
+      for (const side of [-1, 1]) mesh(new THREE.SphereGeometry(0.055, 8, 8), eyeN, side * 0.11, 0.22, 0.21, hd);
+    },
+    buildArm(a, side) {
+      mesh(new THREE.CapsuleGeometry(0.1, 0.38, 5, 10), skinN, 0, -0.24, 0, a);
+      mesh(new THREE.CapsuleGeometry(0.085, 0.34, 5, 10), skinN, side * 0.04, -0.62, 0, a);
+      if (side < 0) {
+        const haft = mesh(new THREE.CylinderGeometry(0.045, 0.045, 2.6, 7), armourN, -0.1, -0.5, 0.1, a);
+        haft.rotation.x = 0.12;
+        for (const px of [-0.16, 0, 0.16]) mesh(new THREE.ConeGeometry(0.07, 0.42, 5), armourN, -0.1 + px, 0.9, 0.08, a);
+        mesh(new THREE.SphereGeometry(0.11, 10, 10), bellN, -0.1, 0.5, 0.1, a);   // the little bell
+      }
+    },
+    buildLeg() { /* no legs: the tentacles are the lower body, built on the torso */ },
+  });
+}
+
 // Moonraya - PLACEHOLDER. Toto is sculpting her, and this stands in so the fight can be
 // played and tuned meanwhile. When the sculpt lands it goes the way Baphomet did: exported
 // limb-segmented by tools/export_heroes.py to assets/monsters/moonraya.glb with an entry in
@@ -991,6 +1182,9 @@ const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   grinlit: buildGrinlit, velmara: buildVelmara, nyxmare: buildNyxmare,
   shardling: buildShardling,
   darkSword: buildDarkSwordGlb,
+  // Bairune. Nerakos is a stand-in until the sculpt arrives, the way Moonraya was.
+  craboon: buildCraboon, hydrella: buildHydrella, jellune: buildJellune,
+  marinox: buildMarinox, shellora: buildShellora, nerakos: buildNerakos,
   // Morroc's boss. No legs: the pose rig simply leaves out what the sculpt does not have.
   sandman: buildSandmanGlb };
 

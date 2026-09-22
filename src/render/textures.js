@@ -287,6 +287,71 @@ export function runeSky(seed = 7, { rift = false } = {}) {
   return t;
 }
 
+// Bairune's water, painted rather than shipped. `deep` is the same scene further down: the
+// surface light goes out of it, the colour walks from turquoise to indigo, and the ruins on
+// the horizon stop being an island and start being a city.
+export function seaSky(seed = 11, { deep = false } = {}) {
+  const w = 1024, h = 440;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  let s = seed;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  const horizon = h * 0.8;
+  ctx.fillStyle = deep ? '#071a33' : '#3ea8c4'; ctx.fillRect(0, 0, w, h);
+  const water = ctx.createLinearGradient(0, 0, 0, horizon);
+  if (deep) { water.addColorStop(0, '#02060f'); water.addColorStop(0.45, '#062038'); water.addColorStop(1, '#0b3a5c'); }
+  else { water.addColorStop(0, '#9fe4f0'); water.addColorStop(0.4, '#4fb9d6'); water.addColorStop(1, '#1d6f96'); }
+  ctx.fillStyle = water; ctx.fillRect(0, 0, w, horizon + 2);
+  // Light from the surface: broad shafts leaning the same way, brighter up top.
+  for (let i = 0; i < 9; i++) {
+    const x = rnd() * w, wide = 34 + rnd() * 70, lean = 60 + rnd() * 80;
+    const g = ctx.createLinearGradient(x, 0, x + lean, horizon);
+    const a = deep ? 0.05 : 0.16;
+    g.addColorStop(0, `rgba(226,250,255,${a})`);
+    g.addColorStop(1, 'rgba(226,250,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x - wide / 2, 0); ctx.lineTo(x + wide / 2, 0);
+    ctx.lineTo(x + lean + wide, horizon); ctx.lineTo(x + lean - wide, horizon);
+    ctx.closePath(); ctx.fill();
+  }
+  // The ruins on the sea floor: columns and roofs, three ranks, fading with distance.
+  const ranks = deep
+    ? [['#0a2d47', 0.72, 130, 96], ['#07223a', 0.82, 162, 78], ['#04162a', 0.93, 200, 58]]
+    : [['#2f7f9c', 0.74, 96, 104], ['#246a86', 0.84, 124, 84], ['#17506a', 0.94, 156, 62]];
+  for (const [col, yk, tall, step] of ranks) {
+    const y0 = h * yk;
+    ctx.fillStyle = col;
+    for (let x = -step; x <= w + step; x += step) {
+      const hgt = tall * (0.4 + rnd() * 0.8), half = step * (0.14 + rnd() * 0.14);
+      ctx.fillRect(x - half, y0 - hgt, half * 2, hgt + 8);
+      if (rnd() > 0.55) {                       // a broken pediment on some of them
+        ctx.beginPath();
+        ctx.moveTo(x - half * 1.5, y0 - hgt);
+        ctx.lineTo(x, y0 - hgt - half * 0.9);
+        ctx.lineTo(x + half * 1.5, y0 - hgt);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+  }
+  // Motes and small fish: the thing that says this is water and not fog.
+  for (let i = 0; i < 90; i++) {
+    const x = rnd() * w, y = rnd() * horizon, r = 0.8 + rnd() * 2.2;
+    ctx.fillStyle = `rgba(${deep ? '150,210,255' : '226,250,255'},${0.1 + rnd() * 0.3})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  const murk = ctx.createLinearGradient(0, horizon - 60, 0, h);
+  murk.addColorStop(0, deep ? 'rgba(4,16,32,0)' : 'rgba(30,110,150,0)');
+  murk.addColorStop(1, deep ? 'rgba(4,16,32,0.6)' : 'rgba(30,110,150,0.5)');
+  ctx.fillStyle = murk; ctx.fillRect(0, horizon - 60, w, h - horizon + 60);
+  noise(ctx, w, h, 0.05, seed);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
 export function duneSky(seed = 5, { rocky = false } = {}) {
   const w = 1024, h = 440;
   const c = document.createElement('canvas');

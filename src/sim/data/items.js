@@ -36,6 +36,7 @@ export const ATTRS = {
   meteor: { name: 'Auto Meteor', key: 'meteorAdd', min: 0.01, max: 0.03, step: 0.01 },
   twin: { name: 'Double Attack', key: 'doubleAdd', min: 0.01, max: 0.03, step: 0.01 },
   drain: { name: 'SP Drain', key: 'spDrainAdd', min: 0.01, max: 0.03, step: 0.01 },
+  pull: { name: 'Undertow', key: 'pullAdd', min: 0.01, max: 0.03, step: 0.01 },
   atkHi: { name: 'ATK', key: 'atkAdd', min: 5, max: 15, step: 1, flat: true },
 };
 export const ATTR_IDS = Object.keys(ATTRS);
@@ -84,6 +85,30 @@ export const ITEMS = {
     name: 'Twinshot', slot: 'weapon', hero: 'hunter', kind: 'bow',
     mods: { atkAdd: 50, doubleAdd: 0.15 },
     tip: '+50 ATK, 15% chance on hit: the shot lands twice',
+  },
+  // ---- Bairune. The town that finally fills the hat slot: one from each of its five, at
+  // the scale of a fifth town. Weapons continue the flat curve at 95 (6, 16, 30, 55, 95) and
+  // carry the town's own proc - Undertow, which drags what it hits back towards the hero,
+  // the sea pulling everything down to the temple.
+  clawHat: { name: 'Crab Claw Hat', slot: 'hat', mods: { atkAdd: 20 }, tip: '+20 ATK' },
+  coralCrown: { name: 'Coral Crown', slot: 'hat', mods: { atkAdd: 8, critAdd: 0.05 }, tip: '+8 ATK, +5% crit rate' },
+  jellyCap: { name: 'Jelly Cap', slot: 'hat', mods: { mp: 1.08, dodgeAdd: 0.04 }, tip: '+8% SP, +4% dodge' },
+  tidefin: { name: 'Tidefin Helm', slot: 'hat', mods: { atkAdd: 16, critDmgAdd: 0.12 }, tip: '+16 ATK, crits hit 12% harder' },
+  pearlDiadem: { name: 'Pearl Diadem', slot: 'hat', mods: { atkAdd: 10, hp: 1.06 }, tip: '+10 ATK, +6% HP' },
+  everwave: {
+    name: 'Everwave Mantle', slot: 'cape',
+    mods: { speed: 1.08, dodgeAdd: 0.06, hp: 1.05 },
+    tip: '+8% move speed, +6% dodge, +5% HP',
+  },
+  tidecleaver: {
+    name: 'Tidecleaver', slot: 'weapon', hero: 'knight', kind: 'sword',
+    mods: { atkAdd: 95, pullAdd: 0.18 },
+    tip: '+95 ATK, 18% chance on hit: Undertow drags them back to you',
+  },
+  coralbow: {
+    name: 'Coralbow', slot: 'weapon', hero: 'hunter', kind: 'bow',
+    mods: { atkAdd: 95, pullAdd: 0.18 },
+    tip: '+95 ATK, 18% chance on hit: Undertow drags them back to you',
   },
   runeSigil: { name: 'Rune Sigil', slot: 'accessory', main: 'meteor', secondary: ['atkHi', 'drain'], rarity: 'rare', tip: 'Main: Auto Meteor' },
   echoBand: { name: 'Echo Band', slot: 'accessory', main: 'twin', secondary: ['atkHi', 'drain'], rarity: 'rare', tip: 'Main: Double Attack' },

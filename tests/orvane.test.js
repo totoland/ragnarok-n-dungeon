@@ -38,8 +38,8 @@ const swing = (g, n) => {
   return events;
 };
 
-test('Orvane is the fourth town and its boss drops a weapon per class', () => {
-  assert.equal(Object.keys(TOWNS).at(-1), 'orvane');
+test('Orvane is a town in the table and its boss drops a weapon per class', () => {
+  assert.ok(Object.keys(TOWNS).includes('orvane'), 'Orvane is in the table');
   assert.equal(ORVANE.rooms.length, 5);
   assert.equal(ORVANE.rooms.at(-1).waves.at(-1)[0].type, 'darkSword');
   for (const [hero, id] of Object.entries(ORVANE.loot)) {
@@ -151,4 +151,50 @@ test('a run through Orvane is deterministic and reaches the Dark Sword', () => {
   const a = play(), b = play();
   assert.deepEqual(a, b);
   assert.ok(a.includes('Hall of Mirrors'), a.join(' -> '));
+});
+
+test('Bairune is a complete town: five monsters, a boss, five hats and a cape', async () => {
+  const { BAIRUNE } = await import('../src/sim/data/dungeon.js');
+  const { MONSTERS } = await import('../src/sim/data/monsters.js');
+  assert.equal(BAIRUNE.rooms.length, 4);
+  // Every monster it spawns is defined, and the last room ends on exactly one boss.
+  const used = new Set();
+  for (const room of BAIRUNE.rooms) for (const wave of room.waves) for (const g of wave) used.add(g.type);
+  for (const t of used) assert.ok(MONSTERS[t], `${t} defined`);
+  const bosses = BAIRUNE.rooms.at(-1).waves.flat().map((g) => g.type).filter((t) => MONSTERS[t]?.boss);
+  assert.deepEqual(bosses, ['nerakos']);
+  for (const move of ['attack', 'charge', 'slam', 'cast', 'adds']) assert.ok(MONSTERS.nerakos[move], `boss has ${move}`);
+  assert.ok(MONSTERS[MONSTERS.nerakos.adds.type], 'adds type defined');
+
+  // The town that finally fills the hat slot: one from each of its five, plus the cape.
+  const hats = new Set(), capes = new Set();
+  for (const t of used) for (const d of MONSTERS[t].drops || []) {
+    if (ITEMS[d.item]?.slot === 'hat') hats.add(d.item);
+    if (ITEMS[d.item]?.slot === 'cape') capes.add(d.item);
+  }
+  assert.equal(hats.size, 5, `five hats, got ${[...hats]}`);
+  assert.deepEqual([...capes], ['everwave']);
+  // And the boss pays a weapon per class, like every other boss.
+  for (const [hero, id] of Object.entries(BAIRUNE.loot)) {
+    assert.equal(ITEMS[id].slot, 'weapon');
+    assert.ok(fits(id, hero));
+    assert.equal(ITEMS[id].mods.atkAdd, 95, 'on the flat curve: 6, 16, 30, 55, 95');
+  }
+});
+
+test('Undertow drags what it hits back towards the hero', async () => {
+  const { BAIRUNE } = await import('../src/sim/data/dungeon.js');
+  const { createEnemy: mk } = await import('../src/sim/enemies.js');
+  const g = createGame({ hero: 'knight', seed: 5, dungeon: BAIRUNE, xp: xpAtLevel(LEVEL.max), gear: { id: 'tidecleaver', plus: 0 } });
+  assert.ok(g.player.pull > 0, 'the weapon grants it');
+  g.player.pull = 1;
+  steps(g, 2);
+  const e = mk(g, 'craboon', g.player.x + 1.2, 0);
+  e.hp = 1e6;
+  g.enemies.push(e);
+  const events = swing(g, 60);
+  const pulls = events.filter((ev) => ev.type === 'undertow');
+  assert.ok(pulls.length > 0, 'it fired');
+  // It pulls rather than pushes: the monster's velocity points back at the hero.
+  assert.ok(Math.sign(e.vx) === Math.sign(g.player.x - e.x) || e.vx === 0, `vx ${e.vx}`);
 });
