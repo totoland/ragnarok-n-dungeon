@@ -24,6 +24,12 @@ const el = (tag, cls, text) => {
   return n;
 };
 
+/** Turn the panel on or off and remember it. The native shell has no address bar, so this is
+ *  the only way in there - see the tap gesture in main.js. */
+export function setTestEnabled(on) {
+  try { localStorage.setItem(KEY, on ? '1' : '0'); return true; } catch { return false; }
+}
+
 /** On with ?test=1, off with ?test=0, and sticky in between - so a tablet keeps it across a
  *  reload without the query string having to be retyped. */
 export function testEnabled() {

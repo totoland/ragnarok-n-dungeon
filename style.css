@@ -558,3 +558,7 @@ body.touch #telemetry-badge { bottom: calc(110px + var(--safe-b)); right: calc(8
 .tstep { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--edge); background: var(--panel); color: var(--gold); font: inherit; font-size: 16px; line-height: 1; cursor: pointer; }
 .tstep:hover:not(:disabled) { background: rgba(232,182,74,0.18); }
 .tstep:disabled { opacity: 0.3; cursor: default; }
+
+/* The title is a five-tap switch for the test panel (main.js), so it has to accept a tap
+   without the browser deciding it is text being selected. */
+#title h1 { cursor: default; user-select: none; -webkit-user-select: none; }

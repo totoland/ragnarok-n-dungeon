@@ -214,22 +214,25 @@ export const ORVANE = {
   ],
 };
 
+// The soak: the game playing itself, forever, for a tablet to be left running while the
+// telemetry watches. One room of the same monsters told us nothing about the things that
+// actually cost frames - building and tearing down rooms, every theme's materials, the
+// sculpted bosses - so it is every room of every town in order, wrapping at the end.
+//
+// `soak: true` is what stops a run ever clearing (sim/game.js).
+const soakRooms = () => {
+  const out = [];
+  for (const town of Object.values(TOWNS_ORDER)) {
+    for (const room of town.rooms) out.push({ ...room, name: `${town.town} · ${room.name}` });
+  }
+  return out;
+};
+
 export const SOAK = {
-  town: 'Soak', name: 'Proving Ground', soak: true,
+  town: 'Soak', name: 'Every room, on a loop', soak: true,
   loot: { knight: 'katana', hunter: 'gakkung' },
-  rooms: [
-    {
-      name: 'Proving Ground', width: 22, theme: 'crypt',
-      waves: [
-        [{ type: 'poring', count: 4 }, { type: 'lunatic', count: 2 }],
-        [{ type: 'skeleton', count: 3 }, { type: 'skelArcher', count: 2 }],
-        [{ type: 'lunatic', count: 4 }, { type: 'poring', count: 3 }, { type: 'ant', count: 2 }],
-        [{ type: 'skeleton', count: 3 }, { type: 'skelArcher', count: 2 }, { type: 'sandWraith', count: 2 }],
-        [{ type: 'golem', count: 2 }, { type: 'babyWolf', count: 3 }, { type: 'pecoPeco', count: 2 }],
-        [{ type: 'skeleton', count: 4 }, { type: 'skelArcher', count: 3 }, { type: 'lunatic', count: 3 }, { type: 'poring', count: 2 }],
-      ],
-    },
-  ],
+  get rooms() { return this._rooms || (this._rooms = soakRooms()); },
 };
 
 export const TOWNS = { prontera: DUNGEON, morroc: MORROC, phaelan: PHAELAN, orvane: ORVANE };
+const TOWNS_ORDER = TOWNS;

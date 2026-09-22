@@ -358,8 +358,16 @@ export function update(g, input, dt = SIM.dt) {
       if (g.room.waves.length && g.roomT >= 0.8) startWave(g, 0);
     } else if (!alive && g.spawnQueue.length === 0) {
       if (g.waveIndex + 1 < g.room.waves.length) startWave(g, g.waveIndex + 1);
-      // A soak room has no last wave: the table starts again, so the run never clears.
-      else if (g.dungeon.soak) { g.loops = (g.loops || 0) + 1; startWave(g, 0); }
+      // A soak room has no last wave. A one-room soak starts its table again; a soak with
+      // more than one room walks to the next instead and wraps at the end, so a night of it
+      // builds and throws away every room in the game rather than sitting in one of them.
+      else if (g.dungeon.soak) {
+        if (g.dungeon.rooms.length > 1) {
+          const next = (g.roomIndex + 1) % g.dungeon.rooms.length;
+          if (!next) g.loops = (g.loops || 0) + 1;
+          loadRoom(g, next);
+        } else { g.loops = (g.loops || 0) + 1; startWave(g, 0); }
+      }
       else { g.phase = 'cleared'; pushEvent(g, { type: 'roomClear', index: g.roomIndex, last: g.roomIndex === g.dungeon.rooms.length - 1 }); }
     }
   } else if (g.phase === 'cleared') {

@@ -11,7 +11,7 @@ import { xpAtLevel } from './sim/progress.js';
 import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
-import { createTestUI, testEnabled } from './render/test-ui.js';
+import { createTestUI, testEnabled, setTestEnabled } from './render/test-ui.js';
 import { createMenuNav } from './render/menu-nav.js';
 import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom, prewarmTick, warmProps } from './render/scene.js';
 import { loadHeroAssets, createHeroView, showWeapon, restPose } from './render/heroes.js';
@@ -114,6 +114,35 @@ const testUI = testEnabled() ? createTestUI({
 }) : null;
 if (testUI) document.getElementById('title-test').hidden = false;
 document.getElementById('title-test')?.addEventListener('click', () => testUI?.open());
+
+// The way into the test panel on a device with no address bar. ?test=1 is fine in a browser
+// and impossible inside the native shell, where there is nowhere to type it - so five taps on
+// the game's own title toggles it and reloads. Deliberately a gesture nobody performs by
+// accident, and deliberately not automatic on native: a store build must not ship a panel
+// that hands out every item in the game.
+{
+  const title = document.querySelector('#title h1');
+  let taps = 0, first = 0;
+  title?.addEventListener('click', () => {
+    const now = performance.now();
+    if (now - first > 2500) { taps = 0; first = now; }
+    if (++taps < 5) return;
+    taps = 0;
+    const turningOn = !testEnabled();
+    if (!setTestEnabled(turningOn)) return;
+    hud.setLoading(`Test mode ${turningOn ? 'on' : 'off'} - reloading…`);
+    // Reload without the test parameter. testEnabled() reads the query string before the
+    // stored flag, so reloading onto a ?test=0 still in the address bar would undo the tap
+    // that just happened - the gesture has to leave with the URL it wants to come back to.
+    setTimeout(() => {
+      try {
+        const u = new URL(location.href);
+        u.searchParams.delete('test');
+        location.replace(u.toString());
+      } catch { location.reload(); }
+    }, 450);
+  });
+}
 // The way in. Enter still works - this is the same call, wearing a button.
 const startBtn = document.getElementById('title-start');
 startBtn.disabled = true;
