@@ -226,6 +226,45 @@ export function prewarmTick(world) {
   return warmQueue.length > 0;
 }
 
+/**
+ * Compile the shaders a room's furniture needs, at load, off-screen.
+ *
+ * The warm-up covers the heroes, every monster and every effect, and did not cover the room
+ * itself - prewarmRoom draws a room's textures and nothing else. That was survivable while
+ * every prop was a plain lit material like everything already warmed, and stopped being so
+ * once Orvane's rune bands and mirror cracks arrived with `toneMapped: false`, which is its
+ * own shader. The telemetry from the iPad names the cost exactly: a 222 ms frame on the way
+ * into Tower Yard, three programs and two textures wide.
+ *
+ * One tiny mesh per *configuration* rather than per theme: what the compiler cares about is
+ * the combination of features, and a dozen themes share a handful of those between them.
+ */
+export function warmProps(world) {
+  const geo = new THREE.BoxGeometry(0.01, 0.01, 0.01);
+  const mats = [
+    new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 }),                       // stone, wood, bone
+    new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.6 }),       // iron, frames
+    new THREE.MeshStandardMaterial({ color: 0x8899cc, roughness: 0.1, metalness: 0.9 }),       // mirror glass
+    new THREE.MeshStandardMaterial({ color: 0x1c4a44, roughness: 0.15, metalness: 0.3, transparent: true, opacity: 0.85 }), // sewer water
+    new THREE.MeshStandardMaterial({ color: 0xffd76a, emissive: 0xffd76a, emissiveIntensity: 1.5, roughness: 0.4 }),        // flame, glow
+    // The two that were not warmed at all, and the reason this function exists.
+    new THREE.MeshStandardMaterial({ color: 0xffd76a, emissive: 0xffd76a, emissiveIntensity: 1.5, roughness: 0.4, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ map: null, toneMapped: false }),
+  ];
+  const meshes = mats.map((m, i) => {
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(-300 + i, 0.5, 0);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    world.scene.add(mesh);
+    return mesh;
+  });
+  // The teardown takes the meshes out of the scene and leaves the materials alone. Disposing
+  // them would hand their programs straight back to the driver, which is the whole thing this
+  // function exists to prevent - and it also asks the renderer for a program that no longer
+  // exists, which WebGL answers with GL_INVALID_VALUE, twelve times, into the console.
+  return () => { for (const m of meshes) world.scene.remove(m); };
+}
+
 export function disposeRoom(world) {
   // The pool outlives the room. Park every light dark so nothing from the old room lingers
   // over the new one, or over the title screen when a run ends. Before the early return:
