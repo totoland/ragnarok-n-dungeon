@@ -12,6 +12,7 @@ import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
 import { createTestUI, testEnabled } from './render/test-ui.js';
+import { createMenuNav } from './render/menu-nav.js';
 import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom, prewarmTick } from './render/scene.js';
 import { loadHeroAssets, createHeroView, showWeapon, restPose } from './render/heroes.js';
 import { auraTick, stripAura } from './render/aura.js';
@@ -117,6 +118,48 @@ document.getElementById('title-test')?.addEventListener('click', () => testUI?.o
 const startBtn = document.getElementById('title-start');
 startBtn.disabled = true;
 startBtn.addEventListener('click', () => { if (!startBtn.disabled) { soak = false; start(); } });
+
+// The title screen on a pad. Everything on it is already a real button, so the same loop the
+// character panel uses drives it: the stick moves focus between hero, town and the way in,
+// and confirm presses what is focused. Without this the screen could only be reached with a
+// finger or a mouse, which on a tablet in a stand is no way at all.
+//
+// It answers only while the title is up and nothing is sitting over it - the panels own the
+// pad while they are open, and two loops reading the same stick would move two cursors.
+const titleEl = document.getElementById('title');
+const titleNav = createMenuNav({
+  input,
+  root: titleEl,
+  active: () => !titleEl.hidden && !settingsUI.isOpen && !characterUI.isOpen && !testUI?.isOpen,
+});
+titleNav.start();
+
+// The pause and end screens are menus too, and a player who reached them with a pad should
+// not have to find a mouse to leave. Same loop, same ring; back resumes a pause, and does
+// nothing on the end screen, where every way out is a deliberate choice.
+const pauseEl = document.getElementById('pause');
+const endEl = document.getElementById('end');
+const pauseNav = createMenuNav({
+  input, root: pauseEl,
+  active: () => !pauseEl.hidden && !settingsUI.isOpen && !characterUI.isOpen && !testUI?.isOpen,
+  onBack: () => { if (game && !ended) { paused = false; hud.showPause(false); } },
+});
+pauseNav.start();
+const endNav = createMenuNav({
+  input, root: endEl,
+  active: () => !endEl.hidden && !settingsUI.isOpen && !characterUI.isOpen && !testUI?.isOpen,
+});
+endNav.start();
+
+// Moving to a hero or a town card should pick it, the way hovering already does: on a pad
+// there is no separate "hover", and having to press confirm just to look at the next town
+// makes a two-button job out of a one-button one.
+titleEl.addEventListener('focusin', (e) => {
+  const b = e.target.closest?.('button');
+  if (!b || titleEl.hidden) return;
+  if (b.dataset.hero && b.dataset.hero !== selectedHero) { selectedHero = b.dataset.hero; markSelected(); }
+  else if (b.dataset.town && !b.disabled && b.dataset.town !== selectedTown) { selectedTown = b.dataset.town; markTown(); }
+});
 document.getElementById('title-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-settings').addEventListener('click', () => settingsUI.open());
 document.getElementById('pause-resume').addEventListener('click', () => { paused = false; hud.showPause(false); });
@@ -135,6 +178,10 @@ let progress = null;   // what recordRun() said about the run that just ended
 let preview = null;    // the title's plinths (built once the assets are in)
 // A New Game+ tier picked below the hero's own on a town card, keyed hero:town; unset
 // means the hero's clear count, which is the default and the ceiling.
+const tierRow = document.getElementById('tier-row');
+const tierLabel = document.getElementById('tier-label');
+const tierDown = document.getElementById('tier-down');
+const tierUp = document.getElementById('tier-up');
 const tierPick = new Map();
 const pickedTier = () => Math.min(tierFor(profile, selectedHero, selectedTown), tierPick.get(`${selectedHero}:${selectedTown}`) ?? Infinity);
 let paused = false;
@@ -181,6 +228,14 @@ function markTown() {
   refreshTitle();
 }
 for (const b of townButtons) b.addEventListener('click', () => { if (b.disabled) return; selectedTown = b.dataset.town; markTown(); });
+const stepTier = (delta) => {
+  const max = tierFor(profile, selectedHero, selectedTown);
+  const next = Math.max(0, Math.min(max, pickedTier() + delta));
+  tierPick.set(`${selectedHero}:${selectedTown}`, next);
+  refreshTitle();
+};
+tierDown.addEventListener('click', () => stepTier(-1));
+tierUp.addEventListener('click', () => stepTier(1));
 
 // Everything on the title that depends on the profile or the pick: level pills on the hero
 // cards, lock / tier state on the town cards, and the one-line blurb for the selected town.
@@ -212,25 +267,19 @@ function refreshTitle() {
       span.className = 'tier';
       span.textContent = ` · cleared ×${t.clears}`;
       em.append(span);
-      // The picker: only on the selected card, only once there is a tier to pick.
-      if (key === selectedTown && max > 0) {
-        const pick = document.createElement('span');
-        pick.className = 'tierpick';
-        const mk = (label, delta) => {
-          const b = document.createElement('span');
-          b.setAttribute('role', 'button'); b.textContent = label;
-          const next = tier + delta;
-          if (next < 0 || next > max) b.classList.add('off');
-          else b.addEventListener('click', (e) => { e.stopPropagation(); tierPick.set(`${selectedHero}:${key}`, next); refreshTitle(); });
-          return b;
-        };
-        const lbl = document.createElement('span');
-        lbl.textContent = tier ? `NG+${tier}` : 'Normal';
-        pick.append(mk('‹', -1), lbl, mk('›', 1));
-        em.append(pick);
-      } else if (tier) em.append(` · NG+${tier}`);
+      if (tier) em.append(` · NG+${tier}`);
     }
   }
+  // The difficulty row: shown only where there is a choice, which is a town already cleared.
+  const maxTier = tierFor(profile, selectedHero, selectedTown);
+  const now = pickedTier();
+  tierRow.hidden = !(maxTier > 0);
+  if (!tierRow.hidden) {
+    tierLabel.textContent = now ? `New Game+${now}` : 'Normal';
+    tierDown.disabled = now <= 0;
+    tierUp.disabled = now >= maxTier;
+  }
+
   const town = TOWNS[selectedTown];
   const last = town.rooms[town.rooms.length - 1];
   // The thing flagged as a boss, wherever in the room it is queued - not the first monster
@@ -258,7 +307,12 @@ input.on('mute', () => { sfx.init(); sfx.toggleMute(); });
 // the attack; say why the pad is dead, and that it came back.
 input.on('padStale', () => { if (game && !ended) hud.banner('Controller stalled', 'boss'); });
 input.on('padLive', () => { if (game && !ended) hud.banner('Controller back'); });
-input.on('pause', () => { if (!game || ended || settingsUI.isOpen || characterUI.isOpen || testUI?.isOpen) return; paused = !paused; hud.showPause(paused); });
+input.on('pause', () => {
+  if (!game || ended || settingsUI.isOpen || characterUI.isOpen || testUI?.isOpen) return;
+  paused = !paused;
+  hud.showPause(paused);
+  if (paused) pauseNav.focusFirst();
+});
 hud.el.retry.addEventListener('click', () => start());
 hud.el.endContinue.addEventListener('click', () => continueRun());
 hud.el.endHome.addEventListener('click', () => toTitle());
@@ -354,6 +408,7 @@ Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   monsters.prebuild(TOWNS[selectedTown].rooms[0], MONSTERS);
   hud.setLoading('Pick a hero and a town, then go.');
   startBtn.disabled = false;
+  titleNav.focusFirst(startBtn);
   for (const b of heroButtons) { b.disabled = false; b.addEventListener('mouseenter', () => { selectedHero = b.dataset.hero; markSelected(); }); }
   markTown();
   markSelected();
@@ -429,6 +484,9 @@ function toTitle() {
   hud.hideEnd();
   hud.showPause(false);
   hud.showTitle(true);
+  // A pad has no pointer, so nothing is under it until something has focus. Put the ring on
+  // the way in, which is where a player coming back to the title is heading anyway.
+  titleNav.focusFirst(startBtn);
   markTown();
   markSelected();
   preview = buildPreview();
@@ -682,7 +740,7 @@ function renderFrame(dt) {
     const g = game, won = g.phase === 'won';
     progress = recordRun(profile, g, { hero: selectedHero, town: selectedTown });
     saveProfile(profile);
-    setTimeout(() => { if (game === g) hud.showEnd(g, won, progress); }, won ? 1800 : 1400);
+    setTimeout(() => { if (game === g) { hud.showEnd(g, won, progress); endNav.focusFirst(); } }, won ? 1800 : 1400);
   }
   game.events.length = 0;
 }

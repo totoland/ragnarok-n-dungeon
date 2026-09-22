@@ -75,6 +75,15 @@
       <!-- Built from data/dungeon.js TOWNS at boot: a town added to the table appears here
            without this file being touched, which is how Orvane came to be missing. -->
       <div id="towns"></div>
+      <!-- New Game+ for the selected town. Its own row, with real buttons: it used to be a
+           pair of spans tucked inside the town card, which a mouse could press and a pad
+           could not reach at all. -->
+      <div id="tier-row" hidden>
+        <span class="tlabel">Difficulty</span>
+        <button id="tier-down" class="tstep" type="button" aria-label="Easier">&lsaquo;</button>
+        <span id="tier-label"></span>
+        <button id="tier-up" class="tstep" type="button" aria-label="Harder">&rsaquo;</button>
+      </div>
       <button id="title-start" class="start" type="button">
         <span class="slabel">Enter the dungeon</span>
         <span class="skey">Enter</span>

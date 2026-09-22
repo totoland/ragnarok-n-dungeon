@@ -10,6 +10,7 @@ import { xpAtLevel, xpToNext } from '../sim/progress.js';
 import { heroOf, skillPointsLeft, spendSkillPoint, setBranch, setEquip, discard, saveProfile } from '../profile.js';
 import { SKILL, REFINE } from '../config.js';
 import { createPreview } from './preview.js';
+import { createMenuNav } from './menu-nav.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -268,56 +269,9 @@ export function createCharacterUI({ input, getProfile, onChange }) {
   // Everything in this panel is a button, so the pad drives the browser's own focus and
   // presses whatever is focused. Moving is geometric rather than by DOM order: the
   // inventory is a grid, and "down" in a grid means the slot below, not the next sibling.
-  let navLoop = 0;
-  const focusables = () => [...root.querySelectorAll('button:not([disabled])')]
-    .filter((b) => b.offsetParent !== null);
-
-  function moveFocus(dir) {
-    const list = focusables();
-    if (!list.length) return;
-    const cur = document.activeElement;
-    if (!list.includes(cur)) { list[0].focus(); return; }
-    const r = cur.getBoundingClientRect();
-    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    let best = null, score = Infinity;
-    for (const b of list) {
-      if (b === cur) continue;
-      const q = b.getBoundingClientRect();
-      const dx = q.left + q.width / 2 - cx, dy = q.top + q.height / 2 - cy;
-      const along = dir === 'left' ? -dx : dir === 'right' ? dx : dir === 'up' ? -dy : dy;
-      if (along <= 2) continue;                       // behind us, or level with us
-      const across = (dir === 'left' || dir === 'right') ? Math.abs(dy) : Math.abs(dx);
-      const s = along + across * 2.5;                 // straight ahead beats far to the side
-      if (s < score) { score = s; best = b; }
-    }
-    if (best) best.focus();
-  }
-
-  function navTick() {
-    navLoop = requestAnimationFrame(navTick);
-    if (root.hidden) return;
-    const nav = input.menuNav();
-    if (nav.up) moveFocus('up');
-    if (nav.down) moveFocus('down');
-    if (nav.left) moveFocus('left');
-    if (nav.right) moveFocus('right');
-    if (nav.confirm) {
-      const cur = document.activeElement;
-      if (focusables().includes(cur)) cur.click(); else focusables()[0]?.focus();
-    }
-    if (nav.back) close();
-  }
-
-  /** render() rebuilds the panel, so the focused element stops existing. Put focus back on
-   *  whatever is now in its place, which keeps a run of presses on the same row. */
-  function keepFocus(fn) {
-    const before = focusables();
-    const at = before.indexOf(document.activeElement);
-    fn();
-    if (at < 0) return;
-    const after = focusables();
-    (after[Math.min(at, after.length - 1)] || after[0])?.focus();
-  }
+  // The pad loop, shared with the title screen and the test panel (render/menu-nav.js).
+  const nav = createMenuNav({ input, root, active: () => !root.hidden, onBack: () => close() });
+  const keepFocus = (fn) => nav.keepFocus(fn);
 
   function open(key, which) {
     if (key) hero = key;
@@ -329,13 +283,13 @@ export function createCharacterUI({ input, getProfile, onChange }) {
     root.hidden = false;
     input.setEnabled(false);
     // The sim loop is not stepping while this is up, so the pad is read here.
-    if (!navLoop) navLoop = requestAnimationFrame(navTick);
-    focusables()[0]?.focus();
+    nav.start();
+    nav.focusFirst();
   }
   function close() {
     preview.unmount();
     root.hidden = true;
-    if (navLoop) { cancelAnimationFrame(navLoop); navLoop = 0; }
+    nav.stop();
     input.setEnabled(true);
     onChange?.();
   }

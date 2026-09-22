@@ -184,18 +184,33 @@ body.touch-edit #hud { opacity: 0.25; }
 .tedit-done { padding: 8px 20px; border-radius: 8px; border: 2px solid var(--gold); background: var(--panel); color: var(--gold); font-weight: 700; cursor: pointer; }
 .seg-loose { display: flex; gap: 8px; justify-self: start; flex-wrap: wrap; }
 @media (max-width: 720px) { .tedit-hint { display: none; } }
-#title:not([hidden]) ~ #touch, #end:not([hidden]) ~ #touch, #pause:not([hidden]) ~ #touch, #settings:not([hidden]) ~ #touch, /* Pad and keyboard navigation put focus on a real button, so focus has to be visible -
-   without a ring the player is moving an invisible cursor around the panel. Bright enough
-   to find on the inventory grid, where the tiles are dark and close together. */
+/* An overlay owns the screen, so the on-screen controls go away under it. A comment had been
+   dropped into the middle of this selector list, which ended it early and glued the rest onto
+   the focus rule below - so instead of being hidden, the touch layer was being given a gold
+   outline and left sitting on top of the title screen's buttons, eating the taps meant for
+   them. Keep the comment above the rule. */
+#title:not([hidden]) ~ #touch,
+#end:not([hidden]) ~ #touch,
+#pause:not([hidden]) ~ #touch,
+#settings:not([hidden]) ~ #touch,
+#character:not([hidden]) ~ #touch,
+#testmode:not([hidden]) ~ #touch { display: none; }
+
+/* Pad and keyboard navigation put focus on a real button, so focus has to be visible -
+   without a ring the player is moving an invisible cursor around the screen. Bright enough
+   to find on the inventory grid, where the tiles are dark and close together, and on the
+   title, where a hero card is already gold. */
 #character button:focus,
-#character button:focus-visible {
+#character button:focus-visible,
+#title button:focus,
+#title button:focus-visible,
+#testmode button:focus,
+#testmode button:focus-visible {
   outline: 2px solid #ffd76a;
-  outline-offset: 2px;
+  outline-offset: 3px;
   border-radius: 4px;
 }
-#character button::-moz-focus-inner { border: 0; }
-
-#character:not([hidden]) ~ #touch { display: none; }
+#character button::-moz-focus-inner, #title button::-moz-focus-inner { border: 0; }
 
 /* ---------------------------------------------------------------- settings overlay */
 .overlay .row { display: flex; gap: 12px; margin-top: 8px; }
@@ -534,3 +549,12 @@ body.touch #telemetry-badge { bottom: calc(110px + var(--safe-b)); right: calc(8
   .start .slabel { font-size: 15px; }
   #title-utils { gap: 6px; margin-top: 10px; }
 }
+
+/* New Game+ for the selected town: its own row of real buttons, so a pad can reach it. */
+#tier-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; font-size: 13px; }
+#tier-row[hidden] { display: none; }
+#tier-row .tlabel { opacity: 0.55; letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; }
+#tier-label { min-width: 104px; color: var(--gold); font-weight: 700; letter-spacing: 0.03em; }
+.tstep { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--edge); background: var(--panel); color: var(--gold); font: inherit; font-size: 16px; line-height: 1; cursor: pointer; }
+.tstep:hover:not(:disabled) { background: rgba(232,182,74,0.18); }
+.tstep:disabled { opacity: 0.3; cursor: default; }
