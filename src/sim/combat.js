@@ -26,10 +26,18 @@ export function rollDamage(atk, mult, rng, crit = 0.08, critDmg = 1.6) {
 
 // Apply a connected hit: hp, knockback, hit-stun and launch. `dir` is the push direction (±1).
 // Heavier monsters take less knockback; anything knocked upward is "launched" and can be juggled.
+//
+// `knock` is a [x, y] pair, or 0 for a hit that carries no shove at all - a meteor, a Cold
+// Bolt, the second half of a doubled blow. That 0 has to be checked rather than indexed:
+// (0)[0] is undefined, undefined * dir * k is NaN, and the NaN goes into vx, into x on the
+// very next step, and never comes back out. A monster at x = NaN is still alive, still
+// counted by the wave and still drawn - drawn nowhere. That was the boss that disappeared
+// the moment you hit it, and why it only ever happened to a hero carrying Orvane's gear:
+// Auto Meteor and Double Attack are the only two things in the game that pass 0 here.
 export function applyHit(target, dmg, knock, stun, dir, mass = 1) {
   target.hp = Math.max(0, target.hp - dmg);
   const k = 1 / Math.max(0.35, mass);
-  target.vx = knock[0] * dir * k;
+  if (knock) target.vx = knock[0] * dir * k;
   // Hyper armour. A boss used to keep 45 % of the stun, which reads as a flinch and is
   // enough to cut a wind-up - so the Sandman, who is hit constantly because he is enormous
   // and slow, almost never got an attack out at all. A boss now takes the hit without
@@ -40,10 +48,10 @@ export function applyHit(target, dmg, knock, stun, dir, mass = 1) {
     target.flash = 0.12;
     return target.hp <= 0;
   }
-  if (knock[1] > 0) {
+  if (knock && knock[1] > 0) {
     target.vy = Math.max(target.vy, knock[1] * Math.min(1, k * 1.2));
     target.launched = true;
-  } else if (knock[1] < 0) {
+  } else if (knock && knock[1] < 0) {
     target.vy = knock[1];
   }
   target.hitstun = Math.max(target.hitstun, stun);
