@@ -209,7 +209,9 @@ export const MONSTERS = {
     hp: 215, atk: 21, speed: 2.2, mass: 1.4,
     hurtbox: { r: 0.5, h: 1.75 },
     attack: { range: 1.7, windup: 0.6, dur: 0.34, cd: 2.2, box: { x0: 0.0, x1: 1.9, y0: -0.2, y1: 2.2 }, knock: [5, 2] },
-    drops: [{ item: 'amulet', chance: 0.008 }],
+    // The Moonveil, now that Moonraya pays a weapon like every other boss. Sorya is the
+    // strongest thing walking in Phaelan, which is the right place for the town's cape.
+    drops: [{ item: 'moonveil', chance: 0.05 }, { item: 'amulet', chance: 0.008 }],
     score: 85,
   },
   foxShade: {

@@ -41,10 +41,16 @@ export const ATTRS = {
 export const ATTR_IDS = Object.keys(ATTRS);
 
 export const ITEMS = {
-  katana: { name: 'Katana', slot: 'weapon', hero: 'knight', kind: 'sword', mods: { atkSpeed: 1.10, crit: 0.30 }, tip: 'Attack 10% faster, 30% crit rate' },
-  gakkung: { name: 'Gakkung Bow', slot: 'weapon', hero: 'hunter', kind: 'bow', mods: { atkSpeed: 1.10, crit: 0.30 }, tip: 'Shoot 10% faster, 30% crit rate' },
-  tsurugi: { name: 'Tsurugi', slot: 'weapon', hero: 'knight', kind: 'sword', mods: { atk: 1.15, crit: 0.15 }, tip: '+15% ATK, 15% crit rate' },
-  arbalest: { name: 'Arbalest', slot: 'weapon', hero: 'hunter', kind: 'bow', mods: { atk: 1.15, crit: 0.15 }, tip: '+15% ATK, 15% crit rate' },
+  // Every weapon carries flat ATK, on one curve across the towns: 6, 16, 30, 55. A weapon
+  // used to be a multiplier of the hero's own table, which is twelve points for the knight -
+  // so the best sword in Morroc was worth +2 ATK and three towns of drops changed nothing a
+  // player could feel. On the flat scale the weapon leads: it is a third of the hero's ATK in
+  // Prontera and nearly two thirds by Orvane, and towns 5-6 have room above that (~95, ~150).
+  // What still distinguishes them is the rest of the set - speed and crit, or raw points.
+  katana: { name: 'Katana', slot: 'weapon', hero: 'knight', kind: 'sword', mods: { atkAdd: 6, atkSpeed: 1.10, crit: 0.30 }, tip: '+6 ATK, attack 10% faster, 30% crit rate' },
+  gakkung: { name: 'Gakkung Bow', slot: 'weapon', hero: 'hunter', kind: 'bow', mods: { atkAdd: 6, atkSpeed: 1.10, crit: 0.30 }, tip: '+6 ATK, shoot 10% faster, 30% crit rate' },
+  tsurugi: { name: 'Tsurugi', slot: 'weapon', hero: 'knight', kind: 'sword', mods: { atkAdd: 16, crit: 0.15 }, tip: '+16 ATK, 15% crit rate' },
+  arbalest: { name: 'Arbalest', slot: 'weapon', hero: 'hunter', kind: 'bow', mods: { atkAdd: 16, crit: 0.15 }, tip: '+16 ATK, 15% crit rate' },
   // Accessories: no model, no refine, every drop rolled - a main attribute fixed by the
   // kind, at a value from its range, plus one random secondary from the rest of the pool.
   // Which monsters drop them, and how often, is on the monsters (data/monsters.js `drops`).
@@ -58,6 +64,11 @@ export const ITEMS = {
   // Moonstep - an afterimage and a moment of speed on a successful dodge - is the cape's own
   // behaviour and still has to be written into the sim; the numbers below are what it gives
   // just by being worn.
+  // Phaelan's weapons. Moonraya used to drop the cape and nothing else, which left the third
+  // town as the only one in the game paying no attack power at all; the cape now comes off
+  // Sorya instead (data/monsters.js) and the boss pays a weapon like every other boss.
+  crescentfang: { name: 'Crescentfang', slot: 'weapon', hero: 'knight', kind: 'sword', mods: { atkAdd: 30, critDmgAdd: 0.30 }, tip: '+30 ATK, crits hit 30% harder' },
+  moonstring: { name: 'Moonstring', slot: 'weapon', hero: 'hunter', kind: 'bow', mods: { atkAdd: 30, critDmgAdd: 0.30 }, tip: '+30 ATK, crits hit 30% harder' },
   moonveil: { name: 'Moonveil', slot: 'cape', mods: { speed: 1.06, dodgeAdd: 0.05 }, tip: '+6% move speed, +5% dodge' },
   robinHat: { name: 'Robin Hood Hat', slot: 'hat', mods: { atkAdd: 10 }, tip: '+10 ATK' },
   // ---- Orvane, the mage city. Its drops are magic where every other town's are steel, and
@@ -66,13 +77,13 @@ export const ITEMS = {
   // monsters carry the HP and ATK to match (data/monsters.js).
   meteorEdge: {
     name: 'Meteor Edge', slot: 'weapon', hero: 'knight', kind: 'sword',
-    mods: { atkAdd: 100, meteorAdd: 0.10 },
-    tip: '+100 ATK, 10% chance on hit: a meteor falls for 10% of ATK as magic',
+    mods: { atkAdd: 55, meteorAdd: 0.10 },
+    tip: '+55 ATK, 10% chance on hit: a meteor falls for 10% of ATK as magic',
   },
   twinshot: {
     name: 'Twinshot', slot: 'weapon', hero: 'hunter', kind: 'bow',
-    mods: { atkAdd: 90, doubleAdd: 0.15 },
-    tip: '+90 ATK, 15% chance on hit: the shot lands twice',
+    mods: { atkAdd: 50, doubleAdd: 0.15 },
+    tip: '+50 ATK, 15% chance on hit: the shot lands twice',
   },
   runeSigil: { name: 'Rune Sigil', slot: 'accessory', main: 'meteor', secondary: ['atkHi', 'drain'], rarity: 'rare', tip: 'Main: Auto Meteor' },
   echoBand: { name: 'Echo Band', slot: 'accessory', main: 'twin', secondary: ['atkHi', 'drain'], rarity: 'rare', tip: 'Main: Double Attack' },
@@ -130,10 +141,10 @@ export function itemMods(gear) {
   const plus = Math.max(0, Math.min(REFINE.max, gear.plus | 0));
   const mods = { ...ITEMS[gear.id].mods };
   if (ITEMS[gear.id].slot === 'weapon') {
-    if (plus) mods.atk = (mods.atk ?? 1) * (1 + REFINE.atk * plus);
-    // A weapon whose ATK is flat rather than a multiplier refines on that instead, or
-    // Orvane's two would gain almost nothing from a duplicate: their own hundred is not in
-    // the base the multiplier scales.
+    // Refining scales the ATK the weapon itself carries. Every weapon's is flat now, so this
+    // is the line that matters; the multiplier branch is kept for anything added later that
+    // scales the hero's table instead.
+    if (plus && mods.atk) mods.atk *= (1 + REFINE.atk * plus);
     if (plus && mods.atkAdd) mods.atkAdd *= (1 + REFINE.atk * plus);
     if (plus >= REFINE.glowAt) mods.critDmg = (mods.critDmg ?? BASE_MODS.critDmg) * (1 + REFINE.critDmg);
   } else if (plus) mods.hp = (mods.hp ?? 1) * (1 + REFINE.hp * plus);

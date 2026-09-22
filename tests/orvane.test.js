@@ -10,7 +10,7 @@ import { ITEMS, ATTRS, rollItem, fits } from '../src/sim/data/items.js';
 import { createEnemy } from '../src/sim/enemies.js';
 import { resolveHero, mergeMods } from '../src/sim/resolve.js';
 import { xpAtLevel } from '../src/sim/progress.js';
-import { LEVEL } from '../src/config.js';
+import { LEVEL, REFINE } from '../src/config.js';
 import { itemMods, wearMods } from '../src/sim/data/items.js';
 import { HEROES } from '../src/sim/data/heroes.js';
 
@@ -62,13 +62,15 @@ test('every Orvane monster is reachable from its rooms, and the boss adds are re
 test('the boss weapons give flat ATK on top of the level, and refine scales it', () => {
   const base = resolveHero(HEROES.knight, mergeMods());
   const armed = resolveHero(HEROES.knight, mergeMods(itemMods({ id: 'meteorEdge', plus: 0 })));
-  assert.equal(armed.atk, base.atk + 100);
+  assert.equal(armed.atk, base.atk + ITEMS.meteorEdge.mods.atkAdd);
   assert.equal(armed.meteor, 0.10);
-  // A duplicate refines it: the hundred grows, not just the hero's own dozen.
+  // A duplicate refines the weapon's own ATK, not just the hero's dozen - so the gain is a
+  // share of the blade, whatever the blade is currently worth.
   const plus5 = resolveHero(HEROES.knight, mergeMods(itemMods({ id: 'meteorEdge', plus: 5 })));
-  assert.ok(plus5.atk > armed.atk + 10, `refined ${plus5.atk} vs ${armed.atk}`);
+  const gain = ITEMS.meteorEdge.mods.atkAdd * REFINE.atk * 5;
+  assert.ok(Math.abs(plus5.atk - (armed.atk + gain)) < 1e-9, `refined ${plus5.atk} vs ${armed.atk} + ${gain}`);
   const bow = resolveHero(HEROES.hunter, mergeMods(itemMods({ id: 'twinshot', plus: 0 })));
-  assert.equal(bow.atk, resolveHero(HEROES.hunter, mergeMods()).atk + 90);
+  assert.equal(bow.atk, resolveHero(HEROES.hunter, mergeMods()).atk + ITEMS.twinshot.mods.atkAdd);
   assert.equal(bow.double, 0.15);
 });
 
@@ -77,7 +79,7 @@ test('a charm adds to the same rate the weapon grants, and the pool is capped', 
   const mods = mergeMods(itemMods({ id: 'meteorEdge', plus: 0 }), ...wearMods({ accessory: charm }));
   const h = resolveHero(HEROES.knight, mods);
   assert.equal(Math.round(h.meteor * 100), 13);          // 10 % from the sword, 3 % from the charm
-  assert.equal(h.atk, resolveHero(HEROES.knight, mergeMods()).atk + 112);
+  assert.equal(h.atk, resolveHero(HEROES.knight, mergeMods()).atk + ITEMS.meteorEdge.mods.atkAdd + 12);
   // Nothing worn stacks past a half: a full set is a surprise, not the way the hero attacks.
   const stacked = {};
   for (let i = 0; i < 40; i++) stacked.meteorAdd = (stacked.meteorAdd || 0) + 0.03;

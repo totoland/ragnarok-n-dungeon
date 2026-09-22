@@ -108,7 +108,7 @@ export const MORROC = {
 // not here yet; the rooms below are the route and the fights.
 export const PHAELAN = {
   town: 'Phaelan', name: 'Phaelan Woods',
-  loot: { knight: 'moonveil', hunter: 'moonveil' },   // the same cape either way: it is not a weapon
+  loot: { knight: 'crescentfang', hunter: 'moonstring' },   // the cape now drops from Sorya
   rooms: [
     {
       name: 'Forest Edge', width: 18, theme: 'forest',

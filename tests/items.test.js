@@ -30,11 +30,13 @@ test('refining: +N multiplies the ATK share, +5 and up adds crit damage; names a
   assert.deepEqual(itemMods(null), {});
   assert.deepEqual(itemMods({ id: 'katana', plus: 0 }), ITEMS.katana.mods);
   const p3 = itemMods({ id: 'katana', plus: 3 });
-  assert.equal(p3.atk, 1 + REFINE.atk * 3); assert.equal(p3.crit, 0.30); assert.equal(p3.critDmg, undefined);
+  assert.equal(p3.atkAdd, ITEMS.katana.mods.atkAdd * (1 + REFINE.atk * 3));
+  assert.equal(p3.atk, undefined, 'a flat-ATK weapon gains no multiplier from refining');
+  assert.equal(p3.crit, 0.30); assert.equal(p3.critDmg, undefined);
   const p5 = itemMods({ id: 'tsurugi', plus: 5 });
-  assert.equal(p5.atk, 1.15 * (1 + REFINE.atk * 5));
+  assert.equal(p5.atkAdd, ITEMS.tsurugi.mods.atkAdd * (1 + REFINE.atk * 5));
   assert.equal(p5.critDmg, BASE_MODS.critDmg * (1 + REFINE.critDmg));
-  assert.equal(itemMods({ id: 'katana', plus: 99 }).atk, 1 + REFINE.atk * REFINE.max, 'plus clamps to the cap');
+  assert.equal(itemMods({ id: 'katana', plus: 99 }).atkAdd, ITEMS.katana.mods.atkAdd * (1 + REFINE.atk * REFINE.max), 'plus clamps to the cap');
   assert.equal(itemName(null), 'Bare hands'); assert.equal(itemName(null, 'knight'), DEFAULT_WEAPON.knight); assert.equal(itemName({ id: 'katana', plus: 1 }, 'knight'), 'Katana +1'); assert.equal(itemName({ id: 'katana', plus: 0 }), 'Katana'); assert.equal(itemName({ id: 'katana', plus: 7 }), 'Katana +7');
   assert.equal(glowOf({ id: 'katana', plus: 4 }), 0); assert.ok(glowOf({ id: 'katana', plus: 5 }) > 0); assert.equal(glowOf({ id: 'katana', plus: 10 }), 1);
 });
@@ -46,9 +48,10 @@ test('a wielded weapon reaches the hero through the resolve step, merged with th
   assert.equal(armed.player.atkSpeed, 1.10);
   // ATK from a level is flat and ATK from a weapon multiplies the hero's own table, so the
   // two no longer compound: the refine share is worth the table, not the whole number.
-  const table = HEROES.knight.atk;
+  const table = HEROES.knight.atk, blade = ITEMS.katana.mods.atkAdd;
   assert.ok(Math.abs(bare.player.atk - (table + LEVEL.atk * 2)) < 1e-9, 'the level adds its points');
-  assert.ok(Math.abs(armed.player.atk - (table * (1 + REFINE.atk * 2) + LEVEL.atk * 2)) < 1e-9, 'refine scales the table');
+  assert.ok(Math.abs(armed.player.atk - (table + LEVEL.atk * 2 + blade * (1 + REFINE.atk * 2))) < 1e-9,
+    'the weapon adds its own points, refined');
   assert.deepEqual(armed.player.gear, { id: 'katana', plus: 2 }, 'the renderer can read the weapon off the player');
   // a level-up mid-run keeps the weapon
   armed.player.level = 1; armed.xp = 0;
@@ -111,8 +114,8 @@ test('setGear swaps the weapon mid-run: stats re-resolve, HP keeps its fraction,
   assert.equal(p.gear, null); assert.equal(g.gear, null);
   assert.equal(p.crit, BASE_MODS.crit); assert.equal(p.atkSpeed, 1);
   // Only the share the weapon put on the hero's own table comes off; the level's points stay.
-  const tbl = HEROES.knight.atk;
-  assert.ok(Math.abs(p.atk - (atkBefore - tbl * REFINE.atk * 2)) < 1e-9, 'the refine share comes off');
+  // The whole weapon comes off - its points and the refine on them - and the level's stay.
+  assert.ok(Math.abs(p.atk - (atkBefore - ITEMS.katana.mods.atkAdd * (1 + REFINE.atk * 2))) < 1e-9, 'the weapon comes off');
   assert.equal(p.hp, Math.round(p.hpMax / 2), 'half health stays half');
   assert.ok(g.events.some((ev) => ev.type === 'equip' && ev.item === null));
   setGear(g, { id: 'tsurugi', plus: 5 });
@@ -189,7 +192,7 @@ test('rolled attributes reach the hero: flat ATK and rates add, HP / SP / ASPD m
   assert.equal(m.atkAdd, 3); assert.ok(Math.abs(m.critAdd - 0.07) < 1e-9); assert.ok(Math.abs(m.atkSpeed - 1.155) < 1e-9);
   const wear = { cape: null, hat: null, accessory: ring };
   const g = createGame({ hero: 'knight', dungeon: quiet, gear: { id: 'katana', plus: 0 }, wear });
-  assert.equal(g.player.atk, HEROES.knight.atk + 2, 'flat ATK after the multiplier');
+  assert.equal(g.player.atk, HEROES.knight.atk + ITEMS.katana.mods.atkAdd + 2, 'the blade and the ring both add points');
   assert.ok(Math.abs(g.player.crit - 0.34) < 1e-9, 'katana 30% + ring 4%');
   const d = resolveHero(HEROES.knight, { dodgeAdd: 0.9, critDmgAdd: 0.1 });
   assert.equal(d.dodge, 0.75, 'dodge is capped'); assert.ok(Math.abs(d.critDmg - 1.7) < 1e-9);
