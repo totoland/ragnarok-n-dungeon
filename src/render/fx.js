@@ -1,6 +1,7 @@
 // Effects: drains game.events into particles, damage numbers, slash arcs, projectiles, rings
 // and camera shake. Own clock, never touches the sim.
 import * as THREE from 'three';
+import { WARM_X, WARM_Z } from './scene.js';
 import { ITEMS } from '../sim/data/items.js';
 import { particleSprite, textTexture } from './textures.js';
 import { addShake } from './scene.js';
@@ -551,7 +552,7 @@ export function createFx(world) {
   // containers clear() empties. burst() writes into the one particle cloud that already
   // exists, so it only needs the points to have been drawn once.
   function warm() {
-    burst(-200, 1, 0, 4, { life: 9 });
+    burst(WARM_X, 1, WARM_Z, 4, { life: 9 });
     // Every glyph the game can show, in the colour it shows it in - and no others. Warming
     // each character against every colour instead came to three hundred textures and most of
     // a second, for combinations nothing ever asks for. Drawing the canvas is only half of
@@ -572,11 +573,11 @@ export function createFx(world) {
     const up = (t) => { try { world.renderer.initTexture(t); } catch { /* not ready yet */ } };
     for (const [chars, color] of wanted) for (const ch of new Set(chars)) up(glyph(ch, color, false));
     for (const ch of DIGITS) up(glyph(ch, '#ffffff', true));   // the critical's own red and gold
-    number(-200, 1, 0, '99', '#fff', true); number(-200, 1, 0, '99', '#fff', false, true);
-    slash(-200, 0, 0, 1); ring(-200, 0, { life: 9 }); beam(-200, 0, { life: 9 });
+    number(WARM_X, 1, WARM_Z, '99', '#fff', true); number(WARM_X, 1, WARM_Z, '99', '#fff', false, true);
+    slash(WARM_X, 0, WARM_Z, 1); ring(WARM_X, WARM_Z, { life: 9 }); beam(WARM_X, WARM_Z, { life: 9 });
     let id = -1;
-    for (const kind of ['arrow', 'hellOrb', 'foxfire', 'sandBall', 'rock']) { const m = makeArrow(kind); m.position.set(-200, 1, 0); scene.add(m); projectiles.set(id--, m); }
-    for (const kind of ['hp', 'mp']) { const m = makePotion(kind); m.position.set(-200, 0, 0); scene.add(m); pickups.set(id--, m); }
+    for (const kind of ['arrow', 'hellOrb', 'foxfire', 'sandBall', 'rock']) { const m = makeArrow(kind); m.position.set(WARM_X, 1, WARM_Z); scene.add(m); projectiles.set(id--, m); }
+    for (const kind of ['hp', 'mp']) { const m = makePotion(kind); m.position.set(WARM_X, 0, WARM_Z); scene.add(m); pickups.set(id--, m); }
   }
   return { update, clear, burst, number, warm };
 }

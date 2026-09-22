@@ -90,6 +90,18 @@ const THEMES = {
 const POINT_LIGHTS = 7;
 const PARKED_Y = -60;   // where an unused light waits, far under the floor
 
+/**
+ * Where everything stands while its shaders are compiled at load.
+ *
+ * It used to be x = -200, far off to one side, which seemed tidy and was wrong: that is
+ * outside the shadow camera's box (x -14..14), so nothing warmed there was ever drawn into
+ * the shadow map and the depth shader for it was never built. The iPad's first long frame of
+ * a session lists `depth` among the programs it had to compile, in the middle of the first
+ * room. Warming happens while the title screen covers the canvas, so the honest place to do
+ * it is where the game actually happens.
+ */
+export const WARM_X = 4, WARM_Z = 0;
+
 export function createScene(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   // A tablet at its native 2x is four times the pixels of 1x on a mobile GPU that also has
@@ -253,7 +265,7 @@ export function warmProps(world) {
   ];
   const meshes = mats.map((m, i) => {
     const mesh = new THREE.Mesh(geo, m);
-    mesh.position.set(-300 + i, 0.5, 0);
+    mesh.position.set(WARM_X - 3 + i * 0.8, 0.5, WARM_Z);
     mesh.castShadow = true; mesh.receiveShadow = true;
     world.scene.add(mesh);
     return mesh;

@@ -2,6 +2,7 @@
 // the sim state. Humanoids (skeletons, the Orc Lord) use the same limb rig / applyPose as the
 // heroes; blobs (Poring, Lunatic) squash and stretch.
 import * as THREE from 'three';
+import { WARM_X, WARM_Z } from './scene.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
@@ -1208,7 +1209,9 @@ export function createMonsterViews(world) {
     // their programs at load instead of on the frame the first one walks in. Returns the
     // teardown; call it after renderer.compile().
     warm() {
-      const built = Object.keys(BUILDERS).map((type) => { const b = BUILDERS[type](); b.root.position.set(-200, 0, 0); world.scene.add(b.root); return b.root; });
+      // Spread along the play line rather than parked off the map: inside the camera and
+      // inside the shadow box, so the depth pass compiles their shaders too.
+      const built = Object.keys(BUILDERS).map((type, i) => { const b = BUILDERS[type](); b.root.position.set(WARM_X + (i % 7) * 1.2 - 3, 0, WARM_Z); world.scene.add(b.root); return b.root; });
       return () => { for (const r of built) { world.scene.remove(r); r.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); } };
     },
     update(game, dt) {

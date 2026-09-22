@@ -13,7 +13,7 @@ import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
 import { createTestUI, testEnabled, setTestEnabled } from './render/test-ui.js';
 import { createMenuNav } from './render/menu-nav.js';
-import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom, prewarmTick, warmProps } from './render/scene.js';
+import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom, prewarmTick, warmProps, WARM_X, WARM_Z } from './render/scene.js';
 import { loadHeroAssets, createHeroView, showWeapon, restPose } from './render/heroes.js';
 import { auraTick, stripAura } from './render/aura.js';
 import { createTelemetry } from './telemetry.js';
@@ -417,7 +417,7 @@ function disposePreview() {
 // first drop do not each cost a 60-100 ms frame on Safari, which compiles lazily and slowly.
 function warmUp() {
   const t0 = performance.now();
-  const heroes = ['knight', 'hunter'].map((k) => { const m = assets[k].clone(); stripAura(m); m.position.set(-200, 0, 0); world.scene.add(m); auraTick(m, { id: 'katana', plus: 9 }, 0); return m; });
+  const heroes = ['knight', 'hunter'].map((k, i) => { const m = assets[k].clone(); stripAura(m); m.position.set(WARM_X + i * 1.5 - 1, 0, WARM_Z); world.scene.add(m); auraTick(m, { id: 'katana', plus: 9 }, 0); return m; });
   const undoMonsters = monsters.warm();
   const undoProps = warmProps(world);
   fx.warm();
