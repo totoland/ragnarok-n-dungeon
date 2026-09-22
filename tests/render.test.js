@@ -64,6 +64,36 @@ test('every monster type builds, walks, winds up, attacks, gets hurt, launched a
   assert.equal(w.scene.children.length, 0, 'clear() removes every view');
 });
 
+test('a boss stays the right way up and the right size through its second phase', () => {
+  // The Dark Sword vanished the moment he crossed half health. The ease into his rage tint
+  // was clamped at the top and not the bottom, so while he was whole it drifted down without
+  // limit - and at the crossing every value read off it went negative at once, scaling him by
+  // about -10: inside out and ten times too big, which on screen is nothing at all.
+  const w = world();
+  const views = createMonsterViews(w);
+  const g = createGame({ hero: 'knight', dungeon: { rooms: [{ name: 't', width: 22, waves: [] }] } });
+  const boss = createEnemy(g, 'darkSword', 9, 0);
+  boss.state = 'chase';
+  g.enemies.push(boss);
+  const sane = (label) => {
+    for (const o of w.scene.children) {
+      for (const k of ['x', 'y', 'z']) {
+        assert.ok(Number.isFinite(o.scale[k]), `${label}: scale.${k} is a number`);
+        assert.ok(o.scale[k] > 0 && o.scale[k] < 4, `${label}: scale.${k} is ${o.scale[k]}`);
+      }
+    }
+  };
+  // A full minute on the near side of the threshold is what let the drift build up.
+  for (let i = 0; i < 60 * 60; i++) { update(g, { held: {}, pressed: {} }); views.update(g, 1 / 60); }
+  sane('before the phase change');
+  // The renderer reads `addsDone`, which the AI sets when the boss crosses its threshold.
+  boss.hp = boss.hpMax * 0.4;
+  boss.addsDone = true;
+  for (let i = 0; i < 60 * 8; i++) { update(g, { held: {}, pressed: {} }); views.update(g, 1 / 60); sane('easing into the phase change'); }
+  sane('after the phase change');
+  views.clear();
+});
+
 test('poses evaluate and apply cleanly on a rig', () => {
   const rig = { root: new THREE.Group(), torso: new THREE.Group(), head: new THREE.Group(), armL: new THREE.Group(), armR: new THREE.Group(), legL: new THREE.Group(), legR: new THREE.Group(), cape: new THREE.Group(), weapon: new THREE.Group() };
   const base = { root: new THREE.Vector3(), torso: new THREE.Vector3(0, 1, 0) };

@@ -1227,7 +1227,12 @@ export function createMonsterViews(world) {
         // out wide, which is the only part of a phase change the silhouette can show.
         const rage = e.def.rage, raging = rage && e.addsDone && !e.dead;
         if (v.built.rig?.shards) {
-          v.rageT = Math.min(1, (v.rageT || 0) + (raging ? dt * 1.6 : -dt * 3));
+          // Clamped at BOTH ends. Only the top was, so a boss that spent a minute below the
+          // threshold eased its way down to -180 instead of resting at 0 - and the moment it
+          // crossed into its second phase every value derived from this went with it: the
+          // group scaled by -9.8, which is a boss inside out and ten times too big, which is
+          // a boss you cannot see. This is the disappearing Dark Sword.
+          v.rageT = Math.max(0, Math.min(1, (v.rageT || 0) + (raging ? dt * 1.6 : -dt * 3)));
           const sh = v.built.rig.shards;
           v.shardSpin = (v.shardSpin || 0) + dt * (0.5 + 2.6 * v.rageT);
           sh.rotation.y = v.shardSpin;

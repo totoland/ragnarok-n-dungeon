@@ -72,7 +72,20 @@ export function createTelemetry({ world, input, game: getGame, extra }) {
       spikes: spikes.slice(),
       upSec: Math.round(performance.now() / 1000),
       marks: (world.marks || []).slice(-8).map((m) => m.label),
-      game: g ? { hero: g.player.hero, town: g.dungeon.town, room: g.room?.name, t: +g.t.toFixed(1), phase: g.phase, level: g.player.level, hp: Math.round(g.player.hp), state: g.player.state, attack: g.player.attack, hold: g.player.holdAttack, enemies: g.enemies.length, alive: g.enemies.filter((e) => !e.dead).length } : null,
+      game: g ? { hero: g.player.hero, town: g.dungeon.town, room: g.room?.name, t: +g.t.toFixed(1), phase: g.phase, level: g.player.level, hp: Math.round(g.player.hp), state: g.player.state, attack: g.player.attack, hold: g.player.holdAttack,
+        at: [+g.player.x.toFixed(1), +g.player.y.toFixed(1), +g.player.z.toFixed(1)],
+        enemies: g.enemies.length, alive: g.enemies.filter((e) => !e.dead).length,
+        // Every live monster, with where it is and what it is doing. "The boss disappeared"
+        // was reported once and could not be reproduced from what this file sent: the report
+        // said one enemy was alive and nothing else, so there was no way to tell a boss that
+        // had stopped being drawn from one standing in a corner off the side of the screen.
+        // Four numbers each, capped, and a report stays small.
+        mobs: g.enemies.filter((e) => !e.dead).slice(0, 8).map((e) => ({
+          t: e.type, x: +e.x.toFixed(1), y: +e.y.toFixed(1), z: +e.z.toFixed(1),
+          hp: Math.round(e.hp / e.hpMax * 100), s: e.state, m: e.move,
+          // How far off the middle of the screen it is: past about 9 it is not on it.
+          off: +Math.abs(e.x - g.player.x).toFixed(1),
+        })) } : null,
       input: { raw: input.raw(), trace: input.trace().slice(-40) },
       errors: errors.slice(),
       ...(extra ? extra() : {}),
