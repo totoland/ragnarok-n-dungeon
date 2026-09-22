@@ -265,6 +265,37 @@ export function warmProps(world) {
   return () => { for (const m of meshes) world.scene.remove(m); };
 }
 
+// One live material per shader configuration, kept forever.
+//
+// A room is thrown away wholesale when the next one is built, and disposing a material hands
+// its shader program back to the driver if nothing else is using it. The next room then makes
+// the same material again and the program has to be compiled again. On Chrome this is
+// invisible, because its programs are coarse enough that something else always still holds a
+// reference; on WebKit they are finer-grained, and the iPad's telemetry shows the count
+// sawing up and down - 20 to 59 over a session, with seven of its long frames carrying a
+// "+prog" and the worst of them 272 ms.
+//
+// So the first material of each configuration is kept rather than disposed. Later rooms build
+// their own copies as before and those are disposed normally; the retained one is enough to
+// hold the program open. The cap is the number of distinct configurations in the game, which
+// is a few dozen objects, against recompiling a shader on the way into every room.
+const keptMats = new Map();
+function matKey(m) {
+  return [
+    m.type, m.transparent, m.toneMapped, m.side, m.vertexColors, m.blending, m.depthWrite,
+    !!m.map, !!m.normalMap, !!m.emissiveMap, !!m.alphaMap, !!m.aoMap,
+    m.emissive && (m.emissive.r || m.emissive.g || m.emissive.b) ? 1 : 0,
+    m.flatShading, m.fog,
+  ].join('|');
+}
+/** Dispose a material unless it is the one example of its shader we are holding on to. */
+function releaseMat(m) {
+  if (m.userData?.cached) return;                 // warm-up materials: never ours to drop
+  const key = matKey(m);
+  if (!keptMats.has(key)) { keptMats.set(key, m); return; }
+  if (keptMats.get(key) !== m) m.dispose();
+}
+
 export function disposeRoom(world) {
   // The pool outlives the room. Park every light dark so nothing from the old room lingers
   // over the new one, or over the title screen when a run ends. Before the early return:
@@ -282,7 +313,7 @@ export function disposeRoom(world) {
       // once there are enough maps to notice - the worst kind of bug to go looking for later.
       for (const m of mats) {
         for (const k in m) { const t = m[k]; if (t && t.isTexture && !t.userData.cached) t.dispose(); }
-        m.dispose();
+        releaseMat(m);
       }
     }
   });
