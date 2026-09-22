@@ -25,4 +25,4 @@ patches:
 # Pinned by deploy.sh to an immutable commit-sha tag.
 images:
   - name: ghcr.io/totoland/ragnarok-n-dungeon
-    newTag: sha-ba524a795da5
+    newTag: sha-8deb24ae2151
