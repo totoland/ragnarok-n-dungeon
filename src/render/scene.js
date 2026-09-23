@@ -142,7 +142,16 @@ export function createScene(canvas) {
   // to run the shadow pass; 1.5x is where an iPad stops dropping frames and still looks
   // crisp. The loop in main.js lowers this further while frames run long (world.setDpr).
   const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-  const dprMax = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
+  // And a pixel budget over the top of that, because "is it a tablet" is not a question the
+  // browser answers honestly. The iPad build running on a MacBook Air - which is how Toto
+  // plays it - reports a Mac, a fine pointer and a 1910x1158 window at 2x, so the tablet
+  // cap above never applied: it started at 8.8 million pixels with shadows and MSAA on a
+  // fanless integrated GPU, and drew the title screen at 21 fps. Nothing in this game needs
+  // more than ~3.7 million pixels to look sharp, whatever it is running on.
+  const PIXEL_BUDGET = 3.7e6;
+  const cssPx = Math.max(1, (window.innerWidth || 1) * (window.innerHeight || 1));
+  const budgetDpr = Math.floor(Math.sqrt(PIXEL_BUDGET / cssPx) * 4) / 4;
+  const dprMax = Math.max(0.75, Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2, budgetDpr));
   renderer.setPixelRatio(dprMax);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = coarse ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;

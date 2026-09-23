@@ -601,6 +601,13 @@ function frame(now) {
     // Adaptive resolution, judged once a second on the share of drawn frames that ran
     // long. A mean hides a GPU that misses every fifth vsync; a share does not. Down a
     // notch when more than 8 % of frames overran, up a notch after three clean seconds.
+    //
+    // "Clean" used to mean exactly zero - not one frame over budget in three seconds
+    // running - and in a fight that never happens: one hitch from a monster being built or a
+    // room loading resets it. So the resolution only ever went one way. Toto's session came
+    // down to 0.75 in its first twenty seconds and stayed there to the end, blurred, through
+    // a solid minute at 59 fps. Clean is now 2 % or under: far enough below the 8 % that
+    // drops a notch that the two cannot chase each other, close enough to zero to be real.
     const drawn = dtReal + pendingDt;
     drawnFrames++;
     if (drawn > (1 / 60) * 1.25) longFrames++;
@@ -610,7 +617,7 @@ function frame(now) {
       world.longShare = Math.round(share * 100);
       if (world.autoDpr && drawnFrames >= 20) {
         if (share > 0.08) { cleanSeconds = 0; if (world.dpr > 0.75) world.setDpr(world.dpr - 0.25); }
-        else if (share === 0) { if (++cleanSeconds >= 3 && world.dpr < world.dprMax) { world.setDpr(world.dpr + 0.25); cleanSeconds = 0; } }
+        else if (share <= 0.02) { if (++cleanSeconds >= 3 && world.dpr < world.dprMax) { world.setDpr(world.dpr + 0.25); cleanSeconds = 0; } }
         else cleanSeconds = 0;
       }
       longFrames = 0; drawnFrames = 0;
