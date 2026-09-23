@@ -20,3 +20,9 @@ ios/App/Pods/
 ios/App/App/public/
 # Who signs the build: personal, and specific to one machine.
 ios/local.xcconfig
+
+# King Orc's source sculpt: 42 MB, three times the next-largest .blend, and it does not
+# compress. Kept on the machine it was made on rather than in the public history, where it
+# would stay for good. The GLB it exports IS committed, so the game never needs it; only a
+# re-export does. (Toto's call, option B.)
+assets/blender/dwarf_warrior_game_source.blend
