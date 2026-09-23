@@ -196,12 +196,17 @@ test('the weapon curve, as it actually stands', async () => {
   const curve = (hero) => Object.values(TOWNS).map((t) => ITEMS[t.loot[hero]].mods.atkAdd);
   // The hunter's climbs the way the towns do.
   assert.deepEqual(curve('hunter'), [6, 16, 30, 50, 95]);
-  // The knight's does not, and that is a decision rather than a slip: Toto moved the Under
-  // Water Sword onto Nerakos for its model, and its 45 ATK was written for a weapon found in
-  // the middle of the town, not paid out at the end of it. So the last step goes DOWN, and
-  // the knight's reward for the hardest boss in the game is worse than Orvane's. Written
-  // down here so that whoever changes it next is choosing to, and so that raising it does
-  // not look like a regression in this file.
+  // The knight's does not, and the reason is worth keeping next to the number rather than in
+  // a commit message. A curve that only ever climbs means the newest town is always the only
+  // one worth playing: every earlier map is strictly worse loot, so nobody goes back to one.
+  // Nerakos therefore pays a SIDEGRADE - 45 ATK against Orvane's 55, bought back with 15%
+  // attack speed, a Cold Bolt that freezes, half again against Fire, and the only card slot
+  // in the game. Which sword a knight carries out of Bairune is a choice, and the 95 that
+  // used to be handed to him is now a thing to go and find (Shellora, 4%).
+  //
+  // So this is not a step down waiting to be fixed. Raising it to 95 would flatten the
+  // decision back into a number, which is the thing being avoided. Asserted exactly so that
+  // changing it stays deliberate.
   assert.deepEqual(curve('knight'), [6, 16, 30, 55, 45]);
 });
 
