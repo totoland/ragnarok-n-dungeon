@@ -453,6 +453,13 @@ export function createFx(world) {
         addShake(world, 0.16);
         break;
       }
+      case 'autoMagnum':   // the weapon casting it: the same burst, without the hero's swing
+        ring(ev.x, ev.z, { color: 0xff8030, radius: 2.6, life: 0.4, y: 0.05 });
+        burst(ev.x, 0.4, ev.z, 28, { color: 0xff9040, speed: 6, up: 3.4, life: 0.5, size: 0.3, gravity: 5 });
+        burst(ev.x, 0.3, ev.z, 10, { color: 0xffe0a0, speed: 3, up: 2, life: 0.35, size: 0.2 });
+        flashLight.position.set(ev.x, 1.2, ev.z); flashLight.intensity = 14;
+        addShake(world, 0.3);
+        break;
       case 'bossHeal': {
         // It worked. Green going UP, against every other number in the game going down.
         number(ev.x, ev.y + 2.2, ev.z, '+' + ev.amount, '#7dff9a');

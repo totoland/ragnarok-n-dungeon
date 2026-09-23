@@ -353,3 +353,28 @@ test('Undertow drags what it hits back towards the hero', async () => {
   // It pulls rather than pushes: the monster's velocity points back at the hero.
   assert.ok(Math.sign(e.vx) === Math.sign(g.player.x - e.x) || e.vx === 0, `vx ${e.vx}`);
 });
+
+test('Auto Magnum casts the skill, not the hero: a burst all round, at the skill\'s own damage', async () => {
+  const { BAIRUNE } = await import('../src/sim/data/dungeon.js');
+  const { createEnemy: mk } = await import('../src/sim/enemies.js');
+  const { HEROES } = await import('../src/sim/data/heroes.js');
+  const g = createGame({ hero: 'knight', seed: 6, dungeon: BAIRUNE, xp: xpAtLevel(LEVEL.max), gear: { id: 'orcSword', plus: 0 } });
+  assert.equal(g.player.magnum, ITEMS.orcSword.mods.magnumAdd, 'the sword grants the rate');
+  g.cheats = { invuln: true };
+  steps(g, 2);
+  g.player.magnum = 1; g.player.meteor = 0; g.player.double = 0; g.player.spDrain = 0; g.player.bolt = 0; g.player.pull = 0;
+  // Magnum Break is radial, so something BEHIND the hero has to be caught - which no swing
+  // of his reaches. That is the whole difference between this and a doubled hit.
+  const ahead = mk(g, 'craboon', g.player.x + 1.1, 0);
+  const behind = mk(g, 'craboon', g.player.x - 1.8, 0);
+  for (const m of [ahead, behind]) { m.hp = 1e6; m.frozen = 99; g.enemies.push(m); }
+  const events = swing(g, 120);
+  assert.ok(events.some((e) => e.type === 'autoMagnum'), 'it went off');
+  assert.ok(behind.hp < 1e6, 'and it reached behind the hero');
+  // It does not take the hero's skill levels with it: the weapon casts Magnum Break, it does
+  // not make him better at it.
+  const hits = events.filter((e) => e.attack === 'autoMagnum' && !e.crit);
+  assert.ok(hits.length > 0);
+  const base = HEROES.knight.attacks.magnumBreak.hits[0].dmg;
+  for (const h of hits) assert.ok(h.dmg <= Math.ceil(g.player.atk * base * 1.1), `${h.dmg} vs a ${(g.player.atk * base).toFixed(0)} cap`);
+});

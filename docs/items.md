@@ -20,6 +20,7 @@ ATK is flat and on one curve across the towns.
 | **Moonstring**<br>`moonstring` | Phaelan | hunter | 30 | +30 ATK, crits hit 30% harder | no — shows the hero’s own weapon | Moonraya (boss, hunter) · always |
 | **Under Water Sword [1]**<br>`underWaterSword` | Bairune | knight | 45 | +45 ATK, attack 15% faster, +50% damage to Fire monsters. 5% chance on hit: ice falls around you for 10% of ATK as magic, and what it hits may freeze | yes | Nerakos (boss, knight) · always |
 | **Twinshot**<br>`twinshot` | Orvane | hunter | 50 | +50 ATK, 15% chance on hit: the shot lands twice | no — shows the hero’s own weapon | Dark Sword (boss, hunter) · always |
+| **Orc Sword [1]**<br>`orcSword` | — | knight | 50 | +50 ATK, 50% crit rate, +25% dodge. 5% chance on hit: Magnum Break goes off around you | no — shows the hero’s own weapon | — not dropped by anything — |
 | **Meteor Edge**<br>`meteorEdge` | Orvane | knight | 55 | +55 ATK, 10% chance on hit: a meteor falls for 10% of ATK as magic | no — shows the hero’s own weapon | Dark Sword (boss, knight) · always |
 | **Tidecleaver**<br>`tidecleaver` | Bairune | knight | 95 | +95 ATK, 18% chance on hit: Undertow drags them back to you | no — shows the hero’s own weapon | Shellora · 4% |
 | **Coralbow**<br>`coralbow` | Bairune | hunter | 95 | +95 ATK, 18% chance on hit: Undertow drags them back to you | no — shows the hero’s own weapon | Nerakos (boss, hunter) · always |
@@ -100,6 +101,7 @@ Anything worn that is not a weapon gains **+2% HP per level** instead.
 | Moonstring | 30 | 34.5 | 39 |
 | Under Water Sword | 45 | 51.75 | 58.5 |
 | Twinshot | 50 | 57.5 | 65 |
+| Orc Sword | 50 | 57.5 | 65 |
 | Meteor Edge | 55 | 63.25 | 71.5 |
 | Tidecleaver | 95 | 109.25 | 123.5 |
 | Coralbow | 95 | 109.25 | 123.5 |
@@ -224,7 +226,7 @@ Boss: **Nerakos**, who pays Under Water Sword (knight) / Coralbow (hunter) every
 
 ## Gaps
 
-**16 of 19 worn things have no model of their own** (accessories are excluded — they are meant to have none):
+**17 of 20 worn things have no model of their own** (accessories are excluded — they are meant to have none):
 
 - Gakkung Bow (`gakkung`, weapon) — shows the hero’s own weapon
 - Tsurugi (`tsurugi`, weapon) — shows the hero’s own weapon
@@ -242,6 +244,11 @@ Boss: **Nerakos**, who pays Under Water Sword (knight) / Coralbow (hunter) every
 - Everwave Mantle (`everwave`, cape) — the knight keeps his own cape, the hunter has no cape node at all
 - Tidecleaver (`tidecleaver`, weapon) — shows the hero’s own weapon
 - Coralbow (`coralbow`, weapon) — shows the hero’s own weapon
+- Orc Sword (`orcSword`, weapon) — shows the hero’s own weapon
+
+**Nothing drops these:**
+
+- Orc Sword (`orcSword`)
 
 **Every attribute in the pool is reachable.** The five common accessories name no `secondary`, so each of them can roll any of the others.
 

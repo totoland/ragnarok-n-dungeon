@@ -126,6 +126,16 @@ export const ITEMS = {
     mods: { atkAdd: 95, pullAdd: 0.18 },
     tip: '+95 ATK, 18% chance on hit: Undertow drags them back to you',
   },
+  // ---- The orc forest. Toto's spec, minus the two halves of it that need systems the game
+  // does not have yet: `Def -50%` wants a damage-reduction stat (nothing in this game reduces
+  // damage at all) and `element: fire` wants elements on the monsters. Both are noted in
+  // docs/items.md as missing rather than faked.
+  orcSword: {
+    name: 'Orc Sword', slot: 'weapon', hero: 'knight', kind: 'sword',
+    mods: { atkAdd: 50, crit: 0.50, dodgeAdd: 0.25, magnumAdd: 0.05 },
+    slots: 1,
+    tip: '+50 ATK, 50% crit rate, +25% dodge. 5% chance on hit: Magnum Break goes off around you',
+  },
   runeSigil: { name: 'Rune Sigil', slot: 'accessory', main: 'meteor', secondary: ['atkHi', 'drain'], rarity: 'rare', tip: 'Main: Auto Meteor' },
   echoBand: { name: 'Echo Band', slot: 'accessory', main: 'twin', secondary: ['atkHi', 'drain'], rarity: 'rare', tip: 'Main: Double Attack' },
   manaClasp: { name: 'Mana Clasp', slot: 'accessory', main: 'drain', secondary: ['atkHi', 'meteor'], rarity: 'uncommon', tip: 'Main: SP Drain' },

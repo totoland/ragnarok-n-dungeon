@@ -220,7 +220,7 @@ function rollPassive(g, e, attackId, killed) {
 const BOLT_R = { x: 2.6, z: 1.6 };
 const FREEZE_SECS = 1.2;
 
-const PROC_FREE = new Set(['autoBlitz', 'autoMeteor', 'autoBolt', 'doubleAttack']);
+const PROC_FREE = new Set(['autoBlitz', 'autoMeteor', 'autoBolt', 'doubleAttack', 'autoMagnum']);
 function rollGearProcs(g, e, attackId, killed) {
   const p = g.player;
   if (PROC_FREE.has(attackId)) return;
@@ -250,6 +250,24 @@ function rollGearProcs(g, e, attackId, killed) {
     // the point of a meteor, and why it goes through the same queue the falcon does.
     g.pending.push({ kind: 'autoMeteor', target: e.id, t: 0.55, x: e.x, z: e.z });
     pushEvent(g, { type: 'autoMeteor', target: e.id, x: e.x, z: e.z, y: e.y });
+  }
+  // Auto Magnum: the weapon casting the hero's own Magnum Break, without his hands or his
+  // SP. The first proc in the game that fires a SKILL rather than a spell of its own, so it
+  // borrows the skill's hit box and knockback exactly - a burst all round that launches -
+  // and deliberately does NOT take the hero's skill levels with it. What the weapon casts is
+  // Magnum Break; how good the hero is at Magnum Break is his business.
+  if (p.magnum && g.rng.chance(p.magnum)) {
+    const hit = p.def.attacks?.magnumBreak?.hits?.[0];
+    if (hit) {
+      pushEvent(g, { type: 'autoMagnum', x: p.x, z: p.z, y: p.y });
+      for (const t of g.enemies) {
+        if (t.dead || !boxHits(p, p.facing, hit.box, t)) continue;
+        const { dmg, crit } = rollDamage(p.atk, hit.dmg, g.rng, p.crit, p.critDmg);
+        const dir = Math.sign(t.x - p.x) || p.facing;
+        const dead = applyHit(t, dmg, hit.knock, hit.stun, dir, t.mass);
+        onEnemyHit(g, t, dmg, crit, dead, 'autoMagnum');
+      }
+    }
   }
   // Cold Bolt. Not the meteor in another colour: the meteor falls on what was hit, and this
   // falls around the HERO - a ring of ice wedges out of the ceiling, so what it answers is

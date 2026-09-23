@@ -26,7 +26,7 @@ const MULT = new Set(['hp', 'mp', 'atk', 'matk', 'speed', 'atkSpeed']);
 // off a landed hit, so a weapon granting a chance and three charms adding to it all reach
 // rollPassive as one number (sim/game.js).
 const ADD = new Set(['atkAdd', 'matkAdd', 'critAdd', 'critDmgAdd', 'dodgeAdd',
-                     'meteorAdd', 'doubleAdd', 'spDrainAdd', 'pullAdd', 'boltAdd', 'freezeAdd']);
+                     'meteorAdd', 'doubleAdd', 'spDrainAdd', 'pullAdd', 'boltAdd', 'freezeAdd', 'magnumAdd']);
 export function mergeMods(...sets) {
   const out = {};
   for (const s of sets) {
@@ -62,6 +62,7 @@ export function resolveHero(base, mods = {}) {
     bolt: Math.min(0.5, m.boltAdd || 0),
     // Not a proc of its own: the chance that magic damage, once it lands, freezes what it hit.
     freeze: Math.min(0.5, m.freezeAdd || 0),
+    magnum: Math.min(0.5, m.magnumAdd || 0),
     mods: m,
   };
 }
