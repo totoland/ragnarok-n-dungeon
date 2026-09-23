@@ -44,6 +44,15 @@ for line in sys.stdin:
         print(f"   game: {g.get('hero')} {g.get('town')}/{g.get('room')} t={g.get('t')} {g.get('phase')} lv{g.get('level')} "
               f"hp{g.get('hp')} state={g.get('state')}/{g.get('attack')} hold={g.get('hold')} "
               f"enemies={g.get('alive')}/{g.get('enemies')}")
+        # Every live monster, which the report has carried since the boss went missing and
+        # this never printed - so the one field added to answer that question was only
+        # readable through `raw` and jq. A coordinate that arrives as None is a NaN: JSON has
+        # no way to write one, and a monster at NaN is alive, counted and drawn nowhere.
+        for m in g.get('mobs') or []:
+            bad = ' <- NaN' if None in (m.get('x'), m.get('y'), m.get('z')) else ''
+            far = ' offscreen' if (m.get('off') or 0) > 9 else ''
+            print(f"     {m.get('t'):<12} ({m.get('x')},{m.get('y')},{m.get('z')}) "
+                  f"hp{m.get('hp')}% {m.get('s')}/{m.get('m')} off {m.get('off')}{far}{bad}")
     sk = r.get('soak') or {}
     if sk:
         print(f"   soak: loop {sk.get('loops')} wave {sk.get('wave')} kills {sk.get('kills')}")

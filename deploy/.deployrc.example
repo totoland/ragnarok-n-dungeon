@@ -20,3 +20,8 @@ PROD_NAMESPACE=ragnarok-n-dungeon
 PROD_ARGOCD_APP=ragnarok-n-dungeon
 PROD_HOST=ragnarok.internal
 PROD_PUBLIC=https://game.example.com
+
+# Optional. Where Loki is, if the cluster has one scraping pod stdout. With it set,
+# deploy/logs.sh reads the client reports from Loki - so they outlive the pod and the window
+# can be days. Without it the script falls back to `kubectl logs` over ssh.
+# LOKI_URL=http://loki.your-cluster.internal
