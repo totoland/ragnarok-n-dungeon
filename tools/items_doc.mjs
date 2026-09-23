@@ -21,15 +21,15 @@ const OUT = path.join(ROOT, 'docs', 'items.md');
 
 // ---------------------------------------------------------------- models
 
-// A worn thing has a model of its own when the exporter put a node there for it: a weapon is
-// baked into the hero holding it (weapon_<id>, because only that hero knows the grip), a hat
-// is its own GLB in assets/gear. Anything else has none - see src/render/gear.js.
+// A worn thing has a model of its own when the exporter made one for it: its own GLB in
+// assets/gear (hats, and weapons since the Under Water Sword), or - for the Katana alone,
+// which predates that - a `weapon_<id>` node baked into the hero holding it.
 function modelIndex() {
   const read = (p) => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, p), 'utf8')); } catch { return {}; } };
   const nodes = new Set();
   for (const hero of Object.values(read('assets/heroes/meta.json'))) for (const k of Object.keys(hero.parts || {})) nodes.add(k);
-  const hats = new Set(Object.keys(read('assets/gear/meta.json')));
-  return (id, slot) => (slot === 'hat' ? hats.has(id) : nodes.has(`${slot}_${id}`));
+  const own = new Set(Object.keys(read('assets/gear/meta.json')));
+  return (id, slot) => own.has(id) || nodes.has(`${slot}_${id}`);
 }
 const hasModel = modelIndex();
 // A weapon with no model of its own still shows one - the hero's own, the same in every town.
@@ -100,7 +100,7 @@ L.push(table(['Item', 'Town', 'Class', 'ATK', 'Effect', 'Model', 'From'],
   bySlot('weapon')
     .sort((a, b) => (a[1].mods.atkAdd || 0) - (b[1].mods.atkAdd || 0))
     .map(([id, it]) => [
-      `**${it.name}**<br>\`${id}\``, townOf(id), it.hero, it.mods.atkAdd ?? '—',
+      `**${it.name}${it.slots ? ` [${it.slots}]` : ''}**<br>\`${id}\``, townOf(id), it.hero, it.mods.atkAdd ?? '—',
       it.tip, modelCell(id, 'weapon'), sourceCell(id),
     ])));
 L.push('');

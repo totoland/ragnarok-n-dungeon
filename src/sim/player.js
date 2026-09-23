@@ -5,7 +5,7 @@
 // which is what makes the combos feel like a belt-scroller instead of a queue.
 import { SIM, FLOOR, PLAYER, SKILL_KEYS, SKILL } from '../config.js';
 import { HEROES, SKILL_BRANCH } from './data/heroes.js';
-import { boxHits, rollDamage, applyHit } from './combat.js';
+import { boxHits, rollDamage, applyHit, elementMult } from './combat.js';
 import { resolveHero, mergeMods } from './resolve.js';
 import { levelMods } from './progress.js';
 
@@ -16,7 +16,7 @@ export function createPlayer(heroKey, mods, level = 1, skills = {}, branches = n
     // shell folds them in at creation. gear is here for the renderer (a +5 glows).
     skillLv: skills, skillBranch: null, gear: null,
     crit: 0, critDmg: 0,
-    meteor: 0, double: 0, spDrain: 0, pull: 0, bolt: 0,
+    meteor: 0, double: 0, spDrain: 0, pull: 0, bolt: 0, freeze: 0,
     x: 1.5, z: 0, y: 0, vx: 0, vy: 0, facing: 1, grounded: true,
     hp: 0, hpMax: 0, mp: 0, mpMax: 0, atk: 0, speed: 0,
     hurtbox: null,
@@ -64,7 +64,7 @@ export function setLevel(p, level, mods) {
   // Gear proc rates (Orvane). Copied onto the player like crit is, so sim/game.js rolls them
   // without reaching through def - and so a level-up mid-run picks up a new charm's share.
   p.meteor = def.meteor || 0; p.double = def.double || 0; p.spDrain = def.spDrain || 0;
-  p.pull = def.pull || 0; p.bolt = def.bolt || 0;
+  p.pull = def.pull || 0; p.bolt = def.bolt || 0; p.freeze = def.freeze || 0;
   p.hurtbox = def.hurtbox;
   foldBuffs(p, 0);
 }
@@ -215,7 +215,8 @@ function runAttack(g, p, dt) {
 }
 
 export function landHit(g, p, e, hit, dir) {
-  const { dmg, crit } = rollDamage(p.atk, hit.dmg * skillDmg(p, p.attack), g.rng, p.crit, p.critDmg);
+  const mult = hit.dmg * skillDmg(p, p.attack) * elementMult(p, e);
+  const { dmg, crit } = rollDamage(p.atk, mult, g.rng, p.crit, p.critDmg);
   const killed = applyHit(e, dmg, hit.knock, hit.stun, dir, e.mass);
   e.facing = -dir || e.facing;
   g.onEnemyHit(e, dmg, crit, killed, p.attack);

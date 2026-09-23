@@ -1,17 +1,23 @@
 // Worn gear that has a model of its own.
 //
-// A weapon is baked into each hero as a `weapon_<id>` node next to the hero's own (see
-// heroes.js weaponNodes) because it has to sit in a hand whose grip only that hero knows.
-// A hat has no such tie: it lands on top of a skull. So a hat is its own GLB, exported by
-// tools/export_heroes.py into assets/gear/, and one file dresses either class - a new hat
-// is a new file rather than a re-export of every character in the game.
+// Everything here is its own GLB in assets/gear/, exported by tools/export_heroes.py, and
+// mounted onto a node the hero rig already has. A new piece of gear is then a new file
+// rather than a re-export of every character in the game.
 //
-// The hat rides the head node, so it nods, leans and blinks with the head the sim already
-// poses. Nothing here animates.
+// The Katana is the one exception and the reason the rule is written down. It was baked into
+// the knight as a `weapon_katana` node beside his own sword, because a weapon has to sit in a
+// fist whose grip only that hero knows - which was true, and answered the wrong way. The grip
+// IS the hero's `weapon` node: an origin already in the hand. A sword exported about its own
+// grip drops straight into it, and heroes.js mounts it as one more variant, so nothing
+// downstream can tell the difference between a baked weapon and a loaded one.
+//
+// Nothing here animates: a hat rides the head node and a weapon rides the weapon node, both
+// of which the sim already poses.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const HAT_FILES = { robinHat: 'robinHat.glb' };
+const WEAPON_FILES = { underWaterSword: 'underWaterSword.glb' };
 
 // Where a hat lands on a head. The exporter puts a hat's origin in the middle of its head
 // band, so `y` is simply how high off the floor that band sits - a little below the top of
@@ -24,14 +30,24 @@ const FIT = {
 
 export async function loadGearAssets(base = 'assets/gear/') {
   const loader = new GLTFLoader();
-  const ids = Object.keys(HAT_FILES);
-  const scenes = await Promise.all(ids.map((id) => loader.loadAsync(base + HAT_FILES[id])));
-  const hats = {};
-  ids.forEach((id, i) => { hats[id] = scenes[i].scene; });
-  return { hats };
+  const load = async (files) => {
+    const ids = Object.keys(files);
+    const scenes = await Promise.all(ids.map((id) => loader.loadAsync(base + files[id])));
+    return Object.fromEntries(ids.map((id, i) => [id, scenes[i].scene]));
+  };
+  const [hats, weapons] = await Promise.all([load(HAT_FILES), load(WEAPON_FILES)]);
+  return { hats, weapons };
 }
 
-export const hasModel = (gear, id) => !!gear?.hats?.[id];
+export const hasModel = (gear, id) => !!(gear?.hats?.[id] || gear?.weapons?.[id]);
+
+/** The weapon model for an item, or null - the node the exporter named `weapon`, not the
+ *  wrapper around it, so what comes back is already about its own grip. */
+export function weaponNode(gear, id) {
+  const src = gear?.weapons?.[id];
+  const node = src && (src.getObjectByName('weapon') || src.children[0]);
+  return node ? node.clone(true) : null;
+}
 
 // A fresh copy of a hat, at the size the hero asks for and with its own materials, framed on
 // its own origin. Used for the inventory icon, which draws the item alone.

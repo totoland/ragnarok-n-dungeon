@@ -8,7 +8,8 @@
 import * as THREE from 'three';
 import { auraOf } from '../sim/data/items.js';
 import { auraTick } from './aura.js';
-import { loadGearAssets, createHatSlot } from './gear.js';
+import { loadGearAssets, createHatSlot, weaponNode } from './gear.js';
+import { ITEMS } from '../sim/data/items.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
@@ -163,7 +164,35 @@ export async function loadHeroAssets(base = 'assets/heroes/') {
     fetch(base + 'meta.json').then((r) => r.json()),
     loadGearAssets(),
   ]);
+  for (const [key, scene] of [['knight', knight.scene], ['hunter', hunter.scene]]) mountWeapons(scene, key, gear);
   return { knight: knight.scene, hunter: hunter.scene, meta, gear };
+}
+
+/**
+ * Hang every loaded weapon model off the hero that wields it, as a sibling of his own weapon
+ * with the same transform - which is exactly the shape a baked variant has.
+ *
+ * Done once at load, on the shared asset, so it costs one clone per weapon for the whole
+ * session and everything downstream - showWeapon, restPose, the inventory icon, the plinths -
+ * finds it by name and cannot tell it was not baked in. A weapon already baked in wins: the
+ * Katana is in the knight's own file and stays there.
+ */
+function mountWeapons(model, heroKey, gear) {
+  const own = model.getObjectByName('weapon');
+  if (!own || !gear?.weapons) return;
+  for (const id of Object.keys(gear.weapons)) {
+    const fitsHero = !ITEMS[id]?.hero || ITEMS[id].hero === heroKey;
+    if (!fitsHero || model.getObjectByName(`weapon_${id}`)) continue;
+    const node = weaponNode(gear, id);
+    if (!node) continue;
+    node.name = `weapon_${id}`;
+    node.position.copy(own.position);
+    node.rotation.copy(own.rotation);
+    node.scale.copy(own.scale);
+    node.visible = false;
+    node.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+    own.parent.add(node);
+  }
 }
 
 // Alternative weapons the exporter baked next to `weapon` (weapon_katana, ...): same
@@ -202,7 +231,7 @@ export function restPose(model, heroKey) {
 }
 
 // Show the wielded weapon and hide the rest. `gearId` is the item id (data/items.js) or
-// null for the hero's own weapon; an item with no baked model falls back to that.
+// null for the hero's own weapon; an item with no model of its own falls back to that.
 export function showWeapon(model, gearId) {
   const { weapon, variants } = weaponNodes(model);
   const variant = gearId ? variants[gearId] || null : null;

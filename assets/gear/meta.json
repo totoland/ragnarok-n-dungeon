@@ -20,5 +20,27 @@
         "verts": 8899
       }
     }
+  },
+  "underWaterSword": {
+    "height": 1.37,
+    "front": "+z",
+    "pivot": {
+      "root": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "weapon": [
+        0.0,
+        0.2207,
+        0.0
+      ]
+    },
+    "parts": {
+      "weapon": {
+        "meshes": 176,
+        "verts": 6147
+      }
+    }
   }
 }

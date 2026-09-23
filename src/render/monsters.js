@@ -8,7 +8,7 @@ import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
 
 const HALF = Math.PI / 2;
 // Scratch colours for the rage tint, made once rather than per material per frame.
-let RAGE_A = null, RAGE_B = null;
+let RAGE_A = null, RAGE_B = null, FROST = null;
 const TAU = Math.PI * 2;
 // Seconds per cycle for the `idle` clips in CLIPS_BY_TYPE, i.e. their source duration.
 const IDLE_SECS = 1.93;
@@ -1291,6 +1291,13 @@ export function createMonsterViews(world) {
     const ai = e.def.ai === 'hopper' ? 'walker' : e.def.ai;
     const clips = CLIPS_BY_TYPE[e.type] || CLIPS[ai] || CLIPS.walker;
     let target = v.scratch, rate = 16;
+    if (e.frozen > 0) {
+      // Whatever it was doing, it is doing it still. No target and a rate of nothing means
+      // blendTo is never called below and the pose it was caught in is the pose it keeps -
+      // which is what a thing frozen mid-stride looks like, and cheaper than a clip.
+      applyPose(rig, base, rest, v.cur, v.yaw);
+      return;
+    }
     if (e.dead) {
       target = evalClip(CLIPS.down, 0, v.scratch); rate = 10;
     } else if (e.state === 'hurt') {
@@ -1473,7 +1480,17 @@ export function createMonsterViews(world) {
           RAGE_A.setHex(rage.tint); RAGE_B.setHex(rage.emissive);
           if (rage.grow) v.group.scale.setScalar(1 + (rage.grow - 1) * k);
         }
+        const iced = e.frozen > 0;
+        if (iced && !FROST) { FROST = new THREE.Color(0x4f9ed0); }
         for (const m of v.materials) {
+          if (iced) {
+            // Enough to read as ice at a glance, not enough to erase the monster under it.
+            // At 0.55 of a pale blue a Craboon went to flat white and stopped being a crab.
+            m.emissive.setRGB(0.04, 0.13, 0.22);
+            m.color.copy(m.userData.color).lerp(FROST, 0.5);
+            v.tinted = true;
+            continue;
+          }
           if (flash) m.emissive.setRGB(0.32, 0.28, 0.24);
           else if (k > 0) {
             // Emissive does the work, not colour. This sculpt is near-black and the room is

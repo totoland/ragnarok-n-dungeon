@@ -194,8 +194,10 @@ test('the Under Water Sword is looted, not won, and its Cold Bolt lands as magic
   assert.ok(!Object.values(BAIRUNE.loot).includes('underWaterSword'), 'and the boss does not');
 
   const g = createGame({ hero: 'knight', seed: 7, dungeon: BAIRUNE, xp: xpAtLevel(LEVEL.max), gear: { id: 'underWaterSword', plus: 0 } });
-  assert.equal(g.player.bolt, 0.10, 'the sword grants the rate');
+  assert.equal(g.player.bolt, ITEMS.underWaterSword.mods.boltAdd, 'the sword grants the rate');
+  assert.equal(g.player.freeze, ITEMS.underWaterSword.mods.freezeAdd, 'and the freeze that rides on it');
   g.player.bolt = 1; g.player.pull = 0; g.player.meteor = 0; g.player.double = 0; g.player.spDrain = 0;
+  g.player.freeze = 0;
   steps(g, 2);
   const { createEnemy: mk } = await import('../src/sim/enemies.js');
   const e = mk(g, 'craboon', g.player.x + 1.2, 0);
@@ -211,6 +213,102 @@ test('the Under Water Sword is looted, not won, and its Cold Bolt lands as magic
   // Magic: it never crits, and it never rolls another one off its own hit.
   for (const h of events.filter((ev) => ev.attack === 'autoBolt')) assert.equal(h.crit, false);
   assert.ok(landed.length <= called.length, `${landed.length} landed from ${called.length} called`);
+  // It falls around the hero, not on what was hit - which is what makes it a different
+  // spell from the meteor rather than the same one in another colour. Checked against where
+  // the hero was on the frame it was called: he walks while he swings.
+  const g2 = createGame({ hero: 'knight', seed: 7, dungeon: BAIRUNE, xp: xpAtLevel(LEVEL.max), gear: { id: 'underWaterSword', plus: 0 } });
+  steps(g2, 2);
+  g2.player.bolt = 1; g2.player.freeze = 0; g2.player.pull = 0; g2.player.meteor = 0; g2.player.double = 0;
+  const foe = mk(g2, 'craboon', g2.player.x + 1.2, 0);
+  foe.hp = 1e6;
+  g2.enemies.push(foe);
+  // The sim never drains g.events - the renderer does (main.js) - so only the ones added
+  // this frame are new, and comparing the older ones against a hero who has walked on since
+  // is how this read as a failure twice before it read as a pass.
+  let checked = 0, seen = g2.events.length;
+  for (let i = 0; i < 120; i++) {
+    const wasAt = g2.player.x;
+    update(g2, i % 12 === 0 ? { held: {}, pressed: { attack: true } } : EMPTY_INPUT);
+    for (const ev of g2.events.slice(seen)) {
+      if (ev.type !== 'autoBolt') continue;
+      checked++;
+      // A frame of slack either side: the proc resolves partway through the update.
+      assert.ok(Math.abs(ev.x - wasAt) < 0.2, `called at ${ev.x}, hero was at ${wasAt}`);
+    }
+    seen = g2.events.length;
+  }
+  assert.ok(checked > 0, 'at least one bolt was checked');
+
+  // And "around" means around: it reaches behind the hero as well as in front, which is the
+  // whole of what separates it from the meteor. One monster each side, both magicked.
+  const g3 = createGame({ hero: 'knight', seed: 7, dungeon: BAIRUNE, xp: xpAtLevel(LEVEL.max), gear: { id: 'underWaterSword', plus: 0 } });
+  g3.cheats = { invuln: true };
+  steps(g3, 2);
+  g3.player.bolt = 1; g3.player.freeze = 0; g3.player.pull = 0; g3.player.meteor = 0; g3.player.double = 0;
+  const ahead = mk(g3, 'craboon', g3.player.x + 1.1, 0);
+  const behind = mk(g3, 'craboon', g3.player.x - 1.6, 0);
+  for (const m of [ahead, behind]) { m.hp = 1e6; m.frozen = 99; g3.enemies.push(m); }  // held still, so they stay put
+  swing(g3, 150);
+  assert.ok(ahead.hp < 1e6, 'the one in front was hit');
+  assert.ok(behind.hp < 1e6, 'and so was the one behind, which no melee swing reached');
+});
+
+test('a Cold Bolt can freeze what it lands on, and a boss shrugs it off', async () => {
+  const { BAIRUNE } = await import('../src/sim/data/dungeon.js');
+  const { createEnemy: mk } = await import('../src/sim/enemies.js');
+  const { MONSTERS } = await import('../src/sim/data/monsters.js');
+  for (const [type, shouldFreeze] of [['craboon', true], ['nerakos', false]]) {
+    const g = createGame({ hero: 'knight', seed: 4, dungeon: BAIRUNE, xp: xpAtLevel(LEVEL.max), gear: { id: 'underWaterSword', plus: 0 } });
+    g.cheats = { invuln: true };
+    steps(g, 2);
+    g.player.bolt = 1; g.player.freeze = 1; g.player.pull = 0; g.player.meteor = 0; g.player.double = 0;
+    const e = mk(g, type, g.player.x + 1.2, 0);
+    e.hp = 1e9;
+    g.enemies.push(e);
+    const events = swing(g, 150);
+    const froze = events.filter((ev) => ev.type === 'freeze');
+    assert.equal(froze.length > 0, shouldFreeze, `${type} froze ${froze.length} times`);
+    if (!shouldFreeze) assert.ok(MONSTERS[type].mass >= 3, 'and it is hyper armour that spared it');
+  }
+});
+
+test('a frozen monster stops doing anything until it thaws', async () => {
+  const { BAIRUNE } = await import('../src/sim/data/dungeon.js');
+  const { createEnemy: mk } = await import('../src/sim/enemies.js');
+  const { updateEnemy } = await import('../src/sim/enemies.js');
+  const g = createGame({ hero: 'knight', seed: 9, dungeon: BAIRUNE, xp: xpAtLevel(LEVEL.max) });
+  steps(g, 2);
+  const e = mk(g, 'craboon', g.player.x + 3, 0);
+  g.enemies.push(e);
+  e.frozen = 0.5;
+  const x0 = e.x;
+  for (let i = 0; i < 20; i++) updateEnemy(g, e, 1 / 60);   // a third of a second, still frozen
+  assert.equal(e.state, 'frozen');
+  assert.equal(e.x, x0, 'it did not walk');
+  // It is still an object in the world: a shove moves it.
+  e.vx = -4;
+  for (let i = 0; i < 6; i++) updateEnemy(g, e, 1 / 60);
+  assert.ok(e.x < x0, 'a block of ice slides');
+  // And it thaws.
+  for (let i = 0; i < 60; i++) updateEnemy(g, e, 1 / 60);
+  assert.ok(e.frozen <= 0 && e.state !== 'frozen', `state ${e.state}`);
+});
+
+test('the element bonus multiplies only against the element it names', async () => {
+  const { elementMult } = await import('../src/sim/combat.js');
+  const { BAIRUNE } = await import('../src/sim/data/dungeon.js');
+  const { createEnemy: mk } = await import('../src/sim/enemies.js');
+  const { MONSTERS } = await import('../src/sim/data/monsters.js');
+  const g = createGame({ hero: 'knight', seed: 2, dungeon: BAIRUNE, gear: { id: 'underWaterSword', plus: 0 } });
+  const plain = mk(g, 'craboon', 5, 0);
+  assert.equal(elementMult(g.player, plain), 1, 'a monster with no element takes no bonus');
+  // Nothing in the game is Fire yet, so the bonus is proved on one made for the purpose -
+  // which is the whole point of having the plumbing before the elements.
+  const fiery = { ...plain, def: { ...plain.def, element: 'fire' } };
+  assert.equal(elementMult(g.player, fiery), ITEMS.underWaterSword.mods.vsFire);
+  const bare = createGame({ hero: 'knight', seed: 2, dungeon: BAIRUNE });
+  assert.equal(elementMult(bare.player, fiery), 1, 'and a weapon that does not claim it gets nothing');
+  assert.ok(!Object.values(MONSTERS).some((m) => m.element), 'no monster has an element yet');
 });
 
 test('Undertow drags what it hits back towards the hero', async () => {

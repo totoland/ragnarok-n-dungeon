@@ -41,6 +41,7 @@ export const ATTRS = {
   // Bairune's own rate, and the second spell in the game: a shaft of ice on the spot the
   // blow landed. It shares the meteor's machinery and sums the same way.
   bolt: { name: 'Auto Cold Bolt', key: 'boltAdd', min: 0.01, max: 0.03, step: 0.01 },
+  freeze: { name: 'Freeze', key: 'freezeAdd', min: 0.01, max: 0.03, step: 0.01 },
 };
 export const ATTR_IDS = Object.keys(ATTRS);
 
@@ -108,8 +109,12 @@ export const ITEMS = {
   // curve on purpose - what it sells is speed and the bolt, not points.
   underWaterSword: {
     name: 'Under Water Sword', slot: 'weapon', hero: 'knight', kind: 'sword',
-    mods: { atkAdd: 40, atkSpeed: 1.10, boltAdd: 0.10 },
-    tip: '+40 ATK, attack 10% faster, 10% chance on hit: a shaft of ice falls for 10% of ATK as magic',
+    mods: { atkAdd: 45, atkSpeed: 1.15, boltAdd: 0.05, freezeAdd: 0.05, vsFire: 1.5 },
+    // One card slot. Nothing can go in it yet - there are no cards - but a weapon that will
+    // carry one has to say so from the day it drops, or the slot arrives as a retrofit on
+    // items players already hold at +10.
+    slots: 1,
+    tip: '+45 ATK, attack 15% faster, +50% damage to Fire monsters. 5% chance on hit: ice falls around you for 10% of ATK as magic, and what it hits may freeze',
   },
   tidecleaver: {
     name: 'Tidecleaver', slot: 'weapon', hero: 'knight', kind: 'sword',
@@ -198,8 +203,13 @@ export const DEFAULT_WEAPON = { knight: 'Knight Sword', hunter: 'Hunter Bow' };
 
 export function itemName(gear, hero) {
   if (!gear || !ITEMS[gear.id]) return DEFAULT_WEAPON[hero] || 'Bare hands';
-  if (gear.main) return `${ITEMS[gear.id].name} · ${attrText(gear.main)}`;
-  return gear.plus ? `${ITEMS[gear.id].name} +${gear.plus}` : ITEMS[gear.id].name;
+  const it = ITEMS[gear.id];
+  if (gear.main) return `${it.name} · ${attrText(gear.main)}`;
+  // Card slots are written into the name the way the genre writes them - "Sword [1]" - so a
+  // slotted weapon is recognisable in a list before anything can be put in one. There are no
+  // cards yet; the bracket is a promise the item makes from the day it drops.
+  const slotted = it.slots ? `${it.name} [${it.slots}]` : it.name;
+  return gear.plus ? `${slotted} +${gear.plus}` : slotted;
 }
 
 // The refine aura: from glowAt the blade carries a soft light that steps through these

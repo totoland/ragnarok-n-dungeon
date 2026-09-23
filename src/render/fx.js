@@ -407,20 +407,29 @@ export function createFx(world) {
       case 'autoMeteor':
         ring(ev.x, ev.z, { color: 0xb070ff, radius: 1.5, life: 0.5, y: 0.04 });
         break;
-      case 'autoBolt':   // the water above freezing: a tight mark on the spot it will land
-        ring(ev.x, ev.z, { color: 0x50c0ff, radius: 0.9, life: 0.32, y: 0.04 });
+      case 'autoBolt':   // the water above freezing: the ring it is about to fall inside
+        ring(ev.x, ev.z, { color: 0x50c0ff, radius: 2.6, life: 0.28, y: 0.04 });
         break;
       case 'coldBolt': {
-        beam(ev.x, ev.z, { color: 0x9fe8ff, life: 0.34 });
-        ring(ev.x, ev.z, { color: 0xd8f4ff, radius: 1.2, life: 0.28, y: 0.06 });
-        // Shards rather than a bloom: ice breaks where a meteor scatters, so the particles
-        // are fewer, faster and fall back down hard.
-        burst(ev.x, 0.4, ev.z, 20, { color: 0x7fd8ff, speed: 4.5, up: 3, life: 0.4, size: 0.24, gravity: 9 });
-        burst(ev.x, 0.3, ev.z, 8, { color: 0xffffff, speed: 2, up: 1.8, life: 0.3, size: 0.16 });
-        flashLight.position.set(ev.x, 1.2, ev.z); flashLight.intensity = 11;
-        addShake(world, 0.14);
+        // Around the hero rather than on one monster, so it is drawn as a ring of falls
+        // rather than a single one: five wedges spaced round him, each its own shaft and
+        // its own shatter. The beams are what carry "it came from above".
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 + 0.3;
+          const bx = ev.x + Math.cos(a) * 1.9, bz = ev.z + Math.sin(a) * 1.1;
+          beam(bx, bz, { color: 0x9fe8ff, life: 0.3 });
+          burst(bx, 0.4, bz, 8, { color: 0x7fd8ff, speed: 3.6, up: 2.6, life: 0.35, size: 0.22, gravity: 9 });
+        }
+        ring(ev.x, ev.z, { color: 0xd8f4ff, radius: 2.4, life: 0.3, y: 0.06 });
+        burst(ev.x, 0.3, ev.z, 10, { color: 0xffffff, speed: 2.4, up: 1.8, life: 0.3, size: 0.16 });
+        flashLight.position.set(ev.x, 1.2, ev.z); flashLight.intensity = 13;
+        addShake(world, 0.16);
         break;
       }
+      case 'freeze':     // it stops: a hard white crack, then nothing while the tint holds it
+        burst(ev.x, ev.y + 0.5, ev.z, 14, { color: 0xcdf2ff, speed: 2.2, up: 1.6, life: 0.4, size: 0.2, gravity: 4 });
+        ring(ev.x, ev.z, { color: 0x9fe8ff, radius: 0.7, life: 0.35, y: 0.05 });
+        break;
       case 'meteor': {
         beam(ev.x, ev.z, { color: 0xc48aff, life: 0.5 });
         ring(ev.x, ev.z, { color: 0xe0b0ff, radius: 2.0, life: 0.35, y: 0.06 });

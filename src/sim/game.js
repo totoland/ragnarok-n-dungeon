@@ -10,7 +10,7 @@ import { levelFromXp, xpForKill } from './progress.js';
 import { mergeMods } from './resolve.js';
 import { itemMods, wearMods, isRolled, rollItem } from './data/items.js';
 import { createEnemy, updateEnemy } from './enemies.js';
-import { boxHits, rollDamage, applyHit } from './combat.js';
+import { boxHits, rollDamage, applyHit, elementMult } from './combat.js';
 
 // The loadout: everything the profile knows that changes the run, fixed when it starts.
 //   tier    the town's New Game+ level; every spawn reads it
@@ -116,7 +116,7 @@ function updateProjectiles(g, dt) {
       for (const e of g.enemies) {
         if (e.dead || pr.hitIds.includes(e.id) || !boxHits(pr, pr.facing, box, e)) continue;
         pr.hitIds.push(e.id);
-        const { dmg, crit } = rollDamage(p.atk, pr.dmg, g.rng, p.crit, p.critDmg);
+        const { dmg, crit } = rollDamage(p.atk, pr.dmg * elementMult(p, e), g.rng, p.crit, p.critDmg);
         const killed = applyHit(e, dmg, pr.knock, pr.stun, pr.facing, e.mass);
         e.facing = -pr.facing;
         onEnemyHit(g, e, dmg, crit, killed, pr.kind);
@@ -216,6 +216,10 @@ function rollPassive(g, e, attackId, killed) {
 // Each one is deliberately not allowed to feed itself: a meteor and a doubled hit both land
 // through onEnemyHit, and letting them roll again there is a loop that ends in a screenful of
 // meteors off one swing. `attackId` carries which is which.
+// How wide the ring of ice around the hero reaches, and how long what it catches stays put.
+const BOLT_R = { x: 2.6, z: 1.6 };
+const FREEZE_SECS = 1.2;
+
 const PROC_FREE = new Set(['autoBlitz', 'autoMeteor', 'autoBolt', 'doubleAttack']);
 function rollGearProcs(g, e, attackId, killed) {
   const p = g.player;
@@ -228,7 +232,7 @@ function rollGearProcs(g, e, attackId, killed) {
   // A doubled hit is the same blow landing twice: same damage, no knockback of its own, and
   // nothing if the first one already killed - there is nothing left to hit twice.
   if (!killed && p.double && g.rng.chance(p.double)) {
-    const { dmg, crit } = rollDamage(p.atk, 1, g.rng, p.crit, p.critDmg);
+    const { dmg, crit } = rollDamage(p.atk, elementMult(p, e), g.rng, p.crit, p.critDmg);
     const dir = Math.sign(e.x - p.x) || p.facing;
     const dead = applyHit(e, dmg, 0, 0, dir, e.mass);
     onEnemyHit(g, e, dmg, crit, dead, 'doubleAttack');
@@ -247,12 +251,13 @@ function rollGearProcs(g, e, attackId, killed) {
     g.pending.push({ kind: 'autoMeteor', target: e.id, t: 0.55, x: e.x, z: e.z });
     pushEvent(g, { type: 'autoMeteor', target: e.id, x: e.x, z: e.z, y: e.y });
   }
-  // Cold Bolt: the same spell shape in a different element. An icicle is a smaller thing
-  // falling a shorter way than a star, so it arrives sooner and covers less ground - which
-  // is the whole difference between them at the same tenth of ATK.
+  // Cold Bolt. Not the meteor in another colour: the meteor falls on what was hit, and this
+  // falls around the HERO - a ring of ice wedges out of the ceiling, so what it answers is
+  // being surrounded rather than what is in front of you. Same tenth of ATK as magic, and it
+  // arrives sooner, because an icicle is a smaller thing falling a shorter way than a star.
   if (p.bolt && g.rng.chance(p.bolt)) {
-    g.pending.push({ kind: 'autoBolt', target: e.id, t: 0.32, x: e.x, z: e.z });
-    pushEvent(g, { type: 'autoBolt', target: e.id, x: e.x, z: e.z, y: e.y });
+    g.pending.push({ kind: 'autoBolt', t: 0.28, x: p.x, z: p.z });
+    pushEvent(g, { type: 'autoBolt', x: p.x, z: p.z, y: p.y });
   }
 }
 
@@ -266,16 +271,24 @@ function resolvePending(g, dt) {
   for (const job of due) {
     if (job.kind === 'autoMeteor' || job.kind === 'autoBolt') {
       // Magic damage: a tenth of the hero's ATK, and it does not crit and does not knock -
-      // it is a star landing on a spot, not a blow the hero threw. The bolt is the same
-      // spell through a narrower hole.
+      // it is a star landing on a spot, not a blow the hero threw. The bolt covers a ring
+      // around the hero instead of a patch around one monster, so it reaches wider.
       const ice = job.kind === 'autoBolt';
       const dmg = Math.max(1, Math.round(p.atk * 0.1));
       pushEvent(g, { type: ice ? 'coldBolt' : 'meteor', x: job.x, z: job.z, y: 0, dmg });
-      const rx = ice ? 0.9 : 1.6, rz = ice ? 0.8 : 1.1;
+      const rx = ice ? BOLT_R.x : 1.6, rz = ice ? BOLT_R.z : 1.1;
       for (const e of g.enemies) {
         if (e.dead || Math.abs(e.x - job.x) > rx || Math.abs(e.z - job.z) > rz) continue;
         const dead = applyHit(e, dmg, 0, 0, Math.sign(e.x - job.x) || 1, e.mass);
         onEnemyHit(g, e, dmg, false, dead, job.kind);
+        // Freeze rides on magic landing rather than on the swing: a chance, once the spell
+        // has actually hit, that what it hit stops. A boss keeps its hyper armour here for
+        // the same reason it keeps it against stun - 5% on a target you hit several times a
+        // second is not a surprise, it is a lock.
+        if (!dead && p.freeze && e.mass < 3 && g.rng.chance(p.freeze)) {
+          e.frozen = Math.max(e.frozen || 0, FREEZE_SECS);
+          pushEvent(g, { type: 'freeze', id: e.id, x: e.x, z: e.z, y: e.y, secs: FREEZE_SECS });
+        }
       }
       continue;
     }

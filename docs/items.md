@@ -18,7 +18,7 @@ ATK is flat and on one curve across the towns.
 | **Arbalest**<br>`arbalest` | Morroc | hunter | 16 | +16 ATK, 15% crit rate | no — shows the hero’s own weapon | Sandman (boss, hunter) · always |
 | **Crescentfang**<br>`crescentfang` | Phaelan | knight | 30 | +30 ATK, crits hit 30% harder | no — shows the hero’s own weapon | Moonraya (boss, knight) · always |
 | **Moonstring**<br>`moonstring` | Phaelan | hunter | 30 | +30 ATK, crits hit 30% harder | no — shows the hero’s own weapon | Moonraya (boss, hunter) · always |
-| **Under Water Sword**<br>`underWaterSword` | Bairune | knight | 40 | +40 ATK, attack 10% faster, 10% chance on hit: a shaft of ice falls for 10% of ATK as magic | no — shows the hero’s own weapon | Shellora · 4% |
+| **Under Water Sword [1]**<br>`underWaterSword` | Bairune | knight | 45 | +45 ATK, attack 15% faster, +50% damage to Fire monsters. 5% chance on hit: ice falls around you for 10% of ATK as magic, and what it hits may freeze | yes | Shellora · 4% |
 | **Twinshot**<br>`twinshot` | Orvane | hunter | 50 | +50 ATK, 15% chance on hit: the shot lands twice | no — shows the hero’s own weapon | Dark Sword (boss, hunter) · always |
 | **Meteor Edge**<br>`meteorEdge` | Orvane | knight | 55 | +55 ATK, 10% chance on hit: a meteor falls for 10% of ATK as magic | no — shows the hero’s own weapon | Dark Sword (boss, knight) · always |
 | **Tidecleaver**<br>`tidecleaver` | Bairune | knight | 95 | +95 ATK, 18% chance on hit: Undertow drags them back to you | no — shows the hero’s own weapon | Nerakos (boss, knight) · always |
@@ -49,16 +49,16 @@ at a value from its range, plus one secondary from the pool the kind allows.
 
 **An accessory that names no `secondary` draws from the whole pool** (`rollItem`: `def.secondary || ATTR_IDS`),
 which means a common Ring can roll Undertow, Auto Meteor, Auto Cold Bolt, Double Attack or SP Drain as its
-second attribute, at about 7.7% each - and can roll `atkHi` (+5 - +15 ATK), which is five times its own main.
+second attribute, at about 7.1% each - and can roll `atkHi` (+5 - +15 ATK), which is five times its own main.
 Only Orvane's three charms narrow it.
 
 | Item | Town | Main | Secondary pool | Rarity | From |
 |---|---|---|---|---|---|
-| **Ring**<br>`ring` | Prontera, Morroc, Phaelan, Bairune | ATK +1 – +3 | the whole pool — any of 13 | common | Poring · 3%<br>PecoPeco · 3%<br>Bonku · 3%<br>Craboon · 3% |
-| **Clip**<br>`clip` | Prontera, Morroc, Phaelan, Orvane, Bairune | SP 1% – 3% | the whole pool — any of 13 | common | Lunatic · 2.5%<br>Baby Desert Wolf · 2.5%<br>Famiru · 2.5%<br>Flittern · 2.5%<br>Jellune · 2.5% |
-| **Bell**<br>`bell` | Prontera, Morroc, Phaelan, Orvane | ASPD 5% – 10% | the whole pool — any of 13 | uncommon | Skel Soldier · 2%<br>Andre · 2%<br>Munari · 2%<br>Stringen · 2% |
-| **Brooch**<br>`brooch` | Prontera, Morroc, Phaelan, Orvane, Bairune | Crit rate 3% – 6% | the whole pool — any of 13 | uncommon | Skel Archer · 1%<br>Sand Wraith · 1%<br>Skelbow · 1%<br>Wispra · 1.5%<br>Hushling · 1.2%<br>Grinlit · 1.2%<br>Hydrella · 1.2% |
-| **Amulet**<br>`amulet` | Morroc, Phaelan, Orvane, Bairune | HP 1% – 3% | the whole pool — any of 13 | rare | Golem · 0.5%<br>Sorya · 0.8%<br>Velmara · 1%<br>Nyxmare · 1.2%<br>Shellora · 1.2%<br>Marinox · 1.2% |
+| **Ring**<br>`ring` | Prontera, Morroc, Phaelan, Bairune | ATK +1 – +3 | the whole pool — any of 14 | common | Poring · 3%<br>PecoPeco · 3%<br>Bonku · 3%<br>Craboon · 3% |
+| **Clip**<br>`clip` | Prontera, Morroc, Phaelan, Orvane, Bairune | SP 1% – 3% | the whole pool — any of 14 | common | Lunatic · 2.5%<br>Baby Desert Wolf · 2.5%<br>Famiru · 2.5%<br>Flittern · 2.5%<br>Jellune · 2.5% |
+| **Bell**<br>`bell` | Prontera, Morroc, Phaelan, Orvane | ASPD 5% – 10% | the whole pool — any of 14 | uncommon | Skel Soldier · 2%<br>Andre · 2%<br>Munari · 2%<br>Stringen · 2% |
+| **Brooch**<br>`brooch` | Prontera, Morroc, Phaelan, Orvane, Bairune | Crit rate 3% – 6% | the whole pool — any of 14 | uncommon | Skel Archer · 1%<br>Sand Wraith · 1%<br>Skelbow · 1%<br>Wispra · 1.5%<br>Hushling · 1.2%<br>Grinlit · 1.2%<br>Hydrella · 1.2% |
+| **Amulet**<br>`amulet` | Morroc, Phaelan, Orvane, Bairune | HP 1% – 3% | the whole pool — any of 14 | rare | Golem · 0.5%<br>Sorya · 0.8%<br>Velmara · 1%<br>Nyxmare · 1.2%<br>Shellora · 1.2%<br>Marinox · 1.2% |
 | **Rune Sigil**<br>`runeSigil` | Orvane | Auto Meteor 1% – 3% | ATK, SP Drain | rare | Grinlit · 3.5% |
 | **Echo Band**<br>`echoBand` | Orvane | Double Attack 1% – 3% | ATK, SP Drain | rare | Hushling · 3.5% |
 | **Mana Clasp**<br>`manaClasp` | Orvane | SP Drain 1% – 3% | ATK, Auto Meteor | uncommon | Velmara · 4% |
@@ -81,6 +81,7 @@ Only Orvane's three charms narrow it.
 | Undertow<br>`pull` | `pullAdd` | 1% – 3% | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet |
 | ATK<br>`atkHi` | `atkAdd` | +5 – +15 | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet, Rune Sigil, Echo Band, Mana Clasp |
 | Auto Cold Bolt<br>`bolt` | `boltAdd` | 1% – 3% | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet |
+| Freeze<br>`freeze` | `freezeAdd` | 1% – 3% | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet |
 
 ## Refine
 
@@ -97,7 +98,7 @@ Anything worn that is not a weapon gains **+2% HP per level** instead.
 | Arbalest | 16 | 18.4 | 20.8 |
 | Crescentfang | 30 | 34.5 | 39 |
 | Moonstring | 30 | 34.5 | 39 |
-| Under Water Sword | 40 | 46 | 52 |
+| Under Water Sword | 45 | 51.75 | 58.5 |
 | Twinshot | 50 | 57.5 | 65 |
 | Meteor Edge | 55 | 63.25 | 71.5 |
 | Tidecleaver | 95 | 109.25 | 123.5 |
@@ -223,7 +224,7 @@ Boss: **Nerakos**, who pays Tidecleaver (knight) / Coralbow (hunter) every time.
 
 ## Gaps
 
-**17 of 19 worn things have no model of their own** (accessories are excluded — they are meant to have none):
+**16 of 19 worn things have no model of their own** (accessories are excluded — they are meant to have none):
 
 - Gakkung Bow (`gakkung`, weapon) — shows the hero’s own weapon
 - Tsurugi (`tsurugi`, weapon) — shows the hero’s own weapon
@@ -239,11 +240,10 @@ Boss: **Nerakos**, who pays Tidecleaver (knight) / Coralbow (hunter) every time.
 - Tidefin Helm (`tidefin`, hat) — nothing appears
 - Pearl Diadem (`pearlDiadem`, hat) — nothing appears
 - Everwave Mantle (`everwave`, cape) — the knight keeps his own cape, the hunter has no cape node at all
-- Under Water Sword (`underWaterSword`, weapon) — shows the hero’s own weapon
 - Tidecleaver (`tidecleaver`, weapon) — shows the hero’s own weapon
 - Coralbow (`coralbow`, weapon) — shows the hero’s own weapon
 
 **Every attribute in the pool is reachable.** The five common accessories name no `secondary`, so each of them can roll any of the others.
 
-**Attributes no accessory carries as its _main_:** Crit damage (`critDmg`), Dodge (`dodge`), MATK (`matk`), Undertow (`pull`), ATK (`atkHi`), Auto Cold Bolt (`bolt`) — reachable only as a second roll, so never at a chosen value.
+**Attributes no accessory carries as its _main_:** Crit damage (`critDmg`), Dodge (`dodge`), MATK (`matk`), Undertow (`pull`), ATK (`atkHi`), Auto Cold Bolt (`bolt`), Freeze (`freeze`) — reachable only as a second roll, so never at a chosen value.
 

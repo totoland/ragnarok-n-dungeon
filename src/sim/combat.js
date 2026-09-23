@@ -59,6 +59,17 @@ export function applyHit(target, dmg, knock, stun, dir, mass = 1) {
   return target.hp <= 0;
 }
 
+// Elemental advantage. A weapon names what it is strong against (`vsFire`, and whatever
+// follows it); a monster names what it is (`element`). No monster has one yet - Toto is
+// assigning them later - so today this returns 1 on every hit in the game. It is here now
+// because a weapon that claims the bonus has to mean it the day the elements land, and a
+// multiplier bolted on afterwards is a multiplier applied in three places out of four.
+export function elementMult(p, target) {
+  const el = target?.def?.element;
+  if (!el) return 1;
+  return p?.def?.mods?.[`vs${el[0].toUpperCase()}${el.slice(1)}`] ?? 1;
+}
+
 export function dist2d(a, b) {
   const dx = a.x - b.x, dz = a.z - b.z;
   return Math.hypot(dx, dz);

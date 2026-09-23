@@ -208,6 +208,19 @@ def classify_goat_samurai(group, name, cx):
     return "torso"                                      # body, neck, throat
 
 
+def classify_weapon(group, name, cx):
+    """A wielded weapon: one rigid piece, like a hat, and for the same reason it gets its own
+    file rather than being baked into the hero.
+
+    Baking was how the Katana arrived, and it is what the rig wanted at the time: a weapon has
+    to sit in a fist whose grip only that hero knows. But the grip is exactly what the hero's
+    `weapon` node already is - an origin in the hand - so a weapon exported about its own grip
+    drops straight into it, and the game gains a sword without re-exporting the character
+    holding it. Ten weapons in the game and one model between them is what the old way cost.
+    """
+    return "weapon"
+
+
 def classify_nerakos(group, name, cx):
     """Bairune's boss, the tidal warden. Sorted by collection like the other sculpts.
 
@@ -428,6 +441,34 @@ MODELS = {
         "parent": {"hat": "root"},
         "pivot": {"root": (0, 0, 0), "hat": (0, 0, 0.0065)},
     },
+    # ---- Wielded weapons. Exported about the grip, into assets/gear/ beside the hats, and
+    # mounted on the hero's own `weapon` node at load (src/render/gear.js).
+    "underWaterSword": {
+        "scene": "Ashen Barbed Sword",
+        # Blender units from the pommel to the tip. `height` is that length in game units:
+        # the grip sits 1.30 of 8.07 up the blade, so at this scale 1.15 units of sword stand
+        # above the fist against the knight's own 1.00 - longer in the hand, which is what a
+        # two-hander should read as, without leaving the reach his attack boxes assume.
+        "height": 1.37,
+        "model_height": 8.07,
+        "classify": classify_weapon,
+        "collections": ["Sword \u2022 Blade", "Sword \u2022 Grip", "Sword \u2022 Guard",
+                        "Sword \u2022 Inlays", "Sword \u2022 Pommel"],
+        # Seven eighths of it is the inlay curves down the fuller - shape at render size,
+        # a smear at the size a sword is drawn in a fist.
+        "curve_res": (1, 0),
+        "decimate": {"Sword \u2022 Grip": 0.5, "*": 1},
+        # The inlays are 129 curve objects of crimson channel down the fuller, and they are
+        # four fifths of the sword. At the size a sword is drawn in a fist they are colour,
+        # not shape. The binding goes furthest because the hand closes over most of it.
+        "curve_decimate": {"Sword \u2022 Inlays": 0.1, "Sword \u2022 Grip": 0.06,
+                           "Sword \u2022 Pommel": 0.4, "Sword \u2022 Guard": 0.3, "*": 1},
+        "parent": {"weapon": "root"},
+        # The grip: the middle of the bound leather, where the fist closes. Authored standing
+        # up with the blade along +Z, which is the frame the hero's own weapon node is in -
+        # so it drops into the hand with no turn at all.
+        "pivot": {"root": (0, 0, 0), "weapon": (0, 0, 1.30)},
+    },
     # Bairune's boss. One body mesh, so no arms and no legs - the tentacles are the rig.
     "nerakos": {
         "scene": "Abyssal Trident \u2022 Tidal Warden",
@@ -497,6 +538,22 @@ MODELS = {
 
 # --------------------------------------------------------------------------------------
 
+def _is_unset(col):
+    """Is this fallback colour a colour anyone chose, or just what the socket came with?
+
+    Two values mean "untouched": pure white, which is what an emission socket starts at, and
+    the neutral 0.8 grey a Principled BSDF's base colour starts at. The Ashen Barbed Sword's
+    seven materials are all the second - pitted steel, blackened iron, oxidised crimson, soot
+    leather - every one of them a ramp over an untouched 0.8, so a threshold that only caught
+    white read the fallback as the answer and exported the whole sword as one grey.
+
+    A deliberate light grey is indistinguishable from the default, and for that one colour
+    reading the ramp is the better guess anyway; anything below this is taken at face value.
+    """
+    lo, hi = min(col), max(col)
+    return lo >= 0.79 and hi - lo < 0.01
+
+
 def _flatten_socket(mat, inp, pick="mean"):
     """Resolve one linked colour socket to the single flat colour glTF can carry.
 
@@ -509,7 +566,7 @@ def _flatten_socket(mat, inp, pick="mean"):
     if not inp or not inp.is_linked:
         return
     col = list(inp.default_value)[:3]
-    if min(col) > 0.9:                       # the fallback is white as well: read the tree
+    if _is_unset(col):                       # the fallback says nothing either: read the tree
         stops = []
         seen = set()
         stack = [inp.links[0].from_node]
@@ -625,7 +682,7 @@ def world_center(o):
     return sum(pts, Vector()) / 8
 
 
-def bake_group(scene, name, objects, scale, pivot, yaw=0.0):
+def bake_group(scene, name, objects, scale, pivot, yaw=0.0, thin=None):
     """Evaluate (modifiers applied), bake world transforms, join into one object at `pivot`.
 
     `yaw` turns the model about Z on the way out, for a source file whose front does not point
@@ -641,6 +698,19 @@ def bake_group(scene, name, objects, scale, pivot, yaw=0.0):
         me.transform(Matrix.Scale(scale, 4) @ turn @ o.matrix_world)
         part = bpy.data.objects.new(f"__{name}_{o.name}", me)
         scene.collection.objects.link(part)
+        # A curve cannot take a DECIMATE modifier, but the mesh it has just become can - and
+        # `curve_res` alone cannot always reach it. A bevelled POLY spline ignores
+        # resolution_u entirely and is walked once per control point, so the sword's grip
+        # binding costs 600 rings whatever that is set to. This is the only handle left.
+        r = thin(o) if thin else 1
+        if r and r < 1:
+            part.modifiers.new("__curve_decimate", "DECIMATE").ratio = r
+            thinned = bpy.data.meshes.new_from_object(
+                part.evaluated_get(bpy.context.evaluated_depsgraph_get()),
+                preserve_all_data_layers=True, depsgraph=bpy.context.evaluated_depsgraph_get())
+            part.modifiers.clear()
+            part.data = thinned
+            bpy.data.meshes.remove(me)
         parts.append(part)
     active = parts[0]
     if len(parts) > 1:
@@ -648,11 +718,29 @@ def bake_group(scene, name, objects, scale, pivot, yaw=0.0):
                                        selected_objects=parts, object=active):
             bpy.ops.object.join()
     me = active.data
-    me.transform(Matrix.Translation(-Vector(pivot) * scale))
+    # The pivot is written in the SOURCE file's frame - "the middle of the head band", "the
+    # fist" - but by here the geometry has already been turned by `yaw`. Turn the pivot the
+    # same way before subtracting it, or the origin lands wherever that point used to be.
+    # Latent until now: every pivot a turned model has had sits on the Z axis, which a yaw
+    # leaves where it is.
+    turned = (turn @ Vector(pivot)) * scale
+    me.transform(Matrix.Translation(-turned))
     active.name = name
     me.name = name
-    active.location = Vector(pivot) * scale
+    active.location = turned
     return active
+
+
+def curve_thinner(cdec, cols):
+    """How hard to thin one object's curve geometry, or None when the recipe does not say."""
+    if cdec is None:
+        return None
+    def thin(o):
+        if o.type == "MESH":
+            return 1                      # meshes are thinned by their own DECIMATE, above
+        g = mesh_group(o, cols)
+        return cdec.get(g, cdec.get("*", 1)) if isinstance(cdec, dict) else cdec
+    return thin
 
 
 def export(model_key, out_dir):
@@ -680,6 +768,10 @@ def export(model_key, out_dir):
     # along its path and around its ring. Authored for a render, both sit far above what a
     # trim line needs at the size the game draws it.
     res = recipe.get("curve_res")
+    # Thinning for geometry DECIMATE cannot be hung on in the source: curves. Keyed by group
+    # like `decimate`, and opt-in, so a recipe that does not ask keeps exactly what it baked
+    # before this existed.
+    cdec = recipe.get("curve_decimate")
     groups = {}
     for o in model_meshes(scene, cols):
         for slot in o.material_slots:
@@ -713,7 +805,8 @@ def export(model_key, out_dir):
     scene.collection.objects.link(root)
     nodes = {"root": root}
     for limb, objs in groups.items():
-        nodes[limb] = bake_group(scene, limb, objs, scale, recipe["pivot"][limb], yaw)
+        nodes[limb] = bake_group(scene, limb, objs, scale, recipe["pivot"][limb], yaw,
+                                 thin=curve_thinner(cdec, cols))
 
     # Parent so every node's local translation is joint-to-joint in the rest pose.
     for limb, parent in recipe["parent"].items():

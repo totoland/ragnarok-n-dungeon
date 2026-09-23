@@ -15,7 +15,7 @@ export function createEnemy(g, type, x, z) {
     x, z, y: 0, vx: 0, vz: 0, vy: 0, facing: -1, grounded: true,
     hp: def.hp, hpMax: def.hp, mass: def.mass, hurtbox: def.hurtbox,
     state: 'enter', stateT: 0, cd: 0.8 + g.rng.next() * 0.8, move: null,
-    hitstun: 0, launched: false, flash: 0, dead: false, deathT: 0,
+    hitstun: 0, frozen: 0, launched: false, flash: 0, dead: false, deathT: 0,
     hopT: g.rng.next(), aiT: 0, hitDone: false, addsDone: false,
     lastHitBy: null,
   };
@@ -181,6 +181,19 @@ export function updateEnemy(g, e, dt) {
     e.dead = true; e.state = 'dead'; e.deathT = 0;
     return;
   }
+  // Frozen (sim/game.js, off a Cold Bolt landing). The one status effect in the game: it
+  // holds everything still - no thinking, no wind-up, no drifting towards the hero - and it
+  // runs down whether or not anything else is happening. Physics still applies, so a block
+  // of ice can be shoved about; only its own will is gone.
+  if (e.frozen > 0) {
+    e.frozen -= dt;
+    e.state = 'frozen';
+    e.stateT = 0;
+    physics(g, e, dt);
+    separate(g, e);
+    return;
+  }
+  if (e.state === 'frozen') { e.state = 'chase'; e.stateT = 0; }
   if (e.hitstun > 0 || e.launched || !e.grounded) {
     e.state = 'hurt';
     e.stateT = 0;

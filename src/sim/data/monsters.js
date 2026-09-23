@@ -4,6 +4,9 @@
 // Names are Ragnarok Online monsters kept as placeholders (see README); the models,
 // stats and behaviour are original.
 
+// `element` is the other half of a weapon's `vsFire` (sim/combat.js elementMult): a monster
+// that names one takes the matching bonus. None of them name one yet - Toto is assigning them
+// later - so every elemental line in the game is currently worth exactly nothing, on purpose.
 export const MONSTERS = {
   poring: {
     name: 'Poring', ai: 'hopper',
