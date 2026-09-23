@@ -95,6 +95,18 @@ const THEMES = {
     bgMake: (i) => seaSky(i + 19, { deep: true }), bgH: 12, outdoor: true,
     sideWall: 0x6e7a82, ledge: 0x5c666e, arch: 0x93a0a8,
   },
+  // Varkhol. The camp is firelight on packed earth under a canopy; the terrace is the same
+  // stone the jungle grew over, open to a hot sky.
+  warcamp: {
+    floor: '#6b5a3c', grout: '#2e2517', wall: '#4a4430', mortar: '#241f14',
+    fog: 0x1a2412, hemi: [0xbfd08a, 0x2e3a1c], torch: 0xff9430, props: 'totems',
+  },
+  terrace: {
+    floor: '#9a8f6e', grout: '#4a4231', wall: '#8a7a56', mortar: '#3c3423',
+    fog: 0x3a2a14, hemi: [0xffd9a0, 0x54401e], torch: 0xffb050, props: 'totems',
+    bgMake: (i) => pineSky(i + 21), bgH: 12, ground: 'grass', outdoor: true,
+    sideWall: 0x7d6f4e, ledge: 0x6a5d40, arch: 0xa89a76,
+  },
   bell: {
     floor: '#6f7a80', grout: '#333c42', wall: '#5e6a72', mortar: '#2a3238',
     fog: 0x04121e, hemi: [0x8fd0e8, 0x18303e], torch: 0x5fc8ff, props: 'greatbell',
@@ -595,6 +607,45 @@ export function buildRoom(world, roomDef, index) {
     coffin.position.set(W / 2, 0.35, zBack + 1.0);
     coffin.castShadow = true; coffin.receiveShadow = true;
     g.add(coffin);
+  } else if (theme.props === 'totems') {
+    // Varkhol: carved posts the camp is built around, a cook fire, and the stone heads the
+    // orcs dug up and never moved. The posts are what read at a glance - a row of tall
+    // silhouettes that say "someone lives here" rather than "something died here".
+    const wood = new THREE.MeshStandardMaterial({ color: 0x5f4526, roughness: 0.94 });
+    const jade = new THREE.MeshStandardMaterial({ color: 0x5d7f57, roughness: 0.78 });
+    const stone = new THREE.MeshStandardMaterial({ color: 0x8a8068, roughness: 0.92 });
+    for (let i = 0; i < 5; i++) {
+      const x = 1.8 + i * (W / 5.2);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 2.4 + (i % 3) * 0.5, 7), wood);
+      post.position.set(x, 1.2 + (i % 3) * 0.25, zBack + 0.7);
+      post.rotation.y = i * 0.7;
+      post.castShadow = true; post.receiveShadow = true;
+      g.add(post);
+      // a carved face near the top, and a banded collar under it
+      const face = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.34), jade);
+      face.position.set(x, post.position.y + (1.2 + (i % 3) * 0.25) - 0.35, zBack + 0.58);
+      face.rotation.y = post.rotation.y;
+      face.castShadow = true;
+      g.add(face);
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.05, 6, 10), jade);
+      collar.position.set(x, post.position.y - 0.45, zBack + 0.7);
+      collar.rotation.x = Math.PI / 2;
+      g.add(collar);
+    }
+    // the stone heads, half swallowed by the floor
+    for (let i = 0; i < 3; i++) {
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.7, 0.7), stone);
+      head.position.set(3.4 + i * (W / 3.4), 0.3, zBack + 1.5);
+      head.rotation.set(0.2, i * 1.1, 0.08);
+      head.castShadow = true; head.receiveShadow = true;
+      g.add(head);
+    }
+    // the cook fire: a ring of stones the room's own torch colour sits over
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.14, 6, 12), stone);
+    ring.position.set(W / 2, 0.1, zBack + 1.9);
+    ring.rotation.x = Math.PI / 2;
+    ring.receiveShadow = true;
+    g.add(ring);
   } else if (theme.props === 'greatbell') {
     // The floor of the temple: the bell hanging over the middle of it, wrapped in what came
     // up out of the dark to take it, and braziers either side. The room was borrowing

@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { createGame, update } from '../src/sim/game.js';
 import { createEnemy } from '../src/sim/enemies.js';
 import { MONSTERS } from '../src/sim/data/monsters.js';
-import { createMonsterViews, setBossModel, setMoonrayaModel, setSandmanModel, setDarkSwordModel, setNerakosModel, CLIPS_BY_TYPE } from '../src/render/monsters.js';
+import { createMonsterViews, setBossModel, setMoonrayaModel, setSandmanModel, setDarkSwordModel, setNerakosModel, setKingOrcModel, CLIPS_BY_TYPE } from '../src/render/monsters.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from '../src/render/anim.js';
 
 const world = () => ({ scene: new THREE.Scene() });
@@ -58,6 +58,8 @@ setSandmanModel(stubBossModel());
 // Orvane's boss is a sculpt with the full set of limbs, so the plain stand-in covers him.
 setDarkSwordModel(stubBossModel());
 setNerakosModel(stubNerakosModel());
+// King Orc has the full limb set, so the plain stand-in covers him.
+setKingOrcModel(stubBossModel());
 
 test('every monster type builds, walks, winds up, attacks, gets hurt, launched and dies without throwing', () => {
   const w = world();

@@ -24,3 +24,4 @@ rm -f assets/monsters/meta.json
 rm -f assets/gear/meta.json
 "$BLENDER" -b assets/blender/robin_hood_hat/robin_hood_hat.blend -P tools/export_heroes.py -- robinHat assets/gear 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
 "$BLENDER" -b assets/blender/under_water_sword/ashen_barbed_sword.blend -P tools/export_heroes.py -- underWaterSword assets/gear 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
+"$BLENDER" -b assets/blender/dwarf_warrior_game_source.blend -P tools/export_heroes.py -- kingOrc assets/monsters 2>&1 | grep -E "^\[export_heroes\]|^    |Error"

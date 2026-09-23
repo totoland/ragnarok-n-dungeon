@@ -217,10 +217,13 @@ function rollPassive(g, e, attackId, killed) {
 // through onEnemyHit, and letting them roll again there is a loop that ends in a screenful of
 // meteors off one swing. `attackId` carries which is which.
 // How wide the ring of ice around the hero reaches, and how long what it catches stays put.
+// Weapons that cast a hero skill: [the rate on the player, the attack it fires, its tag].
+const SKILL_PROCS = [['magnum', 'magnumBreak', 'autoMagnum'], ['shower', 'arrowShower', 'autoShower']];
+
 const BOLT_R = { x: 2.6, z: 1.6 };
 const FREEZE_SECS = 1.2;
 
-const PROC_FREE = new Set(['autoBlitz', 'autoMeteor', 'autoBolt', 'doubleAttack', 'autoMagnum']);
+const PROC_FREE = new Set(['autoBlitz', 'autoMeteor', 'autoBolt', 'doubleAttack', 'autoMagnum', 'autoShower']);
 function rollGearProcs(g, e, attackId, killed) {
   const p = g.player;
   if (PROC_FREE.has(attackId)) return;
@@ -251,22 +254,26 @@ function rollGearProcs(g, e, attackId, killed) {
     g.pending.push({ kind: 'autoMeteor', target: e.id, t: 0.55, x: e.x, z: e.z });
     pushEvent(g, { type: 'autoMeteor', target: e.id, x: e.x, z: e.z, y: e.y });
   }
-  // Auto Magnum: the weapon casting the hero's own Magnum Break, without his hands or his
-  // SP. The first proc in the game that fires a SKILL rather than a spell of its own, so it
-  // borrows the skill's hit box and knockback exactly - a burst all round that launches -
-  // and deliberately does NOT take the hero's skill levels with it. What the weapon casts is
-  // Magnum Break; how good the hero is at Magnum Break is his business.
-  if (p.magnum && g.rng.chance(p.magnum)) {
-    const hit = p.def.attacks?.magnumBreak?.hits?.[0];
-    if (hit) {
-      pushEvent(g, { type: 'autoMagnum', x: p.x, z: p.z, y: p.y });
-      for (const t of g.enemies) {
-        if (t.dead || !boxHits(p, p.facing, hit.box, t)) continue;
-        const { dmg, crit } = rollDamage(p.atk, hit.dmg, g.rng, p.crit, p.critDmg);
-        const dir = Math.sign(t.x - p.x) || p.facing;
-        const dead = applyHit(t, dmg, hit.knock, hit.stun, dir, t.mass);
-        onEnemyHit(g, t, dmg, crit, dead, 'autoMagnum');
-      }
+  // The weapon casting one of the hero's own skills, without his hands or his SP. Unlike
+  // every other proc it is not a spell of its own: it borrows the skill's hit box, damage
+  // and knockback exactly, which is the whole point - Magnum Break is radial, so it reaches
+  // what is standing behind the hero, and Arrow Shower covers a strip he is not facing into.
+  //
+  // It deliberately does NOT take the hero's skill levels with it. What the weapon casts is
+  // the skill; how good the hero is at it is his own business, and a weapon that scaled off
+  // a choice made on the skill screen would be better on some builds for reasons nothing
+  // written on it explains.
+  for (const [rate, skill, tag] of SKILL_PROCS) {
+    if (!p[rate] || !g.rng.chance(p[rate])) continue;
+    const hit = p.def.attacks?.[skill]?.hits?.[0];
+    if (!hit) continue;
+    pushEvent(g, { type: tag, x: p.x, z: p.z, y: p.y, facing: p.facing });
+    for (const t of g.enemies) {
+      if (t.dead || !boxHits(p, p.facing, hit.box, t)) continue;
+      const { dmg, crit } = rollDamage(p.atk, hit.dmg, g.rng, p.crit, p.critDmg);
+      const dir = Math.sign(t.x - p.x) || p.facing;
+      const dead = applyHit(t, dmg, hit.knock, hit.stun, dir, t.mass);
+      onEnemyHit(g, t, dmg, crit, dead, tag);
     }
   }
   // Cold Bolt. Not the meteor in another colour: the meteor falls on what was hit, and this
@@ -287,6 +294,17 @@ function resolvePending(g, dt) {
   if (!due.length) return;
   g.pending = g.pending.filter((j) => j.t > 0);
   for (const job of due) {
+    if (job.kind === 'bossMeteor') {
+      // The boss's own. It lands on a spot and hurts whoever is standing there, which is the
+      // hero - monsters are not caught in it, because a boss dropping rocks on its own adds
+      // reads as a bug however defensible it is.
+      pushEvent(g, { type: 'meteor', x: job.x, z: job.z, y: 0, dmg: job.dmg, fire: true });
+      const hitHero = Math.abs(p.x - job.x) <= job.r && Math.abs(p.z - job.z) <= job.r * 0.7;
+      if (hitHero && !p.dead && hurtPlayer(g, p, job.dmg, [3, 0], 0.25, Math.sign(p.x - job.x) || 1)) {
+        pushEvent(g, { type: 'hit', target: 'player', dmg: job.dmg, x: p.x, z: p.z, y: p.y + 1.2, crit: false });
+      }
+      continue;
+    }
     if (job.kind === 'autoMeteor' || job.kind === 'autoBolt') {
       // Magic damage: a tenth of the hero's ATK, and it does not crit and does not knock -
       // it is a star landing on a spot, not a blow the hero threw. The bolt covers a ring

@@ -49,6 +49,17 @@ function botInput(g, frame) {
   const threat = live.find((e) => e.state === 'windup'
     && (Math.abs(e.x - p.x) < 3 || (e.move === 'charge' && Math.abs(e.z - p.z) < 1.2)));
   const arrow = g.projectiles.find((pr) => pr.owner === 'enemy' && Math.abs(pr.z - p.z) < 0.9 && Math.sign(p.x - pr.x) === Math.sign(pr.vx) && Math.abs(pr.x - p.x) < 3.5);
+  // A ring on the floor with a rock coming down into it. The bot cannot see the ring, so it
+  // is handed the thing the ring stands for: an impact about to land where it is standing.
+  // Without this it stood in every one of the King Orc's and the harness reported a town
+  // nobody could finish, which is a fact about the bot and not the town.
+  const rock = g.pending.find((j) => j.kind === 'bossMeteor' && j.t < 0.7
+    && Math.abs(j.x - p.x) <= j.r + 0.4 && Math.abs(j.z - p.z) <= j.r * 0.7 + 0.4);
+  if (rock) {
+    if (p.x < rock.x) held.left = true; else held.right = true;
+    if (p.z > rock.z) held.down = true; else held.up = true;
+    return { held, pressed };
+  }
   if (arrow) { // change lane to let an incoming arrow pass
     if (p.z > 0) held.up = true; else held.down = true;
     return { held, pressed };

@@ -221,6 +221,28 @@ def classify_weapon(group, name, cx):
     return "weapon"
 
 
+def classify_king_orc(group, name, cx):
+    """Varkhol's boss, the emerald sentinel. The first model to arrive prepared the way
+    assets/blender/PIPELINE.md asks: every limb its own object, named `Part • description`
+    with -1 / 1 sides, flat colours, front at -Y. So this is the full rig, arms and legs,
+    rather than the short one Nerakos had to take.
+
+    He carries two things and the rig has one weapon slot: the cleaver is the weapon and
+    rides armL, the shield rides the other arm - the call the Sandman's lance got. The
+    pauldrons, the apron and the skirts ride the torso, which is the Dark Sword's lesson: a
+    plate that swings with the elbow reads as a loose one.
+    """
+    if group.endswith("Weapon"):
+        return "weapon" if name.startswith("Sword") else "armR"
+    if name.startswith(("Head", "Eye", "Helmet", "Crest")):
+        return "head"
+    if name.startswith(("Arm", "Forearm", "Hand")):
+        return "arm" + _side(cx)
+    if name.startswith(("Leg", "Foot")):
+        return "leg" + _side(cx)
+    return "torso"                  # body, pauldrons, apron, skirts, cape
+
+
 def classify_nerakos(group, name, cx):
     """Bairune's boss, the tidal warden. Sorted by collection like the other sculpts.
 
@@ -472,6 +494,35 @@ MODELS = {
         # The grip: the middle of the bound leather, where the fist closes. Authored standing
         # up with the blade along +Z, the frame the hero's own weapon node is already in.
         "pivot": {"root": (0, 0, 0), "weapon": (0, 0, 1.30)},
+    },
+    # Varkhol's boss. Modelled at a metre tall and a little off centre.
+    "kingOrc": {
+        "scene": "Dwarf Warrior \u2022 Emerald Sentinel",
+        "height": 3.2,                      # game units, to the tip of the feather crest
+        "model_height": 0.98,               # Blender units, the same point
+        "classify": classify_king_orc,
+        "collections": ["DW \u2022 Adornment", "DW \u2022 Anatomy", "DW \u2022 Armour",
+                        "DW \u2022 Cloth", "DW \u2022 Weapon"],
+        # 984k verts arrive. The crest is 200k of feather fan and the cape 183k of torn
+        # cloth, neither of which is shape at the size he is drawn; they take the hardest
+        # cut. What is left lands near the other five bosses.
+        "decimate": {"DW \u2022 Adornment": 0.026, "DW \u2022 Cloth": 0.05,
+                     "DW \u2022 Weapon": 0.055, "DW \u2022 Armour": 0.07,
+                     "DW \u2022 Anatomy": 0.06, "*": 1},
+        "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
+                   "weapon": "armL", "legL": "root", "legR": "root"},
+        "pivot": {
+            # The model's centreline sits at x = 0.065, not 0 - his legs are at -0.07 and
+            # +0.19. The root pivot is subtracted from every vertex on the way out, so this
+            # one number centres him; left at 0 he would swing a fifth of a unit sideways
+            # every time he turned round.
+            "root": (0.065, 0, 0),
+            "torso": (0.065, -0.04, 0.22),      # the waist, under the belt
+            "head": (0.07, -0.02, 0.41),        # the neck, under the jaw
+            "armL": (-0.03, 0.04, 0.43), "armR": (0.17, 0.0, 0.45),
+            "weapon": (-0.17, 0.11, 0.24),      # the cleaver hand
+            "legL": (-0.07, 0.04, 0.22), "legR": (0.19, 0.0, 0.21),
+        },
     },
     # Bairune's boss. One body mesh, so no arms and no legs - the tentacles are the rig.
     "nerakos": {

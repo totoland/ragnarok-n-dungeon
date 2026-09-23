@@ -35,6 +35,15 @@ export function rollDamage(atk, mult, rng, crit = 0.08, critDmg = 1.6) {
 // the moment you hit it, and why it only ever happened to a hero carrying Orvane's gear:
 // Auto Meteor and Double Attack are the only two things in the game that pass 0 here.
 export function applyHit(target, dmg, knock, stun, dir, mass = 1) {
+  // Armour: a share of the damage that never lands. It is a PERCENTAGE and not a flat
+  // subtraction on purpose - a flat one is brutal against a level-1 hero swinging for 12
+  // and worth nothing against one swinging for 89, and this game's ATK moves by 7x across
+  // a run. Negative armour is a real value: the Orc Sword carries -0.5, which is the
+  // drawback its crit and its dodge are paid for with.
+  //
+  // It is named `armor` and not `def` because both the player and every enemy already carry
+  // a `def` - the resolved stat table they were built from.
+  if (dmg > 0) dmg = Math.max(1, Math.round(dmg * (1 - (target.armor || 0))));
   target.hp = Math.max(0, target.hp - dmg);
   const k = 1 / Math.max(0.35, mass);
   if (knock) target.vx = knock[0] * dir * k;

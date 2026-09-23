@@ -435,6 +435,78 @@ export const MONSTERS = {
             { item: 'amulet', chance: 0.012 }],
     score: 130,
   },
+  // ---- Varkhol, the tusked jungle. An orc war-camp grown over an older stone city: boars
+  // on the path in, the camp itself, the ruins they have made a barracks of, and the terrace
+  // at the top where their king sits. Its roster is Toto's - boar, savage, orc warrior, red
+  // bat, orc zombie - under names of their own.
+  tuskin: {
+    name: 'Tuskin', ai: 'walker',
+    hp: 410, armor: 0.18, atk: 34, speed: 3.6, mass: 1.7,
+    hurtbox: { r: 0.5, h: 1.1 },
+    // It does not swing, it runs through you. Long reach, long wind-up, and it commits.
+    attack: { range: 2.4, windup: 0.5, dur: 0.3, cd: 2.2, box: { x0: 0.0, x1: 2.4, y0: -0.3, y1: 1.4 }, knock: [8, 2] },
+    drops: [{ item: 'tuskHelm', chance: 0.05 }, { item: 'ring', chance: 0.03 }],
+    score: 95,
+  },
+  savrin: {
+    name: 'Savrin', ai: 'walker',
+    hp: 460, armor: 0.2, atk: 38, speed: 2.8, mass: 2.0,
+    hurtbox: { r: 0.5, h: 1.8 },
+    attack: { range: 1.9, windup: 0.42, dur: 0.28, cd: 1.6, box: { x0: 0.0, x1: 2.0, y0: -0.2, y1: 2.1 }, knock: [5, 2] },
+    drops: [{ item: 'boneCharm', chance: 0.04 }, { item: 'brooch', chance: 0.012 }],
+    score: 105,
+  },
+  grokmar: {
+    name: 'Grokmar', ai: 'walker',
+    hp: 560, armor: 0.25, atk: 44, speed: 2.4, mass: 2.4,
+    hurtbox: { r: 0.6, h: 2.0 },
+    // The axe is slow and it launches: the one in the camp you step away from.
+    attack: { range: 2.1, windup: 0.6, dur: 0.34, cd: 2.0, box: { x0: 0.0, x1: 2.3, y0: -0.3, y1: 2.3 }, knock: [6, 5] },
+    drops: [{ item: 'warHelm', chance: 0.05 }, { item: 'bell', chance: 0.02 }],
+    score: 125,
+  },
+  emberwing: {
+    name: 'Emberwing', ai: 'walker',
+    hp: 290, armor: 0.1, atk: 30, speed: 5.0, mass: 0.6,
+    hurtbox: { r: 0.4, h: 1.2 },
+    // Fast, weightless, and it comes in at head height - the thing that punishes standing
+    // still while something bigger winds up.
+    attack: { range: 1.5, windup: 0.26, dur: 0.22, cd: 1.1, box: { x0: -0.1, x1: 1.6, y0: 0.4, y1: 2.2 }, knock: [3, 1] },
+    drops: [{ item: 'emberFang', chance: 0.04 }, { item: 'clip', chance: 0.025 }],
+    score: 80,
+  },
+  rotgrim: {
+    name: 'Rotgrim', ai: 'walker',
+    hp: 640, armor: 0.28, atk: 40, speed: 1.6, mass: 2.8,
+    hurtbox: { r: 0.6, h: 1.9 },
+    // Slow enough to walk away from and heavy enough that walking away is the answer.
+    attack: { range: 1.8, windup: 0.7, dur: 0.36, cd: 2.4, box: { x0: 0.0, x1: 2.0, y0: -0.3, y1: 2.1 }, knock: [5, 3] },
+    drops: [{ item: 'graveMantle', chance: 0.05 }, { item: 'amulet', chance: 0.012 }],
+    score: 130,
+  },
+  kingOrc: {
+    name: 'King Orc', ai: 'boss', boss: true,
+    hp: 4200, armor: 0.2, atk: 46, speed: 2.4, mass: 5.6,
+    // Broad and short: the crest reaches 3.2 but the body he can be hit in stops at 2.4.
+    hurtbox: { r: 1.35, h: 2.5 },
+    // A two-handed axe: the longest basic reach of any boss, and it knows it.
+    attack: { range: 3.0, windup: 0.55, dur: 0.36, cd: 1.7, box: { x0: 0.0, x1: 3.4, y0: -0.3, y1: 3.0 }, knock: [8, 3] },
+    charge: { windup: 0.55, dur: 0.5, speed: 13.5, cd: 8.0, box: { x0: -0.6, x1: 2.6, y0: -0.4, y1: 2.8 }, knock: [10, 3] },
+    slam: { windup: 0.95, dur: 0.5, cd: 7.0, box: { x0: -3.8, x1: 3.8, y0: -0.5, y1: 3.0, both: true }, knock: [7, 7], depth: 1.7 },
+    // He calls the sky down instead of chasing. Four impacts walked across the floor around
+    // the hero, each landing a beat after the last, so the answer is to keep moving rather
+    // than to block - and the first one lands where he WAS, not where he is.
+    // Each one at 0.6 of his ATK. At 1.1 a full volley was 204 against a level-10 hero's
+    // 231, which is not a move to read and dodge but a coin flip on whether he got to.
+    meteor: { windup: 1.1, dur: 0.7, cd: 9.0, count: 4, spread: 2.6, delay: 0.34, fall: 0.55, dmg: 0.6, r: 1.5 },
+    // The dead of his own camp get up to help.
+    adds: { at: 0.5, type: 'rotgrim', count: 2 },
+    // Second wind and second phase: war paint, and he swells into it.
+    heal: { at: 0.25, amount: 0.30, windup: 1.5, dur: 0.7, brk: 0.08 },
+    rage: { tint: 0xa03018, emissive: 0x6a1808, grow: 1.07, shards: 1.0 },
+    drops: [],
+    score: 1600,
+  },
   nerakos: {
     name: 'Nerakos', ai: 'boss', boss: true,
     hp: 3950, atk: 30, speed: 2.2, mass: 5.8,

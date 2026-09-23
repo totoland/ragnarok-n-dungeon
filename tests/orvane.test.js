@@ -195,7 +195,7 @@ test('the weapon curve, as it actually stands', async () => {
   const { TOWNS } = await import('../src/sim/data/dungeon.js');
   const curve = (hero) => Object.values(TOWNS).map((t) => ITEMS[t.loot[hero]].mods.atkAdd);
   // The hunter's climbs the way the towns do.
-  assert.deepEqual(curve('hunter'), [6, 16, 30, 50, 95]);
+  assert.deepEqual(curve('hunter'), [6, 16, 30, 50, 95, 50]);
   // The knight's does not, and the reason is worth keeping next to the number rather than in
   // a commit message. A curve that only ever climbs means the newest town is always the only
   // one worth playing: every earlier map is strictly worse loot, so nobody goes back to one.
@@ -207,7 +207,8 @@ test('the weapon curve, as it actually stands', async () => {
   // So this is not a step down waiting to be fixed. Raising it to 95 would flatten the
   // decision back into a number, which is the thing being avoided. Asserted exactly so that
   // changing it stays deliberate.
-  assert.deepEqual(curve('knight'), [6, 16, 30, 55, 45]);
+  // Varkhol carries the same idea on to both classes: 50, a sidegrade rather than a climb.
+  assert.deepEqual(curve('knight'), [6, 16, 30, 55, 45, 50]);
 });
 
 test("the Under Water Sword is Nerakos's payout, and its Cold Bolt lands as magic", async () => {
@@ -377,4 +378,60 @@ test('Auto Magnum casts the skill, not the hero: a burst all round, at the skill
   assert.ok(hits.length > 0);
   const base = HEROES.knight.attacks.magnumBreak.hits[0].dmg;
   for (const h of hits) assert.ok(h.dmg <= Math.ceil(g.player.atk * base * 1.1), `${h.dmg} vs a ${(g.player.atk * base).toFixed(0)} cap`);
+});
+
+test('Varkhol is a complete town, and it unlocks after Bairune', async () => {
+  const { TOWNS, VARKHOL } = await import('../src/sim/data/dungeon.js');
+  const { MONSTERS: M } = await import('../src/sim/data/monsters.js');
+  const order = Object.keys(TOWNS);
+  assert.equal(order.at(-1), 'varkhol', 'the newest town is last in unlock order');
+  assert.equal(order.at(-2), 'bairune');
+  const used = new Set(VARKHOL.rooms.flatMap((r) => r.waves.flat().map((w) => w.type)));
+  for (const t of used) assert.ok(M[t], `${t} defined`);
+  // Toto's roster: boar, savage, orc warrior, red bat, orc zombie - under names of their own.
+  for (const t of ['tuskin', 'savrin', 'grokmar', 'emberwing', 'rotgrim']) assert.ok(used.has(t), `${t} appears`);
+  const bosses = [...used].filter((t) => M[t].boss);
+  assert.deepEqual(bosses, ['kingOrc']);
+  for (const [hero, id] of Object.entries(VARKHOL.loot)) {
+    assert.ok(fits(id, hero), `${id} fits ${hero}`);
+    assert.equal(ITEMS[id].mods.atkAdd, 50, 'a sidegrade, not a climb');
+  }
+});
+
+test('armour takes a share off every hit, and negative armour adds one', async () => {
+  const { applyHit } = await import('../src/sim/combat.js');
+  const hit = (armor) => { const t = { hp: 1000, vx: 0, vy: 0, hitstun: 0, flash: 0, armor }; applyHit(t, 100, 0, 0, 1, 1); return 1000 - t.hp; };
+  assert.equal(hit(0), 100, 'none');
+  assert.equal(hit(0.25), 75, 'a quarter off');
+  assert.equal(hit(-0.5), 150, "the Orc Sword's drawback: half again");
+  // A hit that carries no damage stays at none - Undertow is a shove, not a 1-point graze.
+  assert.equal(hit(0.25) && (() => { const t = { hp: 1000, armor: 0.25 }; applyHit(t, 0, 0, 0, 1, 1); return 1000 - t.hp; })(), 0);
+  // The armoured town is the one that is armoured.
+  const { MONSTERS: M } = await import('../src/sim/data/monsters.js');
+  for (const t of ['tuskin', 'savrin', 'grokmar', 'rotgrim', 'kingOrc']) assert.ok(M[t].armor >= 0.15, `${t} is armoured`);
+  assert.ok(!M.craboon.armor, 'and the towns before it are not');
+});
+
+test("the King Orc's meteors land where they were called, and only on the hero", async () => {
+  const { VARKHOL } = await import('../src/sim/data/dungeon.js');
+  const { createEnemy: mk } = await import('../src/sim/enemies.js');
+  const { MONSTERS: M } = await import('../src/sim/data/monsters.js');
+  const g = createGame({ hero: 'knight', seed: 8, dungeon: VARKHOL, xp: xpAtLevel(LEVEL.max) });
+  steps(g, 2);
+  const king = mk(g, 'kingOrc', g.player.x + 6, 0);
+  const bystander = mk(g, 'grokmar', g.player.x + 1.0, 0);
+  bystander.hp = 1e6; bystander.frozen = 99;
+  king.hp = 1e6; king.meteorCd = 0; king.chargeCd = 99; king.slamCd = 99; king.castCd = 99;
+  g.enemies.push(king, bystander);
+  const called = [], landed = [];
+  let seen = g.events.length;
+  for (let i = 0; i < 60 * 5; i++) {
+    update(g, EMPTY_INPUT);
+    for (const ev of g.events.slice(seen)) { if (ev.type === 'bossMeteorCall') called.push(ev); if (ev.type === 'meteor' && ev.fire) landed.push(ev); }
+    seen = g.events.length;
+  }
+  assert.equal(called.length, M.kingOrc.meteor.count, 'he called the whole volley');
+  assert.equal(landed.length, called.length, 'and every one landed');
+  for (let i = 0; i < called.length; i++) assert.equal(landed[i].x, called[i].x, 'on the spot it was called for');
+  assert.equal(bystander.hp, 1e6, 'his own side is never caught in it');
 });

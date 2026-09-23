@@ -80,7 +80,7 @@ const testUI = testEnabled() ? createTestUI({
   town: () => selectedTown,
   room: () => testRoom,
   setHero(h) { selectedHero = h; markSelected(); },
-  setTown(t) { selectedTown = t; testRoom = 0; markTown(); },
+  setTown(t) { selectedTown = t; testRoom = 0; markTown({ force: true }); },
   setRoom(i) { testRoom = i; },
   levelOf: (h) => heroOf(profile, h).level,
   setLevel(h, lv) { profile.heroes[h].xp = xpAtLevel(lv); saveProfile(profile); refreshTitle(); },
@@ -250,8 +250,11 @@ for (const [key, t] of Object.entries(TOWNS)) {
 }
 const townButtons = [...document.querySelectorAll('.town')];
 const townBlurb = new Map(townButtons.map((b) => [b.dataset.town, b.querySelector('em').textContent]));
-function markTown() {
-  if (!isUnlocked(profile, selectedTown)) selectedTown = 'prontera';
+// `force` is the test panel's: it promises any town "unlocked or not", and this guard used to
+// quietly send a locked pick back to Prontera - which nobody noticed until Varkhol, the first
+// town anyone tried to test before clearing the one ahead of it.
+function markTown({ force = false } = {}) {
+  if (!force && !isUnlocked(profile, selectedTown)) selectedTown = 'prontera';
   if (assets) { prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0); monsters.prebuild(TOWNS[selectedTown].rooms[0], MONSTERS); }
   for (const b of townButtons) b.classList.toggle('selected', b.dataset.town === selectedTown);
   refreshTitle();

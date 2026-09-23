@@ -20,7 +20,8 @@ ATK is flat and on one curve across the towns.
 | **Moonstring**<br>`moonstring` | Phaelan | hunter | 30 | +30 ATK, crits hit 30% harder | no — shows the hero’s own weapon | Moonraya (boss, hunter) · always |
 | **Under Water Sword [1]**<br>`underWaterSword` | Bairune | knight | 45 | +45 ATK, attack 15% faster, +50% damage to Fire monsters. 5% chance on hit: ice falls around you for 10% of ATK as magic, and what it hits may freeze | yes | Nerakos (boss, knight) · always |
 | **Twinshot**<br>`twinshot` | Orvane | hunter | 50 | +50 ATK, 15% chance on hit: the shot lands twice | no — shows the hero’s own weapon | Dark Sword (boss, hunter) · always |
-| **Orc Sword [1]**<br>`orcSword` | — | knight | 50 | +50 ATK, 50% crit rate, +25% dodge. 5% chance on hit: Magnum Break goes off around you | no — shows the hero’s own weapon | — not dropped by anything — |
+| **Orc Sword [1]**<br>`orcSword` | Varkhol | knight | 50 | +50 ATK, 50% crit rate, +25% dodge. 5% chance on hit: Magnum Break goes off around you | no — shows the hero’s own weapon | King Orc (boss, knight) · always |
+| **Tuskbow [1]**<br>`tuskbow` | Varkhol | hunter | 50 | +50 ATK, 50% crit rate, +25% dodge. 5% chance on hit: an Arrow Shower falls ahead | no — shows the hero’s own weapon | King Orc (boss, hunter) · always |
 | **Meteor Edge**<br>`meteorEdge` | Orvane | knight | 55 | +55 ATK, 10% chance on hit: a meteor falls for 10% of ATK as magic | no — shows the hero’s own weapon | Dark Sword (boss, knight) · always |
 | **Tidecleaver**<br>`tidecleaver` | Bairune | knight | 95 | +95 ATK, 18% chance on hit: Undertow drags them back to you | no — shows the hero’s own weapon | Shellora · 4% |
 | **Coralbow**<br>`coralbow` | Bairune | hunter | 95 | +95 ATK, 18% chance on hit: Undertow drags them back to you | no — shows the hero’s own weapon | Nerakos (boss, hunter) · always |
@@ -35,6 +36,8 @@ ATK is flat and on one curve across the towns.
 | **Jelly Cap**<br>`jellyCap` | Bairune | +8% SP, +4% dodge | no — nothing appears | Jellune · 5% |
 | **Tidefin Helm**<br>`tidefin` | Bairune | +16 ATK, crits hit 12% harder | no — nothing appears | Marinox · 5% |
 | **Pearl Diadem**<br>`pearlDiadem` | Bairune | +10 ATK, +6% HP | no — nothing appears | Shellora · 5% |
+| **Boar Tusk Helm**<br>`tuskHelm` | Varkhol | +14 ATK, +5% HP | no — nothing appears | Tuskin · 5% |
+| **Orcish Warhelm**<br>`warHelm` | Varkhol | +22 ATK, -3% dodge | no — nothing appears | Grokmar · 5% |
 
 ## Capes
 
@@ -42,6 +45,7 @@ ATK is flat and on one curve across the towns.
 |---|---|---|---|---|
 | **Moonveil**<br>`moonveil` | Phaelan | +6% move speed, +5% dodge | no — the knight keeps his own cape, the hunter has no cape node at all | Sorya · 5% |
 | **Everwave Mantle**<br>`everwave` | Bairune | +8% move speed, +6% dodge, +5% HP | no — the knight keeps his own cape, the hunter has no cape node at all | Marinox · 5% |
+| **Grave Mantle**<br>`graveMantle` | Varkhol | +10% HP, 4% slower | no — the knight keeps his own cape, the hunter has no cape node at all | Rotgrim · 5% |
 
 ## Accessories
 
@@ -55,11 +59,13 @@ Only Orvane's three charms narrow it.
 
 | Item | Town | Main | Secondary pool | Rarity | From |
 |---|---|---|---|---|---|
-| **Ring**<br>`ring` | Prontera, Morroc, Phaelan, Bairune | ATK +1 – +3 | the whole pool — any of 14 | common | Poring · 3%<br>PecoPeco · 3%<br>Bonku · 3%<br>Craboon · 3% |
-| **Clip**<br>`clip` | Prontera, Morroc, Phaelan, Orvane, Bairune | SP 1% – 3% | the whole pool — any of 14 | common | Lunatic · 2.5%<br>Baby Desert Wolf · 2.5%<br>Famiru · 2.5%<br>Flittern · 2.5%<br>Jellune · 2.5% |
-| **Bell**<br>`bell` | Prontera, Morroc, Phaelan, Orvane | ASPD 5% – 10% | the whole pool — any of 14 | uncommon | Skel Soldier · 2%<br>Andre · 2%<br>Munari · 2%<br>Stringen · 2% |
-| **Brooch**<br>`brooch` | Prontera, Morroc, Phaelan, Orvane, Bairune | Crit rate 3% – 6% | the whole pool — any of 14 | uncommon | Skel Archer · 1%<br>Sand Wraith · 1%<br>Skelbow · 1%<br>Wispra · 1.5%<br>Hushling · 1.2%<br>Grinlit · 1.2%<br>Hydrella · 1.2% |
-| **Amulet**<br>`amulet` | Morroc, Phaelan, Orvane, Bairune | HP 1% – 3% | the whole pool — any of 14 | rare | Golem · 0.5%<br>Sorya · 0.8%<br>Velmara · 1%<br>Nyxmare · 1.2%<br>Shellora · 1.2%<br>Marinox · 1.2% |
+| **Ring**<br>`ring` | Prontera, Morroc, Phaelan, Bairune, Varkhol | ATK +1 – +3 | the whole pool — any of 14 | common | Poring · 3%<br>PecoPeco · 3%<br>Bonku · 3%<br>Craboon · 3%<br>Tuskin · 3% |
+| **Clip**<br>`clip` | Prontera, Morroc, Phaelan, Orvane, Bairune, Varkhol | SP 1% – 3% | the whole pool — any of 14 | common | Lunatic · 2.5%<br>Baby Desert Wolf · 2.5%<br>Famiru · 2.5%<br>Flittern · 2.5%<br>Jellune · 2.5%<br>Emberwing · 2.5% |
+| **Bell**<br>`bell` | Prontera, Morroc, Phaelan, Orvane, Varkhol | ASPD 5% – 10% | the whole pool — any of 14 | uncommon | Skel Soldier · 2%<br>Andre · 2%<br>Munari · 2%<br>Stringen · 2%<br>Grokmar · 2% |
+| **Brooch**<br>`brooch` | Prontera, Morroc, Phaelan, Orvane, Bairune, Varkhol | Crit rate 3% – 6% | the whole pool — any of 14 | uncommon | Skel Archer · 1%<br>Sand Wraith · 1%<br>Skelbow · 1%<br>Wispra · 1.5%<br>Hushling · 1.2%<br>Grinlit · 1.2%<br>Hydrella · 1.2%<br>Savrin · 1.2% |
+| **Amulet**<br>`amulet` | Morroc, Phaelan, Orvane, Bairune, Varkhol | HP 1% – 3% | the whole pool — any of 14 | rare | Golem · 0.5%<br>Sorya · 0.8%<br>Velmara · 1%<br>Nyxmare · 1.2%<br>Shellora · 1.2%<br>Marinox · 1.2%<br>Rotgrim · 1.2% |
+| **Bone Charm**<br>`boneCharm` | Varkhol | Crit damage 5% – 10% | Crit rate, ATK | rare | Savrin · 4% |
+| **Emberfang**<br>`emberFang` | Varkhol | Dodge 3% – 5% | ASPD, ATK | uncommon | Emberwing · 4% |
 | **Rune Sigil**<br>`runeSigil` | Orvane | Auto Meteor 1% – 3% | ATK, SP Drain | rare | Grinlit · 3.5% |
 | **Echo Band**<br>`echoBand` | Orvane | Double Attack 1% – 3% | ATK, SP Drain | rare | Hushling · 3.5% |
 | **Mana Clasp**<br>`manaClasp` | Orvane | SP Drain 1% – 3% | ATK, Auto Meteor | uncommon | Velmara · 4% |
@@ -69,18 +75,18 @@ Only Orvane's three charms narrow it.
 | Attribute | Key in `mods` | Range | How it combines | Can be rolled by |
 |---|---|---|---|---|
 | ATK<br>`atk` | `atkAdd` | +1 – +3 | sums across everything worn | Ring (main), Clip, Bell, Brooch, Amulet |
-| Crit rate<br>`crit` | `critAdd` | 3% – 6% | sums across everything worn | Brooch (main), Ring, Clip, Bell, Amulet |
-| Crit damage<br>`critDmg` | `critDmgAdd` | 5% – 10% | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet |
-| Dodge<br>`dodge` | `dodgeAdd` | 3% – 5% | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet |
+| Crit rate<br>`crit` | `critAdd` | 3% – 6% | sums across everything worn | Brooch (main), Ring, Clip, Bell, Amulet, Bone Charm |
+| Crit damage<br>`critDmg` | `critDmgAdd` | 5% – 10% | sums across everything worn | Bone Charm (main), Ring, Clip, Bell, Brooch, Amulet |
+| Dodge<br>`dodge` | `dodgeAdd` | 3% – 5% | sums across everything worn | Emberfang (main), Ring, Clip, Bell, Brooch, Amulet |
 | MATK<br>`matk` | `matkAdd` | +1 – +3 | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet |
 | HP<br>`hp` | `hp` | 1% – 3% | multiplies | Amulet (main), Ring, Clip, Bell, Brooch |
 | SP<br>`sp` | `mp` | 1% – 3% | multiplies | Clip (main), Ring, Bell, Brooch, Amulet |
-| ASPD<br>`aspd` | `atkSpeed` | 5% – 10% | multiplies | Bell (main), Ring, Clip, Brooch, Amulet |
+| ASPD<br>`aspd` | `atkSpeed` | 5% – 10% | multiplies | Bell (main), Ring, Clip, Brooch, Amulet, Emberfang |
 | Auto Meteor<br>`meteor` | `meteorAdd` | 1% – 3% | sums across everything worn | Rune Sigil (main), Ring, Clip, Bell, Brooch, Amulet, Mana Clasp |
 | Double Attack<br>`twin` | `doubleAdd` | 1% – 3% | sums across everything worn | Echo Band (main), Ring, Clip, Bell, Brooch, Amulet |
 | SP Drain<br>`drain` | `spDrainAdd` | 1% – 3% | sums across everything worn | Mana Clasp (main), Ring, Clip, Bell, Brooch, Amulet, Rune Sigil, Echo Band |
 | Undertow<br>`pull` | `pullAdd` | 1% – 3% | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet |
-| ATK<br>`atkHi` | `atkAdd` | +5 – +15 | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet, Rune Sigil, Echo Band, Mana Clasp |
+| ATK<br>`atkHi` | `atkAdd` | +5 – +15 | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet, Bone Charm, Emberfang, Rune Sigil, Echo Band, Mana Clasp |
 | Auto Cold Bolt<br>`bolt` | `boltAdd` | 1% – 3% | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet |
 | Freeze<br>`freeze` | `freezeAdd` | 1% – 3% | sums across everything worn | Ring, Clip, Bell, Brooch, Amulet |
 
@@ -102,6 +108,7 @@ Anything worn that is not a weapon gains **+2% HP per level** instead.
 | Under Water Sword | 45 | 51.75 | 58.5 |
 | Twinshot | 50 | 57.5 | 65 |
 | Orc Sword | 50 | 57.5 | 65 |
+| Tuskbow | 50 | 57.5 | 65 |
 | Meteor Edge | 55 | 63.25 | 71.5 |
 | Tidecleaver | 95 | 109.25 | 123.5 |
 | Coralbow | 95 | 109.25 | 123.5 |
@@ -138,14 +145,17 @@ depends entirely on its mass:
 | Bonku<br>`bonku` | 1.3 | 0.65 units |
 | Sorya<br>`sorya` | 1.4 | 0.61 units |
 | Craboon<br>`craboon` | 1.6 | 0.53 units |
+| Tuskin<br>`tuskin` | 1.7 | 0.50 units |
 | Marinox<br>`marinox` | 2 | 0.42 units |
 | Nyxmare<br>`nyxmare` | 2.4 | 0.35 units |
 | Golem<br>`golem` | 2.6 | 0.32 units |
+| Rotgrim<br>`rotgrim` | 2.8 | 0.30 units |
 | Orc Lord (boss)<br>`orcLord` | 4 | 0.21 units |
 | Baphomet (boss)<br>`baphomet` | 4.5 | 0.18 units |
 | Phreeoni (boss)<br>`phreeoni` | 5 | 0.16 units |
 | Moonraya (boss)<br>`moonraya` | 5.2 | 0.16 units |
 | Dark Sword (boss)<br>`darkSword` | 5.5 | 0.15 units |
+| King Orc (boss)<br>`kingOrc` | 5.6 | 0.15 units |
 | Nerakos (boss)<br>`nerakos` | 5.8 | 0.14 units |
 | Sandman (boss)<br>`sandman` | 6 | 0.14 units |
 
@@ -224,9 +234,26 @@ Boss: **Nerakos**, who pays Under Water Sword (knight) / Coralbow (hunter) every
 | Marinox | Tidefin Helm (`tidefin`) | Hat | 5% |
 | Marinox | Amulet (`amulet`) | Accessory | 1.2% |
 
+### Varkhol — Varkhol, the Tusked Jungle
+
+Boss: **King Orc**, who pays Orc Sword (knight) / Tuskbow (hunter) every time.
+
+| Monster | Drops | Slot | Chance |
+|---|---|---|---|
+| Tuskin | Boar Tusk Helm (`tuskHelm`) | Hat | 5% |
+| Tuskin | Ring (`ring`) | Accessory | 3% |
+| Emberwing | Emberfang (`emberFang`) | Accessory | 4% |
+| Emberwing | Clip (`clip`) | Accessory | 2.5% |
+| Savrin | Bone Charm (`boneCharm`) | Accessory | 4% |
+| Savrin | Brooch (`brooch`) | Accessory | 1.2% |
+| Grokmar | Orcish Warhelm (`warHelm`) | Hat | 5% |
+| Grokmar | Bell (`bell`) | Accessory | 2% |
+| Rotgrim | Grave Mantle (`graveMantle`) | Cape | 5% |
+| Rotgrim | Amulet (`amulet`) | Accessory | 1.2% |
+
 ## Gaps
 
-**17 of 20 worn things have no model of their own** (accessories are excluded — they are meant to have none):
+**21 of 24 worn things have no model of their own** (accessories are excluded — they are meant to have none):
 
 - Gakkung Bow (`gakkung`, weapon) — shows the hero’s own weapon
 - Tsurugi (`tsurugi`, weapon) — shows the hero’s own weapon
@@ -245,12 +272,12 @@ Boss: **Nerakos**, who pays Under Water Sword (knight) / Coralbow (hunter) every
 - Tidecleaver (`tidecleaver`, weapon) — shows the hero’s own weapon
 - Coralbow (`coralbow`, weapon) — shows the hero’s own weapon
 - Orc Sword (`orcSword`, weapon) — shows the hero’s own weapon
-
-**Nothing drops these:**
-
-- Orc Sword (`orcSword`)
+- Tuskbow (`tuskbow`, weapon) — shows the hero’s own weapon
+- Boar Tusk Helm (`tuskHelm`, hat) — nothing appears
+- Orcish Warhelm (`warHelm`, hat) — nothing appears
+- Grave Mantle (`graveMantle`, cape) — the knight keeps his own cape, the hunter has no cape node at all
 
 **Every attribute in the pool is reachable.** The five common accessories name no `secondary`, so each of them can roll any of the others.
 
-**Attributes no accessory carries as its _main_:** Crit damage (`critDmg`), Dodge (`dodge`), MATK (`matk`), Undertow (`pull`), ATK (`atkHi`), Auto Cold Bolt (`bolt`), Freeze (`freeze`) — reachable only as a second roll, so never at a chosen value.
+**Attributes no accessory carries as its _main_:** MATK (`matk`), Undertow (`pull`), ATK (`atkHi`), Auto Cold Bolt (`bolt`), Freeze (`freeze`) — reachable only as a second roll, so never at a chosen value.
 

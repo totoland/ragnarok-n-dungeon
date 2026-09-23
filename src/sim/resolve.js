@@ -26,7 +26,7 @@ const MULT = new Set(['hp', 'mp', 'atk', 'matk', 'speed', 'atkSpeed']);
 // off a landed hit, so a weapon granting a chance and three charms adding to it all reach
 // rollPassive as one number (sim/game.js).
 const ADD = new Set(['atkAdd', 'matkAdd', 'critAdd', 'critDmgAdd', 'dodgeAdd',
-                     'meteorAdd', 'doubleAdd', 'spDrainAdd', 'pullAdd', 'boltAdd', 'freezeAdd', 'magnumAdd']);
+                     'meteorAdd', 'doubleAdd', 'spDrainAdd', 'pullAdd', 'boltAdd', 'freezeAdd', 'magnumAdd', 'showerAdd', 'armorAdd']);
 export function mergeMods(...sets) {
   const out = {};
   for (const s of sets) {
@@ -63,6 +63,10 @@ export function resolveHero(base, mods = {}) {
     // Not a proc of its own: the chance that magic damage, once it lands, freezes what it hit.
     freeze: Math.min(0.5, m.freezeAdd || 0),
     magnum: Math.min(0.5, m.magnumAdd || 0),
+    shower: Math.min(0.5, m.showerAdd || 0),
+    // Armour is not capped at the top the way a proc rate is - it is capped at 0.8 so
+    // nothing can ever become immune - and it is allowed to go negative.
+    armor: Math.max(-1, Math.min(0.8, m.armorAdd || 0)),
     mods: m,
   };
 }
@@ -73,6 +77,9 @@ export function resolveMonster(base, tier = 0) {
   return {
     ...base,
     hp: Math.round(base.hp * (1 + NGPLUS.hp * t)),
+    // Armour does NOT climb with the tier. Health and damage already do, and a percentage
+    // that also climbed would turn NG+5 into a wall rather than a harder fight.
+    armor: base.armor || 0,
     atk: base.atk * (1 + NGPLUS.atk * t),
     speed: base.speed * (1 + NGPLUS.speed * t),
     tier: t,

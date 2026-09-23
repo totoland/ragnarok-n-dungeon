@@ -477,11 +477,19 @@ export function createFx(world) {
         burst(ev.x, ev.y + 0.5, ev.z, 14, { color: 0xcdf2ff, speed: 2.2, up: 1.6, life: 0.4, size: 0.2, gravity: 4 });
         ring(ev.x, ev.z, { color: 0x9fe8ff, radius: 0.7, life: 0.35, y: 0.05 });
         break;
+      case 'bossMeteorCall':
+        // Where one of the king's is going to land, drawn the moment he calls it: the whole
+        // of the dodge is reading this ring before the rock arrives.
+        ring(ev.x, ev.z, { color: 0xff4a1a, radius: 1.5, life: (ev.at ?? 0.6) + 0.1, y: 0.04 });
+        break;
       case 'meteor': {
-        beam(ev.x, ev.z, { color: 0xc48aff, life: 0.5 });
-        ring(ev.x, ev.z, { color: 0xe0b0ff, radius: 2.0, life: 0.35, y: 0.06 });
-        burst(ev.x, 0.4, ev.z, 34, { color: 0xb070ff, speed: 5, up: 3.5, life: 0.5, size: 0.34, gravity: 5 });
-        burst(ev.x, 0.3, ev.z, 14, { color: 0xffffff, speed: 2.4, up: 2.2, life: 0.35, size: 0.2 });
+        // Two meteors share this: the hero's own Auto Meteor, violet, and the King Orc's,
+        // which is fire and falls on the hero rather than for him.
+        const hot = !!ev.fire;
+        beam(ev.x, ev.z, { color: hot ? 0xff7a2a : 0xc48aff, life: 0.5 });
+        ring(ev.x, ev.z, { color: hot ? 0xffb060 : 0xe0b0ff, radius: 2.0, life: 0.35, y: 0.06 });
+        burst(ev.x, 0.4, ev.z, 34, { color: hot ? 0xff5a18 : 0xb070ff, speed: 5, up: 3.5, life: 0.5, size: 0.34, gravity: 5 });
+        burst(ev.x, 0.3, ev.z, 14, { color: hot ? 0xffe08a : 0xffffff, speed: 2.4, up: 2.2, life: 0.35, size: 0.2 });
         flashLight.position.set(ev.x, 1.2, ev.z); flashLight.intensity = 18;
         addShake(world, 0.3);
         break;

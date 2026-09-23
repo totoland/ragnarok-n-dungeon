@@ -157,6 +157,56 @@ export const PHAELAN = {
   ],
 };
 
+// Varkhol: an orc war-camp grown over an older stone city, which is where the king's
+// feathered mask and jade plate come from - he is wearing something his people dug up.
+// Four rooms up the hill: the boar path in, the camp, the ruins they barrack in, and the
+// terrace at the top.
+//
+// Its monsters are the armoured ones. Every other town's trash dies to a clean hit; these
+// take a quarter of it off first and have more behind that, so the town is fought by
+// committing to a target rather than sweeping through a wave.
+export const VARKHOL = {
+  town: 'Varkhol', name: 'Varkhol, the Tusked Jungle',
+  blurb: 'A jungle war-camp over a buried city \u2014 King Orc',
+  accent: '#8fae4e',
+  loot: { knight: 'orcSword', hunter: 'tuskbow' },
+  rooms: [
+    {
+      name: 'Boar Path', width: 18, theme: 'forest',
+      waves: [
+        [{ type: 'tuskin', count: 3 }],
+        [{ type: 'tuskin', count: 3 }, { type: 'emberwing', count: 2 }],
+      ],
+    },
+    {
+      name: 'Thornwall Camp', width: 20, theme: 'warcamp',
+      waves: [
+        [{ type: 'savrin', count: 2 }, { type: 'tuskin', count: 2 }],
+        [{ type: 'savrin', count: 3 }, { type: 'emberwing', count: 2 }],
+        [{ type: 'grokmar', count: 1 }, { type: 'savrin', count: 2 }, { type: 'tuskin', count: 2 }],
+      ],
+    },
+    {
+      name: 'Sunken Steps', width: 20, theme: 'graveyard',
+      waves: [
+        [{ type: 'grokmar', count: 2 }, { type: 'emberwing', count: 3 }],
+        [{ type: 'rotgrim', count: 2 }, { type: 'grokmar', count: 1 }],
+        [{ type: 'rotgrim', count: 2 }, { type: 'grokmar', count: 2 }, { type: 'savrin', count: 2 }],
+      ],
+    },
+    {
+      name: 'Skull Terrace', width: 22, theme: 'terrace', boss: true,
+      waves: [
+        // One warrior and two savages at the gate, not four elites: two Grokmar and two
+        // Rotgrim came to 3,300 health behind armour before the king was even up, heavier
+        // than the whole of some towns' boss rooms, and the fight was lost at the door.
+        [{ type: 'grokmar', count: 1 }, { type: 'savrin', count: 2 }],
+        [{ type: 'kingOrc', count: 1 }],
+      ],
+    },
+  ],
+};
+
 // A room that never ends, for leaving on a tablet while the reports come in. Its waves are
 // the ones the real towns build up to, in a loop that climbs and starts again, so a long
 // session keeps meeting the same heavy moments instead of drifting into an easy one. Not a
@@ -281,5 +331,5 @@ export const SOAK = {
   get rooms() { return this._rooms || (this._rooms = soakRooms()); },
 };
 
-export const TOWNS = { prontera: DUNGEON, morroc: MORROC, phaelan: PHAELAN, orvane: ORVANE, bairune: BAIRUNE };
+export const TOWNS = { prontera: DUNGEON, morroc: MORROC, phaelan: PHAELAN, orvane: ORVANE, bairune: BAIRUNE, varkhol: VARKHOL };
 const TOWNS_ORDER = TOWNS;

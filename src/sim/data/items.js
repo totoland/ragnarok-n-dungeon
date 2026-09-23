@@ -136,6 +136,24 @@ export const ITEMS = {
     slots: 1,
     tip: '+50 ATK, 50% crit rate, +25% dodge. 5% chance on hit: Magnum Break goes off around you',
   },
+  tuskbow: {
+    name: 'Tuskbow', slot: 'weapon', hero: 'hunter', kind: 'bow',
+    mods: { atkAdd: 50, crit: 0.50, dodgeAdd: 0.25, showerAdd: 0.05 },
+    slots: 1,
+    tip: '+50 ATK, 50% crit rate, +25% dodge. 5% chance on hit: an Arrow Shower falls ahead',
+  },
+  // Varkhol's hats and charms. Its two charms exist to close a hole the doc has been
+  // reporting since it was written: crit damage and dodge were in the attribute pool but
+  // were no accessory's main, so they could only ever arrive as a stray second roll.
+  tuskHelm: { name: 'Boar Tusk Helm', slot: 'hat', mods: { atkAdd: 14, hp: 1.05 }, tip: '+14 ATK, +5% HP' },
+  warHelm: { name: 'Orcish Warhelm', slot: 'hat', mods: { atkAdd: 22, dodgeAdd: -0.03 }, tip: '+22 ATK, -3% dodge' },
+  graveMantle: {
+    name: 'Grave Mantle', slot: 'cape',
+    mods: { hp: 1.10, speed: 0.96 },
+    tip: '+10% HP, 4% slower',
+  },
+  boneCharm: { name: 'Bone Charm', slot: 'accessory', main: 'critDmg', secondary: ['crit', 'atkHi'], rarity: 'rare', tip: 'Main: crit damage' },
+  emberFang: { name: 'Emberfang', slot: 'accessory', main: 'dodge', secondary: ['aspd', 'atkHi'], rarity: 'uncommon', tip: 'Main: dodge' },
   runeSigil: { name: 'Rune Sigil', slot: 'accessory', main: 'meteor', secondary: ['atkHi', 'drain'], rarity: 'rare', tip: 'Main: Auto Meteor' },
   echoBand: { name: 'Echo Band', slot: 'accessory', main: 'twin', secondary: ['atkHi', 'drain'], rarity: 'rare', tip: 'Main: Double Attack' },
   manaClasp: { name: 'Mana Clasp', slot: 'accessory', main: 'drain', secondary: ['atkHi', 'meteor'], rarity: 'uncommon', tip: 'Main: SP Drain' },

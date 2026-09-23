@@ -199,6 +199,7 @@ let moonModel = null;
 let sandModel = null;
 let dsModel = null;
 let nerModel = null;
+let koModel = null;
 
 /** Injection seam for the loaded boss model. The render test uses it to supply a stand-in
  *  rig, since GLTFLoader cannot fetch a file in Node. */
@@ -207,21 +208,24 @@ export function setMoonrayaModel(scene) { moonModel = scene; }
 export function setSandmanModel(scene) { sandModel = scene; }
 export function setDarkSwordModel(scene) { dsModel = scene; }
 export function setNerakosModel(scene) { nerModel = scene; }
+export function setKingOrcModel(scene) { koModel = scene; }
 
 export async function loadMonsterAssets(base = 'assets/monsters/') {
   const loader = new GLTFLoader();
-  const [baph, moon, sand, ds, ner] = await Promise.all([
+  const [baph, moon, sand, ds, ner, ko] = await Promise.all([
     loader.loadAsync(base + 'baphomet.glb'),
     loader.loadAsync(base + 'moonraya.glb'),
     loader.loadAsync(base + 'sandman.glb'),
     loader.loadAsync(base + 'darkSword.glb'),
     loader.loadAsync(base + 'nerakos.glb'),
+    loader.loadAsync(base + 'kingOrc.glb'),
   ]);
   setBossModel(baph.scene);
   setMoonrayaModel(moon.scene);
   setSandmanModel(sand.scene);
   setDarkSwordModel(ds.scene);
   setNerakosModel(ner.scene);
+  setKingOrcModel(ko.scene);
   return bossModel;
 }
 
@@ -273,6 +277,11 @@ function buildDarkSwordGlb() {
 function buildNerakosGlb() {
   if (!nerModel) throw new Error('nerakos.glb not loaded - call loadMonsterAssets() first');
   return rigFromGlb(nerModel);
+}
+
+function buildKingOrcGlb() {
+  if (!koModel) throw new Error('kingOrc.glb not loaded - call loadMonsterAssets() first');
+  return rigFromGlb(koModel);
 }
 
 // Per-type rest offsets, added to every pose, for a sculpt that does not stand the way the
@@ -1158,6 +1167,171 @@ function buildShellora() {
   return { root, body, kind: 'blob' };
 }
 
+// ---- Varkhol. Primitives for now, the way every town's roster starts: the shapes have to
+// be right before a sculpt is worth commissioning, and the fight has to be playable while
+// one is made. King Orc is the one Toto is sculpting; the rest may stay as they are.
+
+function buildTuskin() {
+  const root = new THREE.Group();
+  const body = node(0, 0.42, 0, root);
+  const hideT = mat(0x6e4a2e, { roughness: 0.95 });
+  const dark = mat(0x4a3020, { roughness: 0.95 });
+  const tusk = mat(0xe8dcc0, { roughness: 0.5 });
+  const eyeT = mat(0x2a1008, { roughness: 0.3 });
+  const trunk = mesh(new THREE.SphereGeometry(0.44, 12, 10), hideT, 0, 0, 0, body);
+  trunk.scale.set(1.35, 0.9, 0.95);
+  // the shoulder hump a boar leads with
+  mesh(new THREE.SphereGeometry(0.28, 10, 8), dark, -0.24, 0.22, 0, body).scale.set(1.1, 0.8, 0.9);
+  const snout = mesh(new THREE.BoxGeometry(0.34, 0.26, 0.3), hideT, -0.6, -0.04, 0, body);
+  snout.rotation.z = 0.12;
+  mesh(new THREE.SphereGeometry(0.09, 8, 6), dark, -0.76, -0.06, 0, body);
+  for (const side of [-1, 1]) {
+    mesh(new THREE.SphereGeometry(0.055, 7, 6), eyeT, -0.42, 0.12, side * 0.17, body);
+    const t = mesh(new THREE.ConeGeometry(0.05, 0.3, 5), tusk, -0.66, 0.02, side * 0.12, body);
+    t.rotation.set(0, 0, 2.5);
+    // stubby legs, two a side
+    for (let i = 0; i < 2; i++) mesh(new THREE.CylinderGeometry(0.075, 0.06, 0.4, 6), dark, -0.22 + i * 0.44, -0.34, side * 0.22, body);
+  }
+  return { root, body, kind: 'blob' };
+}
+
+function buildSavrin() {
+  const hide = mat(0x8a6a4a, { roughness: 0.95 });
+  const wrap = mat(0x6d5330, { roughness: 0.95 });
+  const hair = mat(0x2e2418, { roughness: 1 });
+  const stoneS = mat(0x7a7468, { roughness: 0.95 });
+  const eyeS = mat(0xffe8a0, { emissive: 0x6a5410, emissiveIntensity: 0.6 });
+  return humanoid({
+    scale: 1.05, hip: 0.86, torsoH: 0.62, shoulderW: 0.3, legW: 0.15,
+    buildTorso(t, h) {
+      mesh(new THREE.CapsuleGeometry(0.26, 0.38, 6, 10), hide, 0, h * 0.5, 0, t);
+      // a hide wrap across the chest, and a belt
+      mesh(new THREE.BoxGeometry(0.46, 0.2, 0.36), wrap, 0, h * 0.62, 0, t).rotation.z = 0.35;
+      mesh(new THREE.BoxGeometry(0.48, 0.12, 0.38), wrap, 0, h * 0.16, 0, t);
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.22, 12, 10), hide, 0, 0.16, 0, hd);
+      mesh(new THREE.SphereGeometry(0.24, 10, 8), hair, 0, 0.24, -0.05, hd).scale.set(1.05, 0.9, 1);
+      for (const side of [-1, 1]) mesh(new THREE.SphereGeometry(0.04, 7, 6), eyeS, side * 0.09, 0.17, 0.19, hd);
+    },
+    buildArm(a, side) {
+      mesh(new THREE.CapsuleGeometry(0.08, 0.3, 5, 9), hide, 0, -0.2, 0, a);
+      mesh(new THREE.CapsuleGeometry(0.07, 0.26, 5, 9), hide, side * 0.03, -0.5, 0, a);
+      if (side < 0) {
+        // a stone-headed club, the thing the wind-up is showing you
+        mesh(new THREE.CylinderGeometry(0.05, 0.045, 0.6, 6), wrap, 0, -0.78, 0.08, a);
+        mesh(new THREE.BoxGeometry(0.22, 0.24, 0.2), stoneS, 0, -1.04, 0.1, a).rotation.z = 0.2;
+      }
+    },
+    buildLeg(l) {
+      mesh(new THREE.CapsuleGeometry(0.1, 0.34, 5, 9), hide, 0, -0.26, 0, l);
+      mesh(new THREE.BoxGeometry(0.16, 0.1, 0.26), wrap, 0, -0.52, 0.04, l);
+    },
+  });
+}
+
+function buildGrokmar() {
+  const green = mat(0x5d7a42, { roughness: 0.9 });
+  const dark = mat(0x3f5730, { roughness: 0.9 });
+  const leather = mat(0x4a3a28, { roughness: 0.95 });
+  const iron = mat(0x6e7378, { roughness: 0.5, metalness: 0.55 });
+  const tuskG = mat(0xe6dcbe, { roughness: 0.5 });
+  const eyeG = mat(0xff8a3a, { emissive: 0x8a3a08, emissiveIntensity: 0.8 });
+  return humanoid({
+    scale: 1.22, hip: 0.92, torsoH: 0.68, shoulderW: 0.36, legW: 0.18,
+    buildTorso(t, h) {
+      mesh(new THREE.CapsuleGeometry(0.32, 0.4, 6, 12), green, 0, h * 0.5, 0, t);
+      // a slab of plate over one shoulder, which is most of the silhouette
+      mesh(new THREE.SphereGeometry(0.26, 10, 8), iron, -0.34, h * 0.78, 0, t).scale.set(1.1, 0.7, 1);
+      mesh(new THREE.BoxGeometry(0.56, 0.16, 0.44), leather, 0, h * 0.2, 0, t);
+      mesh(new THREE.BoxGeometry(0.2, 0.42, 0.42), leather, 0, h * 0.55, 0, t).rotation.z = 0.4;
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.24, 12, 10), green, 0, 0.16, 0, hd).scale.set(1, 0.95, 1.05);
+      mesh(new THREE.BoxGeometry(0.3, 0.14, 0.22), dark, 0, 0.1, 0.18, hd);
+      for (const side of [-1, 1]) {
+        mesh(new THREE.SphereGeometry(0.042, 7, 6), eyeG, side * 0.1, 0.2, 0.2, hd);
+        const t = mesh(new THREE.ConeGeometry(0.04, 0.16, 5), tuskG, side * 0.1, 0.08, 0.22, hd);
+        t.rotation.x = -0.3;
+      }
+    },
+    buildArm(a, side) {
+      mesh(new THREE.CapsuleGeometry(0.1, 0.32, 5, 10), green, 0, -0.22, 0, a);
+      mesh(new THREE.CapsuleGeometry(0.085, 0.28, 5, 10), green, side * 0.03, -0.54, 0, a);
+      mesh(new THREE.TorusGeometry(0.1, 0.03, 6, 10), iron, side * 0.03, -0.42, 0, a).rotation.x = Math.PI / 2;
+      if (side < 0) {
+        // the axe: a long haft and a broad head, held low
+        mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.0, 6), leather, -0.02, -0.9, 0.1, a);
+        const headA = mesh(new THREE.BoxGeometry(0.1, 0.4, 0.3), iron, -0.02, -1.24, 0.16, a);
+        headA.rotation.x = 0.1;
+        mesh(new THREE.ConeGeometry(0.1, 0.22, 4), iron, -0.02, -1.44, 0.14, a).rotation.z = Math.PI;
+      }
+    },
+    buildLeg(l) {
+      mesh(new THREE.CapsuleGeometry(0.12, 0.34, 5, 10), green, 0, -0.26, 0, l);
+      mesh(new THREE.BoxGeometry(0.2, 0.14, 0.3), leather, 0, -0.54, 0.04, l);
+    },
+  });
+}
+
+function buildEmberwing() {
+  const root = new THREE.Group();
+  const body = node(0, 0.95, 0, root);
+  const red = mat(0x9c2a22, { roughness: 0.8 });
+  const wingM = mat(0x5e1712, { roughness: 0.9 });
+  const eyeE = mat(0xffc44a, { emissive: 0xa05a08, emissiveIntensity: 1.2 });
+  const fang = mat(0xf0e6d0, { roughness: 0.5 });
+  mesh(new THREE.SphereGeometry(0.2, 12, 10), red, 0, 0, 0, body).scale.set(1, 1.15, 1);
+  mesh(new THREE.SphereGeometry(0.14, 10, 8), red, 0, 0.14, 0.12, body);
+  for (const side of [-1, 1]) {
+    mesh(new THREE.SphereGeometry(0.045, 7, 6), eyeE, side * 0.07, 0.17, 0.22, body);
+    mesh(new THREE.ConeGeometry(0.05, 0.16, 4), red, side * 0.09, 0.3, 0.04, body);   // ears
+    mesh(new THREE.ConeGeometry(0.022, 0.07, 4), fang, side * 0.05, 0.05, 0.2, body).rotation.x = Math.PI;
+    // a wing: three panels, swept back, so the silhouette reads in one frame
+    for (let i = 0; i < 3; i++) {
+      const w = mesh(new THREE.BoxGeometry(0.34, 0.02, 0.18), wingM, side * (0.28 + i * 0.22), 0.06 - i * 0.05, -0.04 - i * 0.05, body);
+      w.rotation.set(0, side * (0.3 + i * 0.16), side * (0.35 - i * 0.12));
+    }
+  }
+  return { root, body, kind: 'blob' };
+}
+
+function buildRotgrim() {
+  const rot = mat(0x6d7a55, { roughness: 1 });
+  const dead = mat(0x4e5840, { roughness: 1 });
+  const rag = mat(0x53483a, { roughness: 1 });
+  const boneR = mat(0xd8d0b8, { roughness: 0.8 });
+  const eyeR = mat(0xbdf07a, { emissive: 0x4a7a18, emissiveIntensity: 1.1 });
+  return humanoid({
+    scale: 1.14, hip: 0.9, torsoH: 0.66, shoulderW: 0.34, legW: 0.17,
+    buildTorso(t, h) {
+      mesh(new THREE.CapsuleGeometry(0.28, 0.38, 6, 10), rot, 0, h * 0.5, 0, t);
+      // ribs showing through, and the rags it was buried in
+      for (let i = 0; i < 3; i++) mesh(new THREE.TorusGeometry(0.2 - i * 0.02, 0.022, 5, 9), boneR, 0, h * (0.62 - i * 0.12), 0.09, t).rotation.x = Math.PI / 2;
+      mesh(new THREE.BoxGeometry(0.5, 0.3, 0.38), rag, 0, h * 0.2, 0, t);
+    },
+    buildHead(hd) {
+      mesh(new THREE.SphereGeometry(0.22, 12, 10), dead, 0, 0.15, 0, hd).scale.set(0.95, 1.05, 1);
+      mesh(new THREE.BoxGeometry(0.26, 0.1, 0.2), dead, 0, 0.06, 0.16, hd);
+      for (const side of [-1, 1]) {
+        mesh(new THREE.SphereGeometry(0.04, 7, 6), eyeR, side * 0.09, 0.18, 0.18, hd);
+        mesh(new THREE.ConeGeometry(0.03, 0.12, 4), boneR, side * 0.09, 0.06, 0.2, hd).rotation.x = -0.4;
+      }
+    },
+    buildArm(a, side) {
+      // hanging, because it does not hold them up
+      mesh(new THREE.CapsuleGeometry(0.085, 0.32, 5, 9), rot, 0, -0.24, 0.04, a);
+      mesh(new THREE.CapsuleGeometry(0.07, 0.3, 5, 9), dead, side * 0.02, -0.58, 0.08, a);
+      mesh(new THREE.SphereGeometry(0.075, 8, 7), dead, side * 0.02, -0.78, 0.1, a);
+    },
+    buildLeg(l) {
+      mesh(new THREE.CapsuleGeometry(0.1, 0.34, 5, 9), rot, 0, -0.26, 0, l);
+      mesh(new THREE.BoxGeometry(0.17, 0.1, 0.26), rag, 0, -0.52, 0.03, l);
+    },
+  });
+}
+
+
 // Moonraya - PLACEHOLDER. Toto is sculpting her, and this stands in so the fight can be
 // played and tuned meanwhile. When the sculpt lands it goes the way Baphomet did: exported
 // limb-segmented by tools/export_heroes.py to assets/monsters/moonraya.glb with an entry in
@@ -1181,6 +1355,10 @@ const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   // his rig - the six dorsal tentacles are the limb that moves.
   craboon: buildCraboon, hydrella: buildHydrella, jellune: buildJellune,
   marinox: buildMarinox, shellora: buildShellora, nerakos: buildNerakosGlb,
+  // Varkhol. The roster is primitives; King Orc is the sixth sculpt, and the first to arrive
+  // with every limb already its own object.
+  tuskin: buildTuskin, savrin: buildSavrin, grokmar: buildGrokmar,
+  emberwing: buildEmberwing, rotgrim: buildRotgrim, kingOrc: buildKingOrcGlb,
   // Morroc's boss. No legs: the pose rig simply leaves out what the sculpt does not have.
   sandman: buildSandmanGlb };
 
