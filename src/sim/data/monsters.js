@@ -52,6 +52,11 @@ export const MONSTERS = {
     slam: { windup: 1.0, dur: 0.5, cd: 8, box: { x0: -3.0, x1: 3.0, y0: -0.5, y1: 3, both: true }, knock: [5, 8], depth: 1.4 },
     charge: { windup: 0.7, dur: 0.55, speed: 13, cd: 10, box: { x0: -0.4, x1: 1.8, y0: -0.3, y1: 3 }, knock: [9, 3] },
     adds: { at: 0.5, type: 'skeleton', count: 2 },
+    // Second wind: once a fight, at `at` of its health, it stops and pulls itself back up by
+    // `amount` of its maximum. `windup` is a long, obvious tell and the whole point - deal
+    // `brk` of its max health during it and the heal breaks, so the answer is a saved
+    // cooldown rather than a sigh.
+    heal: { at: 0.22, amount: 0.25, windup: 1.6, dur: 0.7, brk: 0.10 },
     score: 500,
   },
   // Baphomet reuses the Orc Lord's 'boss' AI wholesale - the same three-move kit reads very
@@ -73,6 +78,11 @@ export const MONSTERS = {
       knock: [4, 1],
     },
     adds: { at: 0.5, type: 'baphometling', count: 3 },
+    // Second wind: once a fight, at `at` of its health, it stops and pulls itself back up by
+    // `amount` of its maximum. `windup` is a long, obvious tell and the whole point - deal
+    // `brk` of its max health during it and the heal breaks, so the answer is a saved
+    // cooldown rather than a sigh.
+    heal: { at: 0.22, amount: 0.28, windup: 1.5, dur: 0.7, brk: 0.09 },
     score: 650,
   },
   // ---------------------------------------------------------------- Sograt Desert (town 2)
@@ -141,6 +151,11 @@ export const MONSTERS = {
     // A fistful of the desert, three lanes wide.
     cast: { windup: 0.8, dur: 0.5, cd: 7.0, shot: { kind: 'sandBall', count: 3, speed: 8.5, life: 2.2, y: 1.6, lane: 1.5, dmg: 0.85 }, knock: [4, 1] },
     adds: { at: 0.45, type: 'sandWraith', count: 2 },
+    // Second wind: once a fight, at `at` of its health, it stops and pulls itself back up by
+    // `amount` of its maximum. `windup` is a long, obvious tell and the whole point - deal
+    // `brk` of its max health during it and the heal breaks, so the answer is a saved
+    // cooldown rather than a sigh.
+    heal: { at: 0.24, amount: 0.30, windup: 1.6, dur: 0.7, brk: 0.09 },
     score: 900,
   },
   phreeoni: {
@@ -152,6 +167,11 @@ export const MONSTERS = {
     charge: { windup: 0.65, dur: 0.6, speed: 12.5, cd: 9.5, box: { x0: -0.5, x1: 2.0, y0: -0.4, y1: 2.8 }, knock: [9, 3] },
     cast: { windup: 0.8, dur: 0.5, cd: 7, shot: { kind: 'rock', count: 3, speed: 8, life: 2.2, y: 1.3, lane: 1.5, dmg: 0.85 }, knock: [4, 1] },
     adds: { at: 0.5, type: 'ant', count: 3 },
+    // Second wind: once a fight, at `at` of its health, it stops and pulls itself back up by
+    // `amount` of its maximum. `windup` is a long, obvious tell and the whole point - deal
+    // `brk` of its max health during it and the heal breaks, so the answer is a saved
+    // cooldown rather than a sigh.
+    heal: { at: 0.22, amount: 0.25, windup: 1.6, dur: 0.7, brk: 0.10 },
     score: 800,
   },
   // The boss splits off three of these at half health. Same sculpt at monster scale, so it
@@ -161,7 +181,7 @@ export const MONSTERS = {
   // rest of the table still has to go through the rename pass before any store build.
   famiru: {
     name: 'Famiru', ai: 'hopper',
-    hp: 54, atk: 13, speed: 5.4, mass: 0.45,
+    hp: 77, atk: 13, speed: 5.4, mass: 0.45,
     hurtbox: { r: 0.34, h: 0.62 },
     // A swarm that takes turns diving: fast, frail, and meant to be swept up in one combo.
     attack: { range: 1.4, windup: 0.2, dur: 0.22, cd: 0.9, box: { x0: -0.2, x1: 1.4, y0: 0.1, y1: 1.7 }, knock: [3, 1.5] },
@@ -171,7 +191,7 @@ export const MONSTERS = {
   },
   munari: {
     name: 'Munari', ai: 'walker',
-    hp: 135, atk: 16, speed: 2.4, mass: 0.9,
+    hp: 192, atk: 16, speed: 2.4, mass: 0.9,
     hurtbox: { r: 0.45, h: 1.6 },
     attack: { range: 1.5, windup: 0.45, dur: 0.3, cd: 1.8, box: { x0: 0.0, x1: 1.7, y0: -0.2, y1: 2.0 }, knock: [4, 1.5] },
     drops: [{ item: 'bell', chance: 0.02 }],
@@ -179,7 +199,7 @@ export const MONSTERS = {
   },
   bonku: {
     name: 'Bonku', ai: 'hopper',
-    hp: 170, atk: 19, speed: 3.2, mass: 1.3,
+    hp: 241, atk: 19, speed: 3.2, mass: 1.3,
     hurtbox: { r: 0.52, h: 1.7 },
     // Leaps the gap rather than walking it, so the wind-up is the tell and the landing is
     // the opening.
@@ -190,7 +210,7 @@ export const MONSTERS = {
   },
   skelbow: {
     name: 'Skelbow', ai: 'archer',
-    hp: 115, atk: 15, speed: 1.9, mass: 0.9,
+    hp: 163, atk: 15, speed: 1.9, mass: 0.9,
     hurtbox: { r: 0.5, h: 1.8 },
     // Keeps its distance and draws with a long tell; weak the moment the gap is closed.
     attack: { range: 8.0, keep: 5.0, windup: 0.75, dur: 0.3, cd: 2.3, shot: { speed: 12, life: 1.5, y: 1.25 }, knock: [2, 0] },
@@ -199,7 +219,7 @@ export const MONSTERS = {
   },
   wispra: {
     name: 'Wispra', ai: 'walker',
-    hp: 98, atk: 17, speed: 4.6, mass: 0.5,
+    hp: 139, atk: 17, speed: 4.6, mass: 0.5,
     hurtbox: { r: 0.4, h: 1.5 },
     // Drifts in and lunges. The fade-and-reappear in the brief needs its own behaviour in
     // sim/enemies.js; this is the closing half of it, and reads as the same threat.
@@ -209,7 +229,7 @@ export const MONSTERS = {
   },
   sorya: {
     name: 'Sorya', ai: 'walker',
-    hp: 215, atk: 21, speed: 2.2, mass: 1.4,
+    hp: 305, atk: 21, speed: 2.2, mass: 1.4,
     hurtbox: { r: 0.5, h: 1.75 },
     attack: { range: 1.7, windup: 0.6, dur: 0.34, cd: 2.2, box: { x0: 0.0, x1: 1.9, y0: -0.2, y1: 2.2 }, knock: [5, 2] },
     // The Moonveil, now that Moonraya pays a weapon like every other boss. Sorya is the
@@ -219,7 +239,7 @@ export const MONSTERS = {
   },
   foxShade: {
     name: 'Fox Shade', ai: 'walker',
-    hp: 95, atk: 18, speed: 5.2, mass: 0.6,
+    hp: 135, atk: 18, speed: 5.2, mass: 0.6,
     hurtbox: { r: 0.42, h: 1.2 },
     // Moonraya's second phase: her own shape, thrown at the player and gone again.
     attack: { range: 1.5, windup: 0.22, dur: 0.24, cd: 1.1, box: { x0: -0.1, x1: 1.6, y0: -0.2, y1: 1.6 }, knock: [4, 1.5] },
@@ -227,7 +247,7 @@ export const MONSTERS = {
   },
   moonraya: {
     name: 'Moonraya', ai: 'boss', boss: true,
-    hp: 1500, atk: 20, speed: 2.4, mass: 5.2,
+    hp: 1950, atk: 20, speed: 2.4, mass: 5.2,
     hurtbox: { r: 1.0, h: 2.4 },
     // Her four moves, in the shapes the boss AI already knows how to pick between.
     attack: { range: 2.2, windup: 0.5, dur: 0.34, cd: 1.9, box: { x0: 0.0, x1: 2.5, y0: -0.3, y1: 2.6 }, knock: [6, 2] },
@@ -239,6 +259,11 @@ export const MONSTERS = {
     cast: { windup: 0.75, dur: 0.5, cd: 6.5, shot: { kind: 'foxfire', count: 3, speed: 7.5, life: 2.4, y: 1.4, lane: 1.5, dmg: 0.9 }, knock: [4, 1] },
     // Blood moon: at 40 % she stops coming alone.
     adds: { at: 0.4, type: 'foxShade', count: 2 },
+    // Second wind: once a fight, at `at` of its health, it stops and pulls itself back up by
+    // `amount` of its maximum. `windup` is a long, obvious tell and the whole point - deal
+    // `brk` of its max health during it and the heal breaks, so the answer is a saved
+    // cooldown rather than a sigh.
+    heal: { at: 0.25, amount: 0.30, windup: 1.5, dur: 0.7, brk: 0.08 },
     score: 1000,
   },
   baphometling: {
@@ -256,7 +281,7 @@ export const MONSTERS = {
   // built around.
   flittern: {
     name: 'Flittern', ai: 'hopper',
-    hp: 72, atk: 20, speed: 6.0, mass: 0.4,
+    hp: 93, atk: 20, speed: 6.0, mass: 0.4,
     hurtbox: { r: 0.3, h: 0.6 },
     // Frail and very fast, and never alone: the swarm is the monster, not the bat.
     attack: { range: 1.3, windup: 0.18, dur: 0.2, cd: 0.85, box: { x0: -0.2, x1: 1.3, y0: 0.2, y1: 1.8 }, knock: [3, 1.5] },
@@ -266,7 +291,7 @@ export const MONSTERS = {
   },
   stringen: {
     name: 'Stringen', ai: 'walker',
-    hp: 235, atk: 28, speed: 2.2, mass: 1.2,
+    hp: 303, atk: 28, speed: 2.2, mass: 1.2,
     hurtbox: { r: 0.5, h: 1.8 },
     // A puppet on strings from nothing: it walks in jerks, and the recoil after a swing is
     // the string pulling it back upright.
@@ -276,7 +301,7 @@ export const MONSTERS = {
   },
   hushling: {
     name: 'Hushling', ai: 'walker',
-    hp: 190, atk: 26, speed: 3.6, mass: 0.7,
+    hp: 245, atk: 26, speed: 3.6, mass: 0.7,
     hurtbox: { r: 0.42, h: 1.6 },
     // An empty cloak. The fade that makes it untouchable for a beat is its own behaviour and
     // still has to go into sim/enemies.js; this is the half of it that closes and swings, and
@@ -287,7 +312,7 @@ export const MONSTERS = {
   },
   grinlit: {
     name: 'Grinlit', ai: 'archer',
-    hp: 165, atk: 22, speed: 1.9, mass: 0.8,
+    hp: 213, atk: 22, speed: 1.9, mass: 0.8,
     hurtbox: { r: 0.48, h: 1.5 },
     // A lantern head on a cloak, spitting green fire. Slow, and helpless once reached.
     attack: { range: 8.0, keep: 5.2, windup: 0.7, dur: 0.3, cd: 2.2, shot: { kind: 'foxfire', speed: 9.5, life: 1.7, y: 1.2 }, knock: [3, 0] },
@@ -296,7 +321,7 @@ export const MONSTERS = {
   },
   velmara: {
     name: 'Velmara', ai: 'archer',
-    hp: 215, atk: 27, speed: 2.3, mass: 1.0,
+    hp: 277, atk: 27, speed: 2.3, mass: 1.0,
     hurtbox: { r: 0.45, h: 1.75 },
     // Past the rift. Keeps closer than an archer should and throws violet bolts that take
     // what they hit - the drain is hers, not the player's.
@@ -306,7 +331,7 @@ export const MONSTERS = {
   },
   nyxmare: {
     name: 'Nyxmare', ai: 'walker',
-    hp: 360, atk: 35, speed: 2.9, mass: 2.4,
+    hp: 464, atk: 35, speed: 2.9, mass: 2.4,
     hurtbox: { r: 0.72, h: 2.0 },
     // The heaviest thing in the town that is not the boss: it does not stop when hit and it
     // sends the player a long way when it connects.
@@ -316,7 +341,7 @@ export const MONSTERS = {
   },
   shardling: {
     name: 'Shardling', ai: 'walker',
-    hp: 120, atk: 22, speed: 4.4, mass: 0.6,
+    hp: 155, atk: 22, speed: 4.4, mass: 0.6,
     hurtbox: { r: 0.4, h: 1.3 },
     // What the Dark Sword breaks off himself at half health: his own shape, small and quick.
     attack: { range: 1.5, windup: 0.24, dur: 0.24, cd: 1.15, box: { x0: -0.1, x1: 1.6, y0: -0.2, y1: 1.7 }, knock: [4, 1.5] },
@@ -324,7 +349,7 @@ export const MONSTERS = {
   },
   darkSword: {
     name: 'Dark Sword', ai: 'boss', boss: true,
-    hp: 1800, atk: 24, speed: 2.6, mass: 5.5,
+    hp: 2400, atk: 24, speed: 2.6, mass: 5.5,
     hurtbox: { r: 0.9, h: 2.9 },
     // A duellist, not a colossus. He is the fastest boss in the game and the only one whose
     // basic attack is the thing to fear: everything else is a tell.
@@ -341,6 +366,11 @@ export const MONSTERS = {
     // and no shader of its own, plus the shards flying wide, which is the part the silhouette
     // can actually show. The renderer eases into it off `addsDone` (render/monsters.js).
     rage: { tint: 0x8c0f26, emissive: 0x5e0a18, grow: 1.06, shards: 1.2 },
+    // Second wind: once a fight, at `at` of its health, it stops and pulls itself back up by
+    // `amount` of its maximum. `windup` is a long, obvious tell and the whole point - deal
+    // `brk` of its max health during it and the heal breaks, so the answer is a saved
+    // cooldown rather than a sigh.
+    heal: { at: 0.25, amount: 0.32, windup: 1.4, dur: 0.7, brk: 0.08 },
     score: 1200,
   },
   // ---- Bairune, the drowned temple. Toto's brief: an island whose city sank, where the
@@ -355,7 +385,7 @@ export const MONSTERS = {
   // every town together; until then this one sits where it can be played.
   craboon: {
     name: 'Craboon', ai: 'hopper',
-    hp: 260, atk: 30, speed: 3.0, mass: 1.6,
+    hp: 317, atk: 30, speed: 3.0, mass: 1.6,
     hurtbox: { r: 0.5, h: 0.9 },
     // The big claw goes up before it comes down, which is the whole tell.
     attack: { range: 1.5, windup: 0.5, dur: 0.3, cd: 1.8, box: { x0: 0.0, x1: 1.7, y0: -0.3, y1: 1.5 }, knock: [6, 2] },
@@ -365,7 +395,7 @@ export const MONSTERS = {
   },
   hydrella: {
     name: 'Hydrella', ai: 'archer',
-    hp: 220, atk: 28, speed: 1.1, mass: 1.2,
+    hp: 268, atk: 28, speed: 1.1, mass: 1.2,
     hurtbox: { r: 0.5, h: 1.3 },
     // Rooted: it shoots from where it grew and barely closes, so the lane it covers is the
     // threat rather than the creature.
@@ -375,7 +405,7 @@ export const MONSTERS = {
   },
   jellune: {
     name: 'Jellune', ai: 'walker',
-    hp: 200, atk: 32, speed: 2.6, mass: 0.7,
+    hp: 244, atk: 32, speed: 2.6, mass: 0.7,
     hurtbox: { r: 0.45, h: 1.2 },
     // Drifts in and discharges. Frail, and the damage is in touching it at all.
     attack: { range: 1.3, windup: 0.3, dur: 0.3, cd: 1.3, box: { x0: -0.4, x1: 1.4, y0: -0.3, y1: 1.9, both: true }, knock: [4, 2] },
@@ -384,7 +414,7 @@ export const MONSTERS = {
   },
   marinox: {
     name: 'Marinox', ai: 'walker',
-    hp: 420, atk: 38, speed: 2.5, mass: 2.0,
+    hp: 512, atk: 38, speed: 2.5, mass: 2.0,
     hurtbox: { r: 0.55, h: 1.9 },
     // The elite of the town: a soldier with reach, and the one carrying the cape.
     attack: { range: 2.2, windup: 0.55, dur: 0.32, cd: 2.0, box: { x0: 0.0, x1: 2.5, y0: -0.2, y1: 2.2 }, knock: [7, 2.5] },
@@ -393,7 +423,7 @@ export const MONSTERS = {
   },
   shellora: {
     name: 'Shellora', ai: 'walker',
-    hp: 480, atk: 26, speed: 1.4, mass: 2.6,
+    hp: 586, atk: 26, speed: 1.4, mass: 2.6,
     hurtbox: { r: 0.6, h: 1.4 },
     // Slow and heavy. It spits and then shuts, and the shut is when hitting it is wasted -
     // the closing is its own behaviour and still has to go into sim/enemies.js.
@@ -406,7 +436,7 @@ export const MONSTERS = {
   },
   nerakos: {
     name: 'Nerakos', ai: 'boss', boss: true,
-    hp: 2800, atk: 30, speed: 2.2, mass: 5.8,
+    hp: 3950, atk: 30, speed: 2.2, mass: 5.8,
     hurtbox: { r: 1.2, h: 3.0 },
     // Trident thrust: long, and it comes with the reach of the haft.
     attack: { range: 2.8, windup: 0.5, dur: 0.34, cd: 1.7, box: { x0: 0.0, x1: 3.2, y0: -0.3, y1: 2.9 }, knock: [7, 2] },
@@ -425,6 +455,11 @@ export const MONSTERS = {
     // which reads against both the room and the way he looked a moment ago.
     // `shards` has no shard node to move here; it lengthens the tentacles instead.
     rage: { tint: 0x0b4a3a, emissive: 0x0e6b2e, grow: 1.05, shards: 1.15 },
+    // Second wind: once a fight, at `at` of its health, it stops and pulls itself back up by
+    // `amount` of its maximum. `windup` is a long, obvious tell and the whole point - deal
+    // `brk` of its max health during it and the heal breaks, so the answer is a saved
+    // cooldown rather than a sigh.
+    heal: { at: 0.26, amount: 0.35, windup: 1.4, dur: 0.7, brk: 0.07 },
     score: 1400,
   },
 };

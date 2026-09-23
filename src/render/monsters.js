@@ -1306,11 +1306,15 @@ export function createMonsterViews(world) {
       target = evalClip(CLIPS.down, 0, v.scratch); rate = 14;
     } else if (e.state === 'windup') {
       const pat = e.move === 'attack' ? e.def.attack : e.def[e.move];
-      const clip = clips[e.move === 'attack' ? 'windup' : e.move + 'Windup'] || clips.windup;
+      // A second wind has no swing in it. Without a clip of its own the cast pose is the
+      // right stand-in - both are "plants itself and does something" - and the attack pose
+      // would have the boss winding up a blow it never throws.
+      const clip = clips[e.move === 'attack' ? 'windup' : e.move + 'Windup']
+        || (e.move === 'heal' ? clips.castWindup : null) || clips.windup;
       target = evalClip(clip, Math.min(1, e.stateT / pat.windup), v.scratch); rate = 20;
     } else if (e.state === 'attack') {
       const pat = e.move === 'attack' ? e.def.attack : e.def[e.move];
-      const clip = clips[e.move] || clips.attack;
+      const clip = clips[e.move] || (e.move === 'heal' ? clips.cast : null) || clips.attack;
       target = evalClip(clip, Math.min(1, e.stateT / pat.dur), v.scratch); rate = 34;
       if (e.move === 'charge') { v.walkPhase += 22 * dt; const w = walkPose(v.walkPhase, 1.1); target.lLx = w.lLx; target.lRx = w.lRx; }
     } else if (e.moving || e.state === 'enter') {

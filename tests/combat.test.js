@@ -105,3 +105,94 @@ test('a monster whose position goes NaN is put back rather than lost', async () 
   assert.ok(Math.abs(e.x - wasNear) < 2, `and near where it was: ${e.x} vs ${wasNear}`);
   assert.ok(g.events.some((ev) => ev.type === 'nanRescue'), 'and it said so, so telemetry sees it');
 });
+
+// A boss's second wind. It is the one thing in the game that moves a health bar the wrong
+// way, so it gets held to three promises: it happens once, it is worth what it says, and it
+// can be taken away from the boss by hitting hard enough during the tell.
+test('a boss heals once near death, and only once', async () => {
+  const { createGame, update, EMPTY_INPUT } = await import('../src/sim/game.js');
+  const { createEnemy } = await import('../src/sim/enemies.js');
+  const { MONSTERS } = await import('../src/sim/data/monsters.js');
+  const { ORVANE } = await import('../src/sim/data/dungeon.js');
+  const def = MONSTERS.darkSword;
+  const g = createGame({ hero: 'knight', seed: 2, dungeon: ORVANE });
+  g.cheats = { invuln: true };
+  for (let i = 0; i < 4; i++) update(g, EMPTY_INPUT);
+  const e = createEnemy(g, 'darkSword', g.player.x + 6, 0);
+  g.enemies.push(e);
+  e.hp = e.hpMax * (def.heal.at - 0.01);          // just across the line
+  const low = e.hp;
+  for (let i = 0; i < 60 * 4; i++) update(g, EMPTY_INPUT);
+  const healed = g.events.filter((ev) => ev.type === 'bossHeal');
+  assert.equal(healed.length, 1, 'exactly one second wind');
+  assert.ok(e.hp > low, `${low} -> ${e.hp}`);
+  assert.ok(Math.abs(healed[0].amount - e.hpMax * def.heal.amount) < 2, `healed ${healed[0].amount}`);
+  // Down through the threshold a second time buys nothing.
+  e.hp = e.hpMax * 0.05;
+  for (let i = 0; i < 60 * 5; i++) update(g, EMPTY_INPUT);
+  assert.equal(g.events.filter((ev) => ev.type === 'bossHeal').length, 1, 'still one');
+});
+
+test('hitting hard enough during the tell breaks the heal', async () => {
+  const { createGame, update, EMPTY_INPUT } = await import('../src/sim/game.js');
+  const { createEnemy } = await import('../src/sim/enemies.js');
+  const { MONSTERS } = await import('../src/sim/data/monsters.js');
+  const { ORVANE } = await import('../src/sim/data/dungeon.js');
+  const def = MONSTERS.darkSword;
+  const g = createGame({ hero: 'knight', seed: 2, dungeon: ORVANE });
+  g.cheats = { invuln: true };
+  for (let i = 0; i < 4; i++) update(g, EMPTY_INPUT);
+  const e = createEnemy(g, 'darkSword', g.player.x + 6, 0);
+  g.enemies.push(e);
+  e.hp = e.hpMax * (def.heal.at - 0.01);
+  // wait for the wind-up to start, then take off more than `brk` of its maximum
+  for (let i = 0; i < 60 * 2 && e.move !== 'heal'; i++) update(g, EMPTY_INPUT);
+  assert.equal(e.move, 'heal', 'it started the second wind');
+  e.hp -= e.hpMax * (def.heal.brk + 0.01);
+  const before = e.hp;
+  for (let i = 0; i < 60 * 4; i++) update(g, EMPTY_INPUT);
+  assert.equal(g.events.filter((ev) => ev.type === 'bossHeal').length, 0, 'no heal landed');
+  assert.equal(g.events.filter((ev) => ev.type === 'healBroken').length, 1, 'it broke');
+  assert.ok(e.hp <= before, 'and it did not creep back up');
+});
+
+test('every boss has a second wind, and it cannot outrun the fight', async () => {
+  const { MONSTERS } = await import('../src/sim/data/monsters.js');
+  for (const [key, m] of Object.entries(MONSTERS)) {
+    if (!m.boss) continue;
+    assert.ok(m.heal, `${key} has one`);
+    const h = m.heal;
+    assert.ok(h.at > 0 && h.at < 0.5, `${key} heals near death, not in the middle: ${h.at}`);
+    assert.ok(h.amount > 0 && h.amount <= 0.4, `${key} heals a share, not a reset: ${h.amount}`);
+    // The tell has to be long enough to answer, and breaking it has to be possible with a
+    // skill rather than with the whole health bar.
+    assert.ok(h.windup >= 1.2, `${key} telegraphs it: ${h.windup}`);
+    assert.ok(h.brk > 0 && h.brk < h.amount, `${key} is breakable for less than it gains: ${h.brk} vs ${h.amount}`);
+  }
+});
+
+// The boss at the door. A monster spawns off-stage and walks in; the walk used to be an
+// approach towards the hero, which stops at attack range. With the hero stood near the far
+// wall, a boss spawning behind him stopped 2.5 away - still outside the room, so still
+// "entering", so never attacking - and the hero could not follow, being already at the edge
+// of the floor he is allowed on. Both stood still until the run timed out.
+test('a monster spawned outside the room walks in even when the hero is against the wall', async () => {
+  const { createGame, update, EMPTY_INPUT } = await import('../src/sim/game.js');
+  const { createEnemy } = await import('../src/sim/enemies.js');
+  const { ORVANE } = await import('../src/sim/data/dungeon.js');
+  const g = createGame({ hero: 'knight', seed: 3, dungeon: ORVANE });
+  g.cheats = { invuln: true };
+  for (let i = 0; i < 4; i++) update(g, EMPTY_INPUT);
+  // hero hard against the right-hand wall, boss just past it - the exact shape of the stall
+  g.player.x = g.bounds.xMax - 1.4;
+  const e = createEnemy(g, 'darkSword', g.bounds.xMax + 1.1, g.player.z);
+  g.enemies.push(e);
+  assert.equal(e.state, 'enter');
+  for (let i = 0; i < 60 * 8; i++) update(g, EMPTY_INPUT);
+  assert.notEqual(e.state, 'enter', 'it got into the room');
+  assert.ok(e.x < g.bounds.xMax, `and is inside it: x ${e.x} vs xMax ${g.bounds.xMax}`);
+  // and it is doing something about the hero rather than standing there
+  let acted = false;
+  for (let i = 0; i < 60 * 12 && !acted; i++) { update(g, EMPTY_INPUT); if (e.state === 'windup' || e.state === 'attack') acted = true; }
+  assert.ok(acted, `the boss never attacked; state ${e.state} at x ${e.x}`);
+});

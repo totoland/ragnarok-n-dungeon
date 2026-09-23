@@ -453,6 +453,19 @@ export function createFx(world) {
         addShake(world, 0.16);
         break;
       }
+      case 'bossHeal': {
+        // It worked. Green going UP, against every other number in the game going down.
+        number(ev.x, ev.y + 2.2, ev.z, '+' + ev.amount, '#7dff9a');
+        ring(ev.x, ev.z, { color: 0x7dff9a, radius: 2.2, life: 0.5, y: 0.05 });
+        burst(ev.x, 0.3, ev.z, 26, { color: 0x9dffb0, speed: 1.2, up: 5.5, life: 0.7, size: 0.26, gravity: -3 });
+        flashLight.position.set(ev.x, 1.4, ev.z); flashLight.intensity = 10;
+        break;
+      }
+      case 'healBroken':  // and this is what it looks like when the hero got there in time
+        number(ev.x, ev.y + 2.2, ev.z, 'BROKEN', '#ffd070');
+        burst(ev.x, 1.2, ev.z, 20, { color: 0xffd070, speed: 5, up: 2, life: 0.4, size: 0.24, gravity: 8 });
+        addShake(world, 0.25);
+        break;
       case 'freeze':     // it stops: a hard white crack, then nothing while the tint holds it
         burst(ev.x, ev.y + 0.5, ev.z, 14, { color: 0xcdf2ff, speed: 2.2, up: 1.6, life: 0.4, size: 0.2, gravity: 4 });
         ring(ev.x, ev.z, { color: 0x9fe8ff, radius: 0.7, life: 0.35, y: 0.05 });
@@ -671,6 +684,7 @@ export function createFx(world) {
       ['+' + DIGITS, '#7dff7d'],      // a health potion
       ['+' + DIGITS, '#7db8ff'],      // a mana potion
       ['MISS', '#a0f0ff'],
+      ['BROKEN', '#ffd070'],          // a boss's second wind, cut off
       ['LEVEL UP' + DIGITS + [...names].join(''), '#ffe08a'],
     ];
     const up = (t) => { try { world.renderer.initTexture(t); } catch { /* not ready yet */ } };

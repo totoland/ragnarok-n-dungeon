@@ -16,6 +16,7 @@ export function createEnemy(g, type, x, z) {
     hp: def.hp, hpMax: def.hp, mass: def.mass, hurtbox: def.hurtbox,
     state: 'enter', stateT: 0, cd: 0.8 + g.rng.next() * 0.8, move: null,
     hitstun: 0, frozen: 0, launched: false, flash: 0, dead: false, deathT: 0, lastX: x,
+    healDone: false, healFrom: 0,
     hopT: g.rng.next(), aiT: 0, hitDone: false, addsDone: false,
     lastHitBy: null,
   };
@@ -91,6 +92,18 @@ function stepAttack(g, e, dt) {
         }
         e.hitDone = true;
       }
+      if (e.move === 'heal') {
+        // Whether it worked is decided here, by what the hero managed during the tell.
+        const took = Math.max(0, e.healFrom - e.hp);
+        if (took >= e.hpMax * (pat.brk ?? 1)) {
+          g.events.push({ type: 'healBroken', id: e.id, x: e.x, z: e.z, y: e.y, monster: e.type });
+        } else {
+          const before = e.hp;
+          e.hp = Math.min(e.hpMax, e.hp + e.hpMax * pat.amount);
+          g.events.push({ type: 'bossHeal', id: e.id, x: e.x, z: e.z, y: e.y, amount: Math.round(e.hp - before) });
+        }
+        e.hitDone = true;
+      }
       if (e.move === 'attack' && e.def.ai === 'archer') {
         const s = pat.shot;
         g.spawnProjectile({ owner: 'enemy', kind: s.kind || 'boneArrow', x: e.x + e.facing * 0.5, z: e.z, y: s.y, vx: s.speed * e.facing, vy: 0, dmg: e.def.atk, knock: pat.knock, stun: 0.3, life: s.life, facing: e.facing });
@@ -121,7 +134,11 @@ function stepAttack(g, e, dt) {
     // a half: he stood there with every special still cooling and his basic locked behind a
     // cooldown that was never his. For an ordinary monster this is the same number it always
     // was, because its only pattern is the basic.
-    if (e.stateT >= 0.45) { e.state = 'chase'; e.stateT = 0; e.cd = e.def.attack.cd; }
+    // A second wind is not also a breather. Coming out of it on a fresh basic-attack
+    // cooldown handed the hero two and a half free seconds at the exact moment the fight was
+    // supposed to get harder - enough that the first town started producing runs where
+    // nothing touched the bot at all. It heals and it comes straight back.
+    if (e.stateT >= 0.45) { e.state = 'chase'; e.stateT = 0; e.cd = e.move === 'heal' ? 0 : e.def.attack.cd; }
   }
 }
 
@@ -158,6 +175,14 @@ function think(g, e, dt) {
         e.addsDone = true;
         for (let i = 0; i < def.adds.count; i++) g.queueSpawn(def.adds.type, i % 2 ? 'left' : 'right', 0.2 * i);
         g.events.push({ type: 'bossAdds', id: e.id, x: e.x, z: e.z });
+      }
+      // The second wind outranks everything: it happens once, and a boss that chose to swing
+      // on the frame it crossed the threshold would never get to it.
+      if (def.heal && !e.healDone && e.hp <= e.hpMax * def.heal.at) {
+        e.healDone = true;
+        e.healFrom = e.hp;
+        beginAttack(g, e, 'heal');
+        break;
       }
       if (e.chargeCd <= 0 && dx > 4.5 && Math.abs(p.z - e.z) < 0.9) { e.chargeCd = def.charge.cd; beginAttack(g, e, 'charge'); break; }
       // Cast sits between charge and slam on purpose: at slam range it would never fire,
@@ -211,9 +236,33 @@ export function updateEnemy(g, e, dt) {
       if (e.stateT >= 0.55) { e.state = 'chase'; e.stateT = 0; }
       break;
     case 'enter': {
+      // Walk IN, not towards the hero.
+      //
+      // This used to approach(…, 2.5), which stops once it is 2.5 from the hero - and the
+      // exit from this state needs the monster INSIDE the room. Stand the hero near the far
+      // wall and a boss spawning off-stage behind him lands 2.5 away, outside the bounds:
+      // approach will not move it because it is close enough, and the state will not release
+      // it because it is not in yet. The hero cannot follow, because he is already at the
+      // edge of the room he is allowed in. Both stand still. Forever.
+      //
+      // That is the boss standing at the door and never coming to fight - 280 s of it in the
+      // Hall of Mirrors, which is where it was first reported. Entering is about getting into
+      // the room; what to do once inside is the chase state's business.
       const b = g.bounds;
-      approach(g, e, dt, 2.5);
-      if (e.x > b.xMin + 0.5 && e.x < b.xMax - 0.5) { e.state = 'chase'; e.stateT = 0; }
+      e.stateT += dt;                 // nothing else ticks it in this state, and the belt needs it
+      if (e.x > b.xMin + 0.5 && e.x < b.xMax - 0.5) { e.state = 'chase'; e.stateT = 0; break; }
+      const dir = e.x <= b.xMin + 0.5 ? 1 : -1;
+      e.x += dir * e.def.speed * dt;
+      // Still line up on the hero's lane on the way in - the old approach() did that as a
+      // side effect, and dropping it let a wave walk in on its own lane and take a moment to
+      // find him, which the harness noticed as runs where nothing ever landed a hit.
+      const dz = g.player.z - e.z;
+      if (Math.abs(dz) > 0.15) e.z += sign(dz) * e.def.speed * 0.8 * dt;
+      e.facing = dir;
+      e.moving = true;
+      // And a belt in case something ever parks a monster where even that cannot reach:
+      // after five seconds of entering, it is in, wherever it is.
+      if (e.stateT > 5) { e.x = Math.min(b.xMax - 0.6, Math.max(b.xMin + 0.6, e.x)); e.state = 'chase'; e.stateT = 0; }
       break;
     }
     case 'chase': think(g, e, dt); break;

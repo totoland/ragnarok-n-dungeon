@@ -43,7 +43,11 @@ function botInput(g, frame) {
   const dx = t.x - p.x, dz = t.z - p.z;
   const ranged = p.hero === 'hunter';
   const want = ranged ? 5.5 : 1.3;
-  const threat = live.find((e) => e.state === 'windup' && (Math.abs(e.x - p.x) < 3 || e.move === 'charge'));
+  // A charge is a threat from across the room; everything else only once it is close enough
+  // to land. Without the distance gate a boss pacing about at the far wall counted as a
+  // threat, and the rule below then ran the bot away from it.
+  const threat = live.find((e) => e.state === 'windup'
+    && (Math.abs(e.x - p.x) < 3 || (e.move === 'charge' && Math.abs(e.z - p.z) < 1.2)));
   const arrow = g.projectiles.find((pr) => pr.owner === 'enemy' && Math.abs(pr.z - p.z) < 0.9 && Math.sign(p.x - pr.x) === Math.sign(pr.vx) && Math.abs(pr.x - p.x) < 3.5);
   if (arrow) { // change lane to let an incoming arrow pass
     if (p.z > 0) held.up = true; else held.down = true;
@@ -54,7 +58,13 @@ function botInput(g, frame) {
     // sidestep a telegraphed attack; back off along x from a boss (its slam covers the lanes)
     if (p.z > 0) held.up = true; else held.down = true;
     if (threat.move === 'charge') return { held, pressed }; // a charge is dodged by changing lane, not by running
-    if (ranged || threat.boss) { if (threat.x > p.x) held.left = true; else held.right = true; }
+    // Stepping out of the lane is what dodges; backing off along x as well, on every frame a
+    // boss is winding up, is what made the bot unable to fight one at all. A boss spends a
+    // third of the fight in a wind-up, so the bot spent a third of it walking backwards, and
+    // the tougher the boss the worse it got - the Hall of Mirrors took 280 s and timed out,
+    // while the same fight driven straight at the boss takes 12. Retreat is kept for when it
+    // is genuinely inside the swing.
+    if (ranged || (threat.boss && Math.abs(threat.x - p.x) < 2.2)) { if (threat.x > p.x) held.left = true; else held.right = true; }
     if (Math.abs(threat.x - p.x) < (threat.boss ? 3.5 : 1.6) && p.dashCd <= 0) { if (threat.x > p.x) held.left = true; else held.right = true; pressed.dash = true; }
     return { held, pressed };
   }
