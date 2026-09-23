@@ -1,7 +1,23 @@
 // Tiny WebAudio synth, same shape as the sibling projects: no assets, context created on the
 // first user gesture. Consumes the same game.events the effects layer does.
+//
+// Two things every voice has to do, and for a long time none of them did - which was the
+// Hunter's lag on the iPad (Loki, session i6h6gs): 59 fps falling to 7 over a minute in one
+// room, with the GPU flat, the resolution already at its floor, and the sim at 0.03 ms.
+//
+// 1. Disconnect when it ends. A node wired to the destination and then left alone is
+//    eligible for collection in principle; in WebKit, which is what the iPad and the
+//    Capacitor build both run, it stays in the render graph long after it goes silent. A
+//    minute in the Fallen Library built 2,028 of them for the Hunter and released none, and
+//    the audio thread walked every one of them on every render quantum after that.
+// 2. Do not synthesise noise per call. Every hit used to allocate a fresh buffer and fill it
+//    with Math.random() on the main thread - 35,000 samples a second in a fight, in the same
+//    frame budget as the sim and the draw. One second of noise is made once, and each hit
+//    plays a slice of it from a random offset; the gain envelope was already doing the fade.
+const MAX_VOICES = 32;       // past this, a new sound is dropped rather than stacked
+
 class Sfx {
-  constructor() { this.ctx = null; this.muted = false; this.lastAt = new Map(); }
+  constructor() { this.ctx = null; this.muted = false; this.lastAt = new Map(); this.noiseBuf = null; this.voices = 0; }
 
   init() {
     if (this.ctx) return;
@@ -9,10 +25,29 @@ class Sfx {
     if (AC) this.ctx = new AC();
   }
 
+  // One second of white noise, made the first time it is needed and kept.
+  noiseBuffer() {
+    if (this.noiseBuf) return this.noiseBuf;
+    const n = this.ctx.sampleRate;
+    const buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    return (this.noiseBuf = buf);
+  }
+
+  // Count a voice in, and take every node it built out of the graph when it ends.
+  voice(src, nodes) {
+    this.voices++;
+    src.onended = () => {
+      this.voices--;
+      for (const n of nodes) { try { n.disconnect(); } catch { /* already gone */ } }
+    };
+  }
+
   toggleMute() { this.muted = !this.muted; return this.muted; }
 
   tone({ freq, to = freq, type = 'square', dur = 0.06, vol = 0.12, at = 0 }) {
-    if (!this.ctx || this.muted) return;
+    if (!this.ctx || this.muted || this.voices >= MAX_VOICES) return;
     if (this.ctx.state === 'suspended') this.ctx.resume();
     const t0 = this.ctx.currentTime + at;
     const osc = this.ctx.createOscillator();
@@ -23,26 +58,27 @@ class Sfx {
     gain.gain.setValueAtTime(vol, t0);
     gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
     osc.connect(gain).connect(this.ctx.destination);
+    this.voice(osc, [osc, gain]);
     osc.start(t0);
     osc.stop(t0 + dur + 0.02);
   }
 
   noise({ dur = 0.08, vol = 0.1, at = 0, freq = 1200, q = 0.8, type = 'bandpass' }) {
-    if (!this.ctx || this.muted) return;
+    if (!this.ctx || this.muted || this.voices >= MAX_VOICES) return;
     const t0 = this.ctx.currentTime + at;
-    const n = Math.floor(this.ctx.sampleRate * dur);
-    const buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
     const src = this.ctx.createBufferSource();
-    src.buffer = buf;
+    src.buffer = this.noiseBuffer();
     const f = this.ctx.createBiquadFilter();
     f.type = type; f.frequency.value = freq; f.Q.value = q;
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(vol, t0);
     gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
     src.connect(f).connect(gain).connect(this.ctx.destination);
-    src.start(t0);
+    this.voice(src, [src, f, gain]);
+    // A slice of the shared second, from somewhere different each time so two hits in a row
+    // are not the same hiss. `dur` bounds it; the gain above does the fade-out.
+    const len = Math.min(dur, 0.9);
+    src.start(t0, Math.random() * (1 - len), len);
   }
 
   // rate-limit a voice so a 40-hit combo does not become white noise
