@@ -226,7 +226,7 @@ export const BAIRUNE = {
   town: 'Bairune', name: 'Bairune, the Drowned Temple',
   blurb: 'A city under the sea \u2014 Nerakos',
   accent: '#3fb8d8',
-  loot: { knight: 'tidecleaver', hunter: 'coralbow' },
+  loot: { knight: 'underWaterSword', hunter: 'coralbow' },
   rooms: [
     {
       name: 'Moonshell Beach', width: 18, theme: 'shore',

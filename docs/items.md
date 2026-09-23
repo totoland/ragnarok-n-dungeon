@@ -18,10 +18,10 @@ ATK is flat and on one curve across the towns.
 | **Arbalest**<br>`arbalest` | Morroc | hunter | 16 | +16 ATK, 15% crit rate | no — shows the hero’s own weapon | Sandman (boss, hunter) · always |
 | **Crescentfang**<br>`crescentfang` | Phaelan | knight | 30 | +30 ATK, crits hit 30% harder | no — shows the hero’s own weapon | Moonraya (boss, knight) · always |
 | **Moonstring**<br>`moonstring` | Phaelan | hunter | 30 | +30 ATK, crits hit 30% harder | no — shows the hero’s own weapon | Moonraya (boss, hunter) · always |
-| **Under Water Sword [1]**<br>`underWaterSword` | Bairune | knight | 45 | +45 ATK, attack 15% faster, +50% damage to Fire monsters. 5% chance on hit: ice falls around you for 10% of ATK as magic, and what it hits may freeze | yes | Shellora · 4% |
+| **Under Water Sword [1]**<br>`underWaterSword` | Bairune | knight | 45 | +45 ATK, attack 15% faster, +50% damage to Fire monsters. 5% chance on hit: ice falls around you for 10% of ATK as magic, and what it hits may freeze | yes | Nerakos (boss, knight) · always |
 | **Twinshot**<br>`twinshot` | Orvane | hunter | 50 | +50 ATK, 15% chance on hit: the shot lands twice | no — shows the hero’s own weapon | Dark Sword (boss, hunter) · always |
 | **Meteor Edge**<br>`meteorEdge` | Orvane | knight | 55 | +55 ATK, 10% chance on hit: a meteor falls for 10% of ATK as magic | no — shows the hero’s own weapon | Dark Sword (boss, knight) · always |
-| **Tidecleaver**<br>`tidecleaver` | Bairune | knight | 95 | +95 ATK, 18% chance on hit: Undertow drags them back to you | no — shows the hero’s own weapon | Nerakos (boss, knight) · always |
+| **Tidecleaver**<br>`tidecleaver` | Bairune | knight | 95 | +95 ATK, 18% chance on hit: Undertow drags them back to you | no — shows the hero’s own weapon | Shellora · 4% |
 | **Coralbow**<br>`coralbow` | Bairune | hunter | 95 | +95 ATK, 18% chance on hit: Undertow drags them back to you | no — shows the hero’s own weapon | Nerakos (boss, hunter) · always |
 
 ## Hats
@@ -205,7 +205,7 @@ Boss: **Dark Sword**, who pays Meteor Edge (knight) / Twinshot (hunter) every ti
 
 ### Bairune — Bairune, the Drowned Temple
 
-Boss: **Nerakos**, who pays Tidecleaver (knight) / Coralbow (hunter) every time.
+Boss: **Nerakos**, who pays Under Water Sword (knight) / Coralbow (hunter) every time.
 
 | Monster | Drops | Slot | Chance |
 |---|---|---|---|
@@ -216,7 +216,7 @@ Boss: **Nerakos**, who pays Tidecleaver (knight) / Coralbow (hunter) every time.
 | Hydrella | Coral Crown (`coralCrown`) | Hat | 5% |
 | Hydrella | Brooch (`brooch`) | Accessory | 1.2% |
 | Shellora | Pearl Diadem (`pearlDiadem`) | Hat | 5% |
-| Shellora | Under Water Sword (`underWaterSword`) | Weapon | 4% |
+| Shellora | Tidecleaver (`tidecleaver`) | Weapon | 4% |
 | Shellora | Amulet (`amulet`) | Accessory | 1.2% |
 | Marinox | Everwave Mantle (`everwave`) | Cape | 5% |
 | Marinox | Tidefin Helm (`tidefin`) | Hat | 5% |

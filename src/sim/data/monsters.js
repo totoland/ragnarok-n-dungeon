@@ -428,9 +428,10 @@ export const MONSTERS = {
     // Slow and heavy. It spits and then shuts, and the shut is when hitting it is wasted -
     // the closing is its own behaviour and still has to go into sim/enemies.js.
     attack: { range: 3.4, windup: 0.7, dur: 0.35, cd: 2.6, box: { x0: 0.0, x1: 3.6, y0: -0.3, y1: 1.8 }, knock: [5, 3] },
-    // The drowned sword is hers: a shell in a wreck closes over what sank into it, and it
-    // is the only weapon in the game that is found rather than paid out by a boss.
-    drops: [{ item: 'pearlDiadem', chance: 0.05 }, { item: 'underWaterSword', chance: 0.04 },
+    // A shell in a wreck closes over what sank into it, so hers is the weapon that is found
+    // rather than paid out by a boss. The two swords swapped places when Toto moved the
+    // Under Water Sword onto Nerakos: whichever one is not the boss's reward is this one.
+    drops: [{ item: 'pearlDiadem', chance: 0.05 }, { item: 'tidecleaver', chance: 0.04 },
             { item: 'amulet', chance: 0.012 }],
     score: 130,
   },

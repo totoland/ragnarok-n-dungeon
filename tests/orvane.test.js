@@ -181,17 +181,38 @@ test('Bairune is a complete town: five monsters, a boss, five hats and a cape', 
   for (const [hero, id] of Object.entries(BAIRUNE.loot)) {
     assert.equal(ITEMS[id].slot, 'weapon');
     assert.ok(fits(id, hero));
-    assert.equal(ITEMS[id].mods.atkAdd, 95, 'on the flat curve: 6, 16, 30, 55, 95');
+  }
+  // Whatever the boss is not paying has to still be reachable, or it leaves the game.
+  const { MONSTERS: M } = await import('../src/sim/data/monsters.js');
+  const paid = new Set(Object.values(BAIRUNE.loot));
+  for (const id of ['tidecleaver', 'coralbow', 'underWaterSword']) {
+    const dropped = Object.values(M).some((m) => (m.drops || []).some((d) => d.item === id));
+    assert.ok(paid.has(id) || dropped, `${id} is obtainable`);
   }
 });
 
-test('the Under Water Sword is looted, not won, and its Cold Bolt lands as magic', async () => {
+test('the weapon curve, as it actually stands', async () => {
+  const { TOWNS } = await import('../src/sim/data/dungeon.js');
+  const curve = (hero) => Object.values(TOWNS).map((t) => ITEMS[t.loot[hero]].mods.atkAdd);
+  // The hunter's climbs the way the towns do.
+  assert.deepEqual(curve('hunter'), [6, 16, 30, 50, 95]);
+  // The knight's does not, and that is a decision rather than a slip: Toto moved the Under
+  // Water Sword onto Nerakos for its model, and its 45 ATK was written for a weapon found in
+  // the middle of the town, not paid out at the end of it. So the last step goes DOWN, and
+  // the knight's reward for the hardest boss in the game is worse than Orvane's. Written
+  // down here so that whoever changes it next is choosing to, and so that raising it does
+  // not look like a regression in this file.
+  assert.deepEqual(curve('knight'), [6, 16, 30, 55, 45]);
+});
+
+test("the Under Water Sword is Nerakos's payout, and its Cold Bolt lands as magic", async () => {
   const { BAIRUNE } = await import('../src/sim/data/dungeon.js');
   const { MONSTERS } = await import('../src/sim/data/monsters.js');
-  // The first weapon in the game on a monster's drop table rather than a boss's payout.
-  const from = Object.entries(MONSTERS).filter(([, m]) => (m.drops || []).some((d) => d.item === 'underWaterSword'));
-  assert.equal(from.length, 1, 'exactly one monster drops it');
-  assert.ok(!Object.values(BAIRUNE.loot).includes('underWaterSword'), 'and the boss does not');
+  // It started on Shellora's table and moved onto the boss when it got its model. The two
+  // swords swapped: whichever one the boss is not paying is the one that is found.
+  assert.equal(BAIRUNE.loot.knight, 'underWaterSword', 'the boss pays it');
+  const found = Object.entries(MONSTERS).filter(([, m]) => (m.drops || []).some((d) => d.item === 'tidecleaver'));
+  assert.equal(found.length, 1, 'and Tidecleaver took its place on a drop table');
 
   const g = createGame({ hero: 'knight', seed: 7, dungeon: BAIRUNE, xp: xpAtLevel(LEVEL.max), gear: { id: 'underWaterSword', plus: 0 } });
   assert.equal(g.player.bolt, ITEMS.underWaterSword.mods.boltAdd, 'the sword grants the rate');
