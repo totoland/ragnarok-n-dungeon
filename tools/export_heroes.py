@@ -463,10 +463,14 @@ MODELS = {
         # not shape. The binding goes furthest because the hand closes over most of it.
         "curve_decimate": {"Sword \u2022 Inlays": 0.1, "Sword \u2022 Grip": 0.06,
                            "Sword \u2022 Pommel": 0.4, "Sword \u2022 Guard": 0.3, "*": 1},
+        # The blade stands along +Z, so `yaw` here turns it about its OWN length: which way
+        # the edge faces in the fist, and nothing else. At 0 the flat of the blade pointed
+        # forward and the edge ran across the knight's body; a quarter turn puts the edge out
+        # in front of him, which is the way a sword is carried.
+        "yaw": 90,
         "parent": {"weapon": "root"},
         # The grip: the middle of the bound leather, where the fist closes. Authored standing
-        # up with the blade along +Z, which is the frame the hero's own weapon node is in -
-        # so it drops into the hand with no turn at all.
+        # up with the blade along +Z, the frame the hero's own weapon node is already in.
         "pivot": {"root": (0, 0, 0), "weapon": (0, 0, 1.30)},
     },
     # Bairune's boss. One body mesh, so no arms and no legs - the tentacles are the rig.
