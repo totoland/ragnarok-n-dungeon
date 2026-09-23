@@ -10,6 +10,7 @@
     "sim": "node tools/playtest.mjs",
     "export": "sh tools/export_heroes.sh",
     "build:web": "node tools/build-web.mjs",
+    "docs": "node tools/items_doc.mjs",
     "ios": "npm run build:web && npx cap sync ios && npx cap open ios",
     "ios:sync": "npm run build:web && npx cap sync ios"
   },

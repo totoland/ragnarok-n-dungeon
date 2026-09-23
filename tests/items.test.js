@@ -10,6 +10,7 @@ import { BASE_MODS } from '../src/sim/resolve.js';
 import { REFINE, SKILL, LEVEL } from '../src/config.js';
 import { createGame, update, EMPTY_INPUT, setGear } from '../src/sim/game.js';
 import { createEnemy } from '../src/sim/enemies.js';
+import { spawnSync } from 'node:child_process';
 import { xpAtLevel } from '../src/sim/progress.js';
 
 const quiet = { rooms: [{ name: 't', width: 20, waves: [] }] };
@@ -210,4 +211,14 @@ test('a monster drop table pays out near its rate and every hit is a rolled inst
   assert.equal(rings.length, g.loot.length, 'porings drop rings and nothing else');
   assert.ok(rings.length > N * 0.02 && rings.length < N * 0.04, `~3% (${rings.length}/${N})`);
   assert.ok(rings.every((r) => r.main.stat === 'atk' && r.sub && r.sub.stat !== 'atk'));
+});
+
+// A reference page is only worth having if it cannot quietly stop being true. This one is
+// generated from the same data the game reads (tools/items_doc.mjs), so the only way it goes
+// stale is if someone changes an item and does not regenerate it - which is exactly what this
+// catches. `npm run docs` fixes a failure here.
+test('docs/items.md is current', () => {
+  const root = new URL('..', import.meta.url).pathname;
+  const r = spawnSync(process.execPath, ['tools/items_doc.mjs', '--check'], { cwd: root, encoding: 'utf8' });
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`.trim() || 'the generator failed');
 });
