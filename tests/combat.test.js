@@ -85,3 +85,23 @@ test('a hit that carries no knockback leaves the target somewhere', () => {
   assert.equal(shoved.vx, -8);
   assert.ok(shoved.vy > 0 && shoved.launched);
 });
+
+// The net behind the fix above. Whatever puts a NaN in a position next - and something will,
+// eventually - the monster must not be lost: it is alive, it holds up the wave, and it is
+// drawn at no position at all, which is indistinguishable from a monster that is not there.
+test('a monster whose position goes NaN is put back rather than lost', async () => {
+  const { createGame, update, EMPTY_INPUT } = await import('../src/sim/game.js');
+  const { createEnemy } = await import('../src/sim/enemies.js');
+  const { BAIRUNE } = await import('../src/sim/data/dungeon.js');
+  const g = createGame({ hero: 'knight', seed: 3, dungeon: BAIRUNE });
+  for (let i = 0; i < 4; i++) update(g, EMPTY_INPUT);
+  const e = createEnemy(g, 'craboon', g.player.x + 4, 0);
+  g.enemies.push(e);
+  for (let i = 0; i < 10; i++) update(g, EMPTY_INPUT);
+  const wasNear = e.x;
+  e.vx = NaN;                                      // however it got there
+  for (let i = 0; i < 4; i++) update(g, EMPTY_INPUT);
+  assert.ok(Number.isFinite(e.x), `x is ${e.x}`);
+  assert.ok(Math.abs(e.x - wasNear) < 2, `and near where it was: ${e.x} vs ${wasNear}`);
+  assert.ok(g.events.some((ev) => ev.type === 'nanRescue'), 'and it said so, so telemetry sees it');
+});

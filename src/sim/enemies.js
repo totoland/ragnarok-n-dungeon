@@ -15,7 +15,7 @@ export function createEnemy(g, type, x, z) {
     x, z, y: 0, vx: 0, vz: 0, vy: 0, facing: -1, grounded: true,
     hp: def.hp, hpMax: def.hp, mass: def.mass, hurtbox: def.hurtbox,
     state: 'enter', stateT: 0, cd: 0.8 + g.rng.next() * 0.8, move: null,
-    hitstun: 0, frozen: 0, launched: false, flash: 0, dead: false, deathT: 0,
+    hitstun: 0, frozen: 0, launched: false, flash: 0, dead: false, deathT: 0, lastX: x,
     hopT: g.rng.next(), aiT: 0, hitDone: false, addsDone: false,
     lastHitBy: null,
   };
@@ -224,6 +224,17 @@ export function updateEnemy(g, e, dt) {
 }
 
 function physics(g, e, dt) {
+  // A net, not a fix. The knockback NaN (sim/combat.js applyHit) is closed, but a monster
+  // whose x goes non-finite is alive, counted by the wave, drawn nowhere and gone for the
+  // rest of the run - and it took a report, a screenshot and three days of telemetry to
+  // find the last one. Anything that puts a NaN in here again costs a stumble instead.
+  if (!Number.isFinite(e.x) || !Number.isFinite(e.vx)) {
+    e.vx = 0;
+    e.x = Number.isFinite(e.lastX) ? e.lastX : g.player.x;
+    g.events.push({ type: 'nanRescue', id: e.id, monster: e.type, x: e.x, z: e.z, y: e.y });
+  } else {
+    e.lastX = e.x;
+  }
   e.x += e.vx * dt;
   e.vx *= Math.max(0, 1 - (e.grounded ? 7 : 1.2) * dt);
   if (Math.abs(e.vx) < 0.05) e.vx = 0;

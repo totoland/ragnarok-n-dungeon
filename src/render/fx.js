@@ -255,7 +255,22 @@ export function createFx(world) {
     return m;
   }
 
+  // Cold Bolt's wedges. One geometry and one material between all of them, like the arrow:
+  // a shard per icicle would hand the driver a new program on the frame the spell lands.
+  const icicleGeo = new THREE.ConeGeometry(0.15, 0.85, 5);
+  const icicleMat = new THREE.MeshStandardMaterial({
+    color: 0x8fd4ef, roughness: 0.2, metalness: 0.05,
+    emissive: 0x1f5e80, emissiveIntensity: 0.7, transparent: true, opacity: 0.88,
+  });
+  function makeIcicle() {
+    const m = new THREE.Mesh(icicleGeo, icicleMat);
+    m.rotation.x = Math.PI;                 // the point leads, the way a falling spike would
+    m.castShadow = true;
+    return m;
+  }
+
   function makeArrow(kind) {
+    if (kind === 'icicle') return makeIcicle();
     if (kind === 'hellOrb') return makeOrb();
     if (kind === 'foxfire') return makeFoxfire();
     if (kind === 'tide') return makeTide();
@@ -302,6 +317,22 @@ export function createFx(world) {
       a.rotation.z = -Math.PI / 2 + (Math.random() - 0.5) * 0.3;
       scene.add(a);
       rain.push({ m: a, vy: -(11 + Math.random() * 4), t: -Math.random() * 0.18, stuck: 0 });
+    }
+  }
+
+  // ---- ice shower: the same falling-and-sticking machinery the arrows use, in a ring
+  // around the hero rather than a fan in front of him.
+  function iceShower(x, z) {
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + Math.random() * 0.5;
+      const r = 0.6 + Math.random() * 1.9;
+      const m = makeIcicle();
+      m.position.set(x + Math.cos(a) * r, 4.6 + Math.random() * 1.6, z + Math.sin(a) * r * 0.55);
+      m.rotation.z = (Math.random() - 0.5) * 0.35;
+      scene.add(m);
+      // Fast enough to be on the ground about when the spell resolves - the sim gives them
+      // 0.28 s of flight, and a wedge that lands after the damage reads as a miss.
+      rain.push({ m, vy: -(16 + Math.random() * 4), t: -Math.random() * 0.1, stuck: 0, color: 0x9fe8ff });
     }
   }
 
@@ -407,19 +438,15 @@ export function createFx(world) {
       case 'autoMeteor':
         ring(ev.x, ev.z, { color: 0xb070ff, radius: 1.5, life: 0.5, y: 0.04 });
         break;
-      case 'autoBolt':   // the water above freezing: the ring it is about to fall inside
-        ring(ev.x, ev.z, { color: 0x50c0ff, radius: 2.6, life: 0.28, y: 0.04 });
+      case 'autoBolt':
+        // The wedges leave on the call, not on the landing: the sim holds the damage 0.28 s
+        // and this is that 0.28 s made visible. Beams read as a thing arriving from nowhere;
+        // real shards falling read as a thing that was already on its way.
+        iceShower(ev.x, ev.z);
+        ring(ev.x, ev.z, { color: 0x50c0ff, radius: 2.6, life: 0.3, y: 0.04 });
         break;
       case 'coldBolt': {
-        // Around the hero rather than on one monster, so it is drawn as a ring of falls
-        // rather than a single one: five wedges spaced round him, each its own shaft and
-        // its own shatter. The beams are what carry "it came from above".
-        for (let i = 0; i < 5; i++) {
-          const a = (i / 5) * Math.PI * 2 + 0.3;
-          const bx = ev.x + Math.cos(a) * 1.9, bz = ev.z + Math.sin(a) * 1.1;
-          beam(bx, bz, { color: 0x9fe8ff, life: 0.3 });
-          burst(bx, 0.4, bz, 8, { color: 0x7fd8ff, speed: 3.6, up: 2.6, life: 0.35, size: 0.22, gravity: 9 });
-        }
+        // and the ground answers when they land
         ring(ev.x, ev.z, { color: 0xd8f4ff, radius: 2.4, life: 0.3, y: 0.06 });
         burst(ev.x, 0.3, ev.z, 10, { color: 0xffffff, speed: 2.4, up: 1.8, life: 0.3, size: 0.16 });
         flashLight.position.set(ev.x, 1.2, ev.z); flashLight.intensity = 13;
@@ -606,7 +633,7 @@ export function createFx(world) {
       if (r.t < 0) continue;
       if (r.stuck) { r.stuck += dt; if (r.stuck > 0.9) { scene.remove(r.m); rain.splice(i, 1); } continue; }
       r.m.position.y += r.vy * dt;
-      if (r.m.position.y <= 0.15) { r.m.position.y = 0.15; r.stuck = 0.001; burst(r.m.position.x, 0.1, r.m.position.z, 4, { color: 0xa0e0ff, speed: 1.5, up: 1.5, life: 0.3, size: 0.2 }); }
+      if (r.m.position.y <= 0.15) { r.m.position.y = 0.15; r.stuck = 0.001; burst(r.m.position.x, 0.1, r.m.position.z, 4, { color: r.color ?? 0xa0e0ff, speed: 1.5, up: 1.5, life: 0.3, size: 0.2 }); }
     }
   }
 
@@ -652,7 +679,7 @@ export function createFx(world) {
     number(WARM_X, 1, WARM_Z, '99', '#fff', true); number(WARM_X, 1, WARM_Z, '99', '#fff', false, true);
     slash(WARM_X, 0, WARM_Z, 1); ring(WARM_X, WARM_Z, { life: 9 }); beam(WARM_X, WARM_Z, { life: 9 });
     let id = -1;
-    for (const kind of ['arrow', 'hellOrb', 'foxfire', 'tide', 'sandBall', 'rock']) { const m = makeArrow(kind); m.position.set(WARM_X, 1, WARM_Z); scene.add(m); projectiles.set(id--, m); }
+    for (const kind of ['arrow', 'icicle', 'hellOrb', 'foxfire', 'tide', 'sandBall', 'rock']) { const m = makeArrow(kind); m.position.set(WARM_X, 1, WARM_Z); scene.add(m); projectiles.set(id--, m); }
     for (const kind of ['hp', 'mp']) { const m = makePotion(kind); m.position.set(WARM_X, 0, WARM_Z); scene.add(m); pickups.set(id--, m); }
   }
   return { update, clear, burst, number, warm };
