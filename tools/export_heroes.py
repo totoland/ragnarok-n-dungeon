@@ -69,6 +69,18 @@ def classify_knight(group, name, cx):
     return "torso"  # cuirass, gorget, pauldrons, mail, gambeson, belts, surcoat, clasps, neck
 
 
+def classify_knight_tripo(group, name, cx):
+    """assets/blender/knight_tripo: the split was done by convert_tripo_knight.py, from the rig's
+    weights, and every object is already named for the limb it went to."""
+    part = name.split(" •")[0]
+    if part == "Arm":
+        return "arm" + _side(cx)
+    if part == "Leg":
+        return "leg" + _side(cx)
+    return {"Torso": "torso", "Head": "head", "Cape": "cape",
+            "Sword": "weapon", "Katana": "weapon_katana"}.get(part)
+
+
 def classify_hunter(group, name, cx):
     if group.startswith("Falcon"):
         if name.startswith("Falcon | near"):
@@ -325,7 +337,29 @@ def classify_dark_sword(group, name, cx):
 
 
 MODELS = {
+    # The Knight from Tripo, re-posed, split and flattened by
+    # assets/blender/knight_tripo/convert_tripo_knight.py. Pivots are the Mixamo joints it
+    # recorded on the scene (scene["knight_joints"], scene["knight_fist"]), in its own units.
     "knight": {
+        "scene": "Knight • Tripo",
+        "collections": ["KN • Body", "KN • Weapon"],
+        "height": 1.9,
+        "model_height": 0.9786,             # top of the hair
+        "classify": classify_knight_tripo,
+        "parent": {"torso": "root", "head": "torso", "armL": "torso", "armR": "torso",
+                   "cape": "torso", "weapon": "armL", "weapon_katana": "armL", "legL": "root", "legR": "root"},
+        "pivot": {
+            "root": (0, 0, 0),
+            "torso": (0, -0.05, 0.53),                          # hips
+            "head": (0, -0.0325, 0.789),                        # neck
+            "armL": (-0.1013, -0.0363, 0.7474), "armR": (0.1051, -0.0363, 0.7474),
+            "cape": (0, 0.06, 0.78),                            # across the back of the collar
+            "weapon": (-0.1118, -0.2044, 0.5945), "weapon_katana": (-0.1118, -0.2044, 0.5945),
+            "legL": (-0.0554, -0.0478, 0.5065), "legR": (0.0593, -0.0478, 0.5065),
+        },
+    },
+    # The previous, hand-built Knight. Kept so its source still rebuilds, under its own key.
+    "knightClassic": {
         "scene": "RO Knight | Studio",
         "height": 1.9,                      # game units, feet at 0
         "model_height": 3.75,               # Blender units, top of hair

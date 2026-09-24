@@ -11,7 +11,9 @@ import { auraTick } from './aura.js';
 import { loadGearAssets, createHatSlot, weaponNode } from './gear.js';
 import { ITEMS } from '../sim/data/items.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
+import { PLAYER } from '../config.js';
 
 // Emissive tint per buff. Gold for the Knight's Quicken, a cold wind-green for Wind Walk.
 // Only Quicken tints the body. Wind Walk is drawn as dust and gusts at the feet (fx.js), which
@@ -90,6 +92,20 @@ const KNIGHT = {
     ],
   },
   run: { bowlingBash: [0.1, 0.65, 26] }, // overlay a sprint on the legs: [from, until, phase rate]
+  // The skinned Knight (tools/export_skinned_hero.py): which Mixamo clip plays each thing he
+  // does. An attack's clip is cut to [strike - pre, strike + post] seconds and time-warped so
+  // its fastest frame lands on the attack's first hit; everything not listed stays on the
+  // procedural clips above, driven onto the same bones.
+  skinned: {
+    walk: { clip: 'walk', stride: 1.8, keep: 'swordArm' },   // game units per cycle
+    air: { clip: 'jump' },
+    dead: { clip: 'dead' },                                   // plays once and holds the last frame
+    attacks: {
+      slash1: { clip: 'slash1', pre: 0.45, post: 0.5 },
+      slash2: { clip: 'slash2', pre: 0.4, post: 0.45 },
+      slash3: { clip: 'slash3', pre: 0.5, post: 0.6 },
+    },
+  },
 };
 
 const HUNTER = {
@@ -164,8 +180,114 @@ export async function loadHeroAssets(base = 'assets/heroes/') {
     fetch(base + 'meta.json').then((r) => r.json()),
     loadGearAssets(),
   ]);
+  for (const [key, gltf] of [['knight', knight], ['hunter', hunter]]) if (meta?.[key]?.skinned) prepareSkin(key, gltf, meta[key]);
   for (const [key, scene] of [['knight', knight.scene], ['hunter', hunter.scene]]) mountWeapons(scene, key, gear);
   return { knight: knight.scene, hunter: hunter.scene, meta, gear };
+}
+
+// A hero model's own copy. A skinned mesh cannot be cloned like the rigid ones: a plain
+// clone keeps pointing at the original's bones, and the copy would dance with the live hero.
+export function cloneHero(model) {
+  return model.userData.skinHero ? cloneSkinned(model) : model.clone();
+}
+
+// ------------------------------------------------------------------ skinned heroes
+//
+// A hero exported with its skeleton (tools/export_skinned_hero.py) is posed two ways at once.
+// The procedural clips above still run - they are the whole move set, and the channels they
+// write (aLx, tx, lRx, cx...) are turned into bone rotations by driveSkin(): each channel
+// node's rotation is re-expressed about its bone's parent in the rest pose, which is exactly
+// how the rigid limb it replaces turned. Mixamo clips then play over that where the KNIGHT
+// def names one - the walk, the slashes, the jump - with a weight that fades in and out, so
+// a move with no clip of its own is never left without a pose.
+const MIXAMO = (n) => 'mixamorig' + n;      // GLTFLoader strips the ':' from mixamorig:Hips
+const DRIVE = { torso: 'Spine', head: 'Neck', armL: 'RightArm', armR: 'LeftArm', legL: 'RightUpLeg', legR: 'LeftUpLeg', cape: 'Cape' };
+// Bone sets a clip layer leaves alone. The walk swings both arms; the Knight's sword arm
+// stays on its stance so the blade is carried upright rather than waved at the floor.
+const KEEP = {
+  swordArm: (name) => /^mixamorigRight(Shoulder|Arm|ForeArm|Hand)/.test(name),
+};
+const SKIN = {};
+
+function prepareSkin(heroKey, gltf, meta) {
+  const root = gltf.scene;
+  root.userData.skinHero = heroKey;
+  root.updateMatrixWorld(true);
+  const rest = new Map();
+  root.traverse((o) => { if (o.isBone) rest.set(o.name, { q: o.quaternion.clone(), p: o.position.clone() }); });
+  const drive = [];
+  for (const [key, bone] of Object.entries(DRIVE)) {
+    const b = root.getObjectByName(MIXAMO(bone));
+    if (!b) continue;
+    const P0 = b.parent.getWorldQuaternion(new THREE.Quaternion());
+    drive.push({ key, name: b.name, P0, P0inv: P0.clone().invert(), L0: b.quaternion.clone(), scale: b.parent.getWorldScale(new THREE.Vector3()).x });
+  }
+  const clips = {};
+  for (const c of gltf.animations) {
+    const bones = new Set(c.tracks.map((t) => t.name.split('.')[0]));
+    clips[c.name] = { clip: c, bones, info: meta.clips?.[c.name] || { dur: c.duration, strike: c.duration / 2 } };
+  }
+  SKIN[heroKey] = { rest, drive, clips };
+}
+
+function skinBones(root) {
+  const bones = new Map();
+  root.traverse((o) => { if (o.isBone) bones.set(o.name, o); });
+  return bones;
+}
+
+const Q = new THREE.Quaternion(), V = new THREE.Vector3();
+// Channels -> bones. The rig's torso/armL/... are stand-in nodes that applyPose writes as it
+// always has; this is the one place those rotations reach the skeleton.
+function driveSkin(rig) {
+  const S = SKIN[rig.skinHero];
+  for (const [name, b] of rig.bones) { const r = S.rest.get(name); if (r) { b.quaternion.copy(r.q); b.position.copy(r.p); } }
+  for (const d of S.drive) {
+    const b = rig.bones.get(d.name), node = rig[d.key];
+    if (!b || !node) continue;
+    b.quaternion.copy(Q.copy(d.P0inv).multiply(node.quaternion).multiply(d.P0)).multiply(d.L0);
+    if (node.position.y) b.position.add(V.set(0, node.position.y, 0).applyQuaternion(d.P0inv).divideScalar(d.scale));
+  }
+}
+
+// Mixamo layers over the driven pose. Each layer is { name, time, w }; a layer samples its
+// clip through the mixer onto the bones, and the result is blended into what is already
+// there by its weight - so a fading layer hands over to the next one, or back to the
+// procedural pose, without a pop.
+function layerSkin(rig, layers) {
+  if (!layers.length) return;
+  const S = SKIN[rig.skinHero];
+  const acc = rig.skinAcc;
+  for (const [name, b] of rig.bones) { const a = acc.get(name); a.q.copy(b.quaternion); a.p.copy(b.position); }
+  for (const L of layers) {
+    const C = S.clips[L.name];
+    if (!C || L.w <= 0.001) continue;
+    const action = rig.mixer.clipAction(C.clip);
+    for (const a of rig.mixer._actions) a.enabled = a === action;
+    action.play(); action.paused = true; action.time = L.time; action.weight = 1;
+    rig.mixer.update(0);
+    const keep = L.keep ? KEEP[L.keep] : null;
+    for (const [name, b] of rig.bones) {
+      const a = acc.get(name);
+      if (C.bones.has(name) && !(keep && keep(name))) { a.q.slerp(b.quaternion, L.w); a.p.lerp(b.position, L.w); }
+    }
+  }
+  for (const [name, b] of rig.bones) { const a = acc.get(name); b.quaternion.copy(a.q); b.position.copy(a.p); }
+}
+
+// Map an attack's own clock onto its clip: the wind-up squeezed or stretched into the time
+// before the first hit, the follow-through into the rest.
+function attackClipTime(info, cfg, u, hitU) {
+  const strike = info.strike, ws = Math.max(0, strike - cfg.pre), we = Math.min(info.dur, strike + cfg.post);
+  if (u <= hitU) return ws + (strike - ws) * (hitU > 0 ? u / hitU : 1);
+  return strike + (we - strike) * Math.min(1, (u - hitU) / Math.max(1e-6, 1 - hitU));
+}
+
+function airClipTime(info, vy) {
+  const v0 = PLAYER.jumpVel;
+  const t0 = info.takeoff ?? 0, apex = info.apex ?? info.dur / 2, land = info.land ?? info.dur;
+  if (vy > 0) return t0 + (apex - t0) * THREE.MathUtils.clamp(1 - vy / v0, 0, 1);
+  return apex + (land - apex) * THREE.MathUtils.clamp(-vy / v0, 0, 1) * 0.9;
 }
 
 /**
@@ -215,7 +337,17 @@ function findRig(root) {
     const n = root.getObjectByName(name);
     if (n) rig[name] = n;
   }
+  // Where a hat goes. On a rigid hero that is the head node itself; on a skinned one the
+  // head node is an anchor riding the Head bone, and `head` below becomes a stand-in.
+  rig.hatHead = rig.head;
   rig.variants = weaponNodes(root).variants;
+  if (root.userData.skinHero && SKIN[root.userData.skinHero]) {
+    rig.skinHero = root.userData.skinHero;
+    for (const key of Object.keys(DRIVE)) { const n = new THREE.Object3D(); n.name = key; rig[key] = n; }
+    rig.bones = skinBones(root);
+    rig.skinAcc = new Map([...rig.bones.keys()].map((k) => [k, { q: new THREE.Quaternion(), p: new THREE.Vector3() }]));
+    rig.mixer = new THREE.AnimationMixer(root);
+  }
   return rig;
 }
 
@@ -227,6 +359,7 @@ export function restPose(model, heroKey) {
   for (const k of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'cape', 'weapon', 'root']) if (rig[k]) base[k] = rig[k].position.clone();
   if (model.userData.base) for (const k in model.userData.base) if (base[k]) base[k].copy(model.userData.base[k]);
   applyPose(rig, base, DEFS[heroKey].rest, {}, 0);
+  if (rig.skinHero) driveSkin(rig);
   for (const v of Object.values(rig.variants)) { v.rotation.copy(rig.weapon.rotation); v.position.copy(rig.weapon.position); }
 }
 
@@ -279,7 +412,7 @@ export function createHeroView(world, heroKey, assets) {
   }
   let shownGear = undefined;
   let shownHat = undefined;
-  const showHat = createHatSlot(rig, heroKey, assets.gear, assets.meta?.[heroKey]?.pivot?.head?.[1] ?? 0);
+  const showHat = createHatSlot({ head: rig.hatHead }, heroKey, assets.gear, assets.meta?.[heroKey]?.pivot?.head?.[1] ?? 0);
   if (!model.userData.base) {
     model.userData.base = {};
     for (const k of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'cape', 'weapon', 'root']) if (rig[k]) model.userData.base[k] = rig[k].position.clone();
@@ -306,7 +439,50 @@ export function createHeroView(world, heroKey, assets) {
     group, rig, hero: heroKey, def,
     cur: {}, target: {}, walkPhase: 0, yaw: HALF, t: 0, lastAttack: null,
     scratch: {},
+    layers: [],        // skinned heroes: the Mixamo clips playing over the driven pose
   };
+
+  // Which clip, if any, the skinned hero should be playing now, and where in it.
+  const skinCfg = rig.skinHero ? def.skinned : null;
+  function wantedLayer(p, dt) {
+    const S = SKIN[rig.skinHero];
+    if (p.state === 'attack' && p.attack) {
+      const atk = p.def.attacks[p.attack];
+      const cfg = skinCfg.attacks?.[atk.anim || p.attack];
+      const C = cfg && S.clips[cfg.clip];
+      if (!C) return null;
+      const u = Math.min(1, p.attackT / atk.dur);
+      const hitU = (atk.hits?.[0]?.at ?? atk.dur / 2) / atk.dur;
+      return { name: cfg.clip, key: 'atk:' + p.attack, time: attackClipTime(C.info, cfg, u, hitU) };
+    }
+    if (p.state === 'walk' && skinCfg.walk && S.clips[skinCfg.walk.clip]) {
+      const C = S.clips[skinCfg.walk.clip];
+      view.walkTime = ((view.walkTime ?? 0) + dt * (p.speed / skinCfg.walk.stride) * C.info.dur) % C.info.dur;
+      return { name: skinCfg.walk.clip, key: 'walk', time: view.walkTime, keep: skinCfg.walk.keep };
+    }
+    if (p.state === 'dead' && skinCfg.dead && S.clips[skinCfg.dead.clip]) {
+      const C = S.clips[skinCfg.dead.clip];
+      return { name: skinCfg.dead.clip, key: 'dead', time: Math.min(C.info.dur, view.deadT ?? 0) };
+    }
+    if (p.state === 'air' && skinCfg.air && S.clips[skinCfg.air.clip]) {
+      const C = S.clips[skinCfg.air.clip];
+      return { name: skinCfg.air.clip, key: 'air', time: airClipTime(C.info, p.vy) };
+    }
+    return null;
+  }
+  function updateLayers(p, dt) {
+    const want = wantedLayer(p, dt);
+    const top = view.layers[view.layers.length - 1];
+    if (want && (!top || top.key !== want.key)) view.layers.push({ ...want, w: 0 });
+    else if (want) { top.time = want.time; top.keep = want.keep; }
+    const k = 1 - Math.exp(-(want?.key.startsWith('atk') ? 40 : 14) * dt);
+    view.layers.forEach((L, i) => {
+      const live = want && i === view.layers.length - 1;
+      L.w += ((live ? 1 : 0) - L.w) * k;
+    });
+    // A layer that has faded out, or is fully covered by the one above it, is done.
+    view.layers = view.layers.filter((L, i, a) => L.w > 0.01 && !(i < a.length - 1 && a[a.length - 1].w > 0.99));
+  }
 
   view.update = (game, dt) => {
     const p = game.player;
@@ -355,8 +531,12 @@ export function createHeroView(world, heroKey, assets) {
       }
       if (p.state !== 'dead') view.deadT = 0;
     }
+    // The death clip falls down on its own; the procedural one tips the whole root over, and
+    // both at once would put him through the floor.
+    if (skinCfg?.dead && p.state === 'dead' && SKIN[rig.skinHero].clips[skinCfg.dead.clip]) { for (const k in target) delete target[k]; rate = 12; }
     blendTo(view.cur, target, rate, dt);
     applyPose(rig, base, def.rest, view.cur, view.yaw);
+    if (rig.skinHero) { driveSkin(rig); updateLayers(p, dt); layerSkin(rig, view.layers); }
     // The wielded weapon rides the sword's grip: same pose every frame, and only it shows.
     if (shownGear !== (p.gear?.id ?? null)) { shownGear = p.gear?.id ?? null; showWeapon(model, shownGear); }
     // The hat rides the head node and needs no per-frame work, only a swap when it changes.

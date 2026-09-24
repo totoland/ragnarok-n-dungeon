@@ -8,8 +8,18 @@ set -e
 cd "$(dirname "$0")/.."
 BLENDER=${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender}
 SRC=${SRC:-assets/blender}
-rm -f assets/heroes/meta.json
-"$BLENDER" -b "$SRC/ro_knight/ro_knight.blend" -P tools/export_heroes.py -- knight assets/heroes 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
+# No `rm meta.json` here: each hero merges its own entry, and a machine without the Knight's
+# clips keeps his.
+# The Knight is skinned: his GLB carries the Mixamo skeleton and clips (export_skinned_hero.py).
+# The animation FBXs are local-only (see .gitignore), so a clone keeps the committed GLB.
+KA=assets/blender/knight_tripo/anims
+if [ -f "$KA/Standard_Walk.fbx" ]; then
+  sh tools/export_skinned_hero.sh knight "$SRC/knight_tripo/knight_tripo_skinned.blend" \
+    walk=$KA/Standard_Walk.fbx slash1=$KA/Great_Sword_Slash_1.fbx slash2=$KA/Sword_And_Shield_Slash_2.fbx \
+    slash3=$KA/Sword_And_Shield_Slash_3.fbx jump=$KA/Jumping_Up.fbx dead=$KA/Standing_Death_Forward_02.fbx
+else
+  echo "[export_heroes] knight: Mixamo clips not on this machine - keeping the committed GLB"
+fi
 "$BLENDER" -b "$SRC/hunter_falcon/hunter_falcon.blend" -P tools/export_heroes.py -- hunter assets/heroes 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
 
 rm -f assets/monsters/meta.json

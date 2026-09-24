@@ -14,7 +14,7 @@ import { createSettingsUI } from './render/settings-ui.js';
 import { createTestUI, testEnabled, setTestEnabled } from './render/test-ui.js';
 import { createMenuNav } from './render/menu-nav.js';
 import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom, prewarmTick, warmProps, WARM_X, WARM_Z } from './render/scene.js';
-import { loadHeroAssets, createHeroView, showWeapon, restPose } from './render/heroes.js';
+import { loadHeroAssets, createHeroView, showWeapon, restPose, cloneHero } from './render/heroes.js';
 import { auraTick, stripAura } from './render/aura.js';
 import { createTelemetry } from './telemetry.js';
 import { createMonsterViews, loadMonsterAssets } from './render/monsters.js';
@@ -373,7 +373,7 @@ function buildPreview() {
     plinth.position.y = -0.125; plinth.receiveShadow = true;
     const rim = new THREE.Mesh(new THREE.TorusGeometry(1.27, 0.03, 8, 48), rimMat);
     rim.rotation.x = Math.PI / 2;
-    const model = assets[key].clone();
+    const model = cloneHero(assets[key]);
     stripAura(model);
     model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     restPose(model, key);                                          // a run may have left the shared asset mid-swing
@@ -420,7 +420,7 @@ function disposePreview() {
 // first drop do not each cost a 60-100 ms frame on Safari, which compiles lazily and slowly.
 function warmUp() {
   const t0 = performance.now();
-  const heroes = ['knight', 'hunter'].map((k, i) => { const m = assets[k].clone(); stripAura(m); m.position.set(WARM_X + i * 1.5 - 1, 0, WARM_Z); world.scene.add(m); auraTick(m, { id: 'katana', plus: 9 }, 0); return m; });
+  const heroes = ['knight', 'hunter'].map((k, i) => { const m = cloneHero(assets[k]); stripAura(m); m.position.set(WARM_X + i * 1.5 - 1, 0, WARM_Z); world.scene.add(m); auraTick(m, { id: 'katana', plus: 9 }, 0); return m; });
   const undoMonsters = monsters.warm();
   const undoProps = warmProps(world);
   fx.warm();

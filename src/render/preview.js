@@ -3,7 +3,7 @@
 // sprite, drawn once per (hero, item) and cached as a data URL. The turntable is the hero's
 // own model wielding the selected weapon, turning slowly in a box in the profile panel.
 import * as THREE from 'three';
-import { showWeapon, restPose } from './heroes.js';
+import { showWeapon, restPose, cloneHero } from './heroes.js';
 import { hatNode, createHatSlot } from './gear.js';
 import { ITEMS, auraOf } from '../sim/data/items.js';
 import { auraTick, stripAura } from './aura.js';
@@ -114,7 +114,7 @@ export function createPreview() {
     if (!assets) return;
     if (mounted && mounted.hero !== hero) unmount();
     if (!mounted) {
-      const model = assets[hero].clone();
+      const model = cloneHero(assets[hero]);
       stripAura(model);
       restPose(model, hero);
       ownMaterials(model);

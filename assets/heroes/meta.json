@@ -2,94 +2,58 @@
   "knight": {
     "height": 1.9,
     "front": "+z",
+    "skinned": true,
     "pivot": {
       "root": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "torso": [
-        0.0,
-        0.8512,
-        0.0
+        0,
+        0,
+        0
       ],
       "head": [
-        0.0,
-        1.4693,
-        0.0
-      ],
-      "armL": [
-        -0.2381,
-        1.2413,
-        -0.0
-      ],
-      "armR": [
-        0.2381,
-        1.2413,
-        -0.0
-      ],
-      "cape": [
-        0.0,
-        1.368,
-        -0.0851
+        0.0037,
+        1.5327,
+        0.0631
       ],
       "weapon": [
-        -0.4053,
-        1.0133,
-        0.2067
-      ],
-      "weapon_katana": [
-        -0.4053,
-        1.0133,
-        0.2067
-      ],
-      "legL": [
-        -0.1115,
-        0.8208,
-        0.0
-      ],
-      "legR": [
-        0.1216,
-        0.8208,
-        0.0
+        -0.2926,
+        1.0989,
+        0.4444
       ]
     },
     "parts": {
-      "legL": {
-        "meshes": 19,
-        "verts": 977
+      "weapon": {},
+      "weapon_katana": {}
+    },
+    "clips": {
+      "walk": {
+        "dur": 1.167,
+        "strike": 0.033
       },
-      "legR": {
-        "meshes": 19,
-        "verts": 977
+      "slash1": {
+        "dur": 1.267,
+        "strike": 0.567
       },
-      "torso": {
-        "meshes": 92,
-        "verts": 3706
+      "slash2": {
+        "dur": 3.533,
+        "strike": 0.7,
+        "takeoff": 1.767,
+        "apex": 2.1,
+        "land": 2.367
       },
-      "head": {
-        "meshes": 59,
-        "verts": 5083
+      "slash3": {
+        "dur": 1.5,
+        "strike": 0.6
       },
-      "armR": {
-        "meshes": 25,
-        "verts": 1231
+      "jump": {
+        "dur": 0.833,
+        "strike": 0.433,
+        "takeoff": 0.533,
+        "apex": 0.767,
+        "land": 0.833
       },
-      "armL": {
-        "meshes": 43,
-        "verts": 3087
-      },
-      "cape": {
-        "meshes": 4,
-        "verts": 5082
-      },
-      "weapon": {
-        "meshes": 21,
-        "verts": 3026
-      },
-      "weapon_katana": {
-        "meshes": 26,
-        "verts": 885
+      "dead": {
+        "dur": 2.367,
+        "strike": 1.6
       }
     }
   },
