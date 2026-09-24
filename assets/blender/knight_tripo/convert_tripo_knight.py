@@ -32,7 +32,10 @@ from mathutils import Vector, Matrix
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
 SRC = os.path.join(HERE, "fantasy_knight_rigged.glb")
-OLD = os.path.join(REPO, "assets", "heroes", "knight.glb")   # the previous Knight: weapons only
+# The hand-built Knight's GLB (git 115159a), kept here for its Sword and Katana. NOT
+# assets/heroes/knight.glb: that is this script's own output once exported, and reading the
+# blades back out of a skinned hand bakes the hand's turn and scale into them.
+OLD = os.path.join(HERE, "classic_knight_weapons.glb")
 OUT = os.path.join(HERE, "knight_tripo.blend")
 DEBUG = "--debug" in sys.argv                                 # also render a label preview
 # --skinned keeps the rig: one mesh on the Mixamo skeleton, saved as knight_skinned.blend for
