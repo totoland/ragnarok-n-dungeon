@@ -224,28 +224,57 @@ def aim(name, direction):
     bone.matrix = world.inverted() @ new
     bpy.context.view_layer.update()
 
-def curl(prefix, angle, thumb=0.5):
-    for bone in pb:
-        n = bone.name.replace("mixamorig:", "")
-        if n.startswith(prefix) and not n.endswith("4"):
-            a = angle * (thumb if "Thumb" in n else 1)
-            bone.rotation_mode = "XYZ"
-            bone.rotation_euler = (a, 0, 0)
+def H(n):
+    return world @ pb["mixamorig:" + n].head
+
+def turn_bone(name, axis, angle):
+    """Rotate a bone about a world axis through its own head."""
+    bone = pb["mixamorig:" + name]
+    m = world @ bone.matrix
+    r = Matrix.Rotation(angle, 4, Vector(axis).normalized())
+    bone.matrix = world.inverted() @ (Matrix.Translation(m.translation) @ r @ Matrix.Translation(-m.translation) @ m)
     bpy.context.view_layer.update()
+
+def fist_up(side):
+    """Roll the hand about its own length until the knuckles stand vertical, index on top -
+    the only way a fist holds a grip that points straight up."""
+    f = (world @ pb[f"mixamorig:{side}Hand"].matrix).to_3x3().col[1].normalized()
+    k = H(f"{side}HandIndex1") - H(f"{side}HandPinky1")
+    k_flat = (k - f * k.dot(f)).normalized()
+    up = Vector((0, 0, 1)); up = (up - f * up.dot(f)).normalized()
+    ang = k_flat.angle(up)
+    if k_flat.cross(up).dot(f) < 0:
+        ang = -ang
+    turn_bone(f"{side}Hand", f, ang)
+
+def make_fist(side, joints, thumb):
+    """Close the fingers towards the palm, joint by joint. The palm is found from the knuckle
+    line and the hand's length, mirrored for the left hand."""
+    f = (world @ pb[f"mixamorig:{side}Hand"].matrix).to_3x3().col[1].normalized()
+    k = (H(f"{side}HandIndex1") - H(f"{side}HandPinky1")).normalized()
+    palm = (k.cross(f) if side == "Right" else f.cross(k)).normalized()
+    axis = f.cross(palm)
+    for finger in ("Index", "Middle", "Ring", "Pinky"):
+        for j, deg in zip((1, 2, 3), joints):
+            turn_bone(f"{side}Hand{finger}{j}", axis, math.radians(deg))
+    for j, deg in zip((1, 2, 3), thumb):
+        turn_bone(f"{side}HandThumb{j}", axis, math.radians(deg))
 
 # Sword arm (the model's right, -X): upper arm down at the side, forearm out front, fist at
 # the hip - where the old Knight held his grip, so the clips land the blade where they did.
 aim("RightArm", (-0.28, -0.12, -1.0))
 aim("RightForeArm", (-0.08, -1.0, -0.30))
 aim("RightHand", (-0.05, -1.0, -0.25))
-#curl("RightHand", math.radians(75))
+fist_up("Right")
+make_fist("Right", (75, 95, 70), thumb=(20, 45, 40))
 # Free arm: relaxed, a little forward.
 aim("LeftArm", (0.26, -0.02, -1.0))
 aim("LeftForeArm", (0.16, -0.30, -1.0))
 aim("LeftHand", (0.10, -0.30, -1.0))
-#curl("LeftHand", math.radians(35))
+make_fist("Left", (25, 30, 20), thumb=(0, 10, 10))           # relaxed, half closed
 
-fist = world @ pb["mixamorig:RightHand"].matrix @ Vector((0, 0.045, 0))   # the middle of the grip
+# The middle of the grip: the hollow the curled middle finger rings.
+fist = sum((H(f"RightHandMiddle{j}") for j in (1, 2, 3, 4)), Vector()) / 4
 
 dg = bpy.context.evaluated_depsgraph_get()
 posed = bpy.data.meshes.new_from_object(body.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg)

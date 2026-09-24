@@ -98,6 +98,7 @@ const KNIGHT = {
   // procedural clips above, driven onto the same bones.
   skinned: {
     walk: { clip: 'walk', stride: 1.8, keep: 'swordArm' },   // game units per cycle
+    idle: { clip: 'idle', keep: 'swordArm' },                 // an unarmed idle: the sword arm keeps its stance
     air: { clip: 'jump' },
     dead: { clip: 'dead' },                                   // plays once and holds the last frame
     attacks: {
@@ -215,6 +216,10 @@ function prepareSkin(heroKey, gltf, meta) {
   root.updateMatrixWorld(true);
   const rest = new Map();
   root.traverse((o) => { if (o.isBone) rest.set(o.name, { q: o.quaternion.clone(), p: o.position.clone() }); });
+  // A skinned mesh is culled by a bounding sphere taken once, in whatever pose it was first
+  // seen in - so a lunge or a fall can carry the body out of it and blink it away. One hero is
+  // cheap enough to always draw.
+  root.traverse((o) => { if (o.isSkinnedMesh) o.frustumCulled = false; });
   const drive = [];
   for (const [key, bone] of Object.entries(DRIVE)) {
     const b = root.getObjectByName(MIXAMO(bone));
@@ -463,6 +468,11 @@ export function createHeroView(world, heroKey, assets) {
     if (p.state === 'dead' && skinCfg.dead && S.clips[skinCfg.dead.clip]) {
       const C = S.clips[skinCfg.dead.clip];
       return { name: skinCfg.dead.clip, key: 'dead', time: Math.min(C.info.dur, view.deadT ?? 0) };
+    }
+    if (p.state === 'idle' && skinCfg.idle && S.clips[skinCfg.idle.clip]) {
+      const C = S.clips[skinCfg.idle.clip];
+      view.idleTime = ((view.idleTime ?? 0) + dt) % C.info.dur;
+      return { name: skinCfg.idle.clip, key: 'idle', time: view.idleTime, keep: skinCfg.idle.keep };
     }
     if (p.state === 'air' && skinCfg.air && S.clips[skinCfg.air.clip]) {
       const C = S.clips[skinCfg.air.clip];

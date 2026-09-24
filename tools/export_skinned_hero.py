@@ -33,6 +33,9 @@ from mathutils import Matrix, Vector
 
 M = "mixamorig:"
 HEIGHT = {"knight": 1.9}          # game units, as the rigid recipes had them
+# Every weapon was fitted to the old, chunky Knight; on this slimmer one at the same height the
+# blade reads a size too big. The grip carries the shrink, so a mounted weapon gets it too.
+WEAPON_SCALE = {"knight": 0.8}
 
 
 def rot3(m):
@@ -163,7 +166,8 @@ def main():
     # rigid heroes. So the anchors go back to scale 1 in the world, and so do their blades.
     for o in bpy.data.objects:
         if o.parent is target and o.parent_type == "BONE":
-            o.matrix_world = Matrix.Translation(o.matrix_world.translation)
+            k = WEAPON_SCALE.get(hero, 1) if o.name == "grip" else 1
+            o.matrix_world = Matrix.Translation(o.matrix_world.translation) @ Matrix.Scale(k, 4)
     bpy.context.view_layer.update()
     for o in bpy.data.objects:
         if o.parent is not None and o.parent.parent is target and o.parent.parent_type == "BONE":

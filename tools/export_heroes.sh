@@ -16,7 +16,8 @@ KA=assets/blender/knight_tripo/anims
 if [ -f "$KA/Standard_Walk.fbx" ]; then
   sh tools/export_skinned_hero.sh knight "$SRC/knight_tripo/knight_tripo_skinned.blend" \
     walk=$KA/Standard_Walk.fbx slash1=$KA/Great_Sword_Slash_1.fbx slash2=$KA/Sword_And_Shield_Slash_2.fbx \
-    slash3=$KA/Sword_And_Shield_Slash_3.fbx jump=$KA/Jumping_Up.fbx dead=$KA/Standing_Death_Forward_02.fbx
+    slash3=$KA/Sword_And_Shield_Slash_3.fbx jump=$KA/Jumping_Up.fbx dead=$KA/Standing_Death_Forward_02.fbx \
+    idle=$KA/Unarmed_Idle_Looking_Ver_2.fbx
 else
   echo "[export_heroes] knight: Mixamo clips not on this machine - keeping the committed GLB"
 fi
