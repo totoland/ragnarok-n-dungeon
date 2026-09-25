@@ -24,6 +24,7 @@ const STYLE = `
 #studio { position: fixed; top: 8px; right: 8px; bottom: 8px; width: 300px; z-index: 50;
   background: rgba(14, 12, 20, 0.88); color: #eee; border: 1px solid #5a4a2a; border-radius: 10px;
   font: 12px/1.35 system-ui, sans-serif; display: flex; flex-direction: column; }
+#studio[hidden] { display: none; }   /* display:flex above would otherwise beat the hidden attribute */
 #studio header { display: flex; align-items: center; padding: 8px 10px; border-bottom: 1px solid #3a3040; }
 #studio header h2 { font-size: 14px; margin: 0; flex: 1; color: #e8b64a; }
 #studio .body { overflow-y: auto; padding: 6px 10px 12px; }
