@@ -120,6 +120,12 @@ export function createTestUI(host) {
     run.appendChild(el('p', 'hint', 'Start drops you straight into the chosen room, unlocked or not.'));
     body.appendChild(run);
 
+    // ---- studio: one hero, one monster, every move and effect on a button (render/studio.js)
+    const st = group('Studio');
+    st.appendChild(row('', action('Open studio', () => { root.hidden = true; host.studio(); })));
+    st.appendChild(el('p', 'hint', 'A stage to look at moves and effects one at a time, with slow motion. Also ?studio=1.'));
+    body.appendChild(st);
+
     // ---- hero: class, level, skill points spent
     const who = group('Hero');
     who.appendChild(row('Class',

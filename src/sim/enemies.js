@@ -162,6 +162,13 @@ function think(g, e, dt) {
   const def = e.def;
   e.cd -= dt;
   e.moving = false;
+  // The studio (render/studio.js) holds its monster where it was put: it faces the hero and
+  // does only what the panel tells it to. Unset in every ordinary run.
+  if (g.cheats?.hold) {
+    e.facing = sign(g.player.x - e.x);
+    if (e.walkDemo) { e.moving = true; e.hopT = (e.hopT + dt * 1.6) % 1; }
+    return;
+  }
   switch (def.ai) {
     case 'hopper':
     case 'walker': {

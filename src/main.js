@@ -12,6 +12,7 @@ import { createInput, attachTouch } from './input.js';
 import { loadSettings, lookup, hintLine } from './settings.js';
 import { createSettingsUI } from './render/settings-ui.js';
 import { createTestUI, testEnabled, setTestEnabled } from './render/test-ui.js';
+import { createStudio } from './render/studio.js';
 import { createMenuNav } from './render/menu-nav.js';
 import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom, prewarmTick, warmProps, WARM_X, WARM_Z } from './render/scene.js';
 import { loadHeroAssets, createHeroView, showWeapon, restPose, cloneHero } from './render/heroes.js';
@@ -111,7 +112,28 @@ const testUI = testEnabled() ? createTestUI({
     saveProfile(profile);
   },
   start() { testTown = selectedTown; soak = false; start(); },
+  studio() { openStudio(); },
 }) : null;
+
+// The studio (render/studio.js): one hero, one monster, every move and effect on a button.
+// A run in a room with no waves; `studioOn` keeps it out of the profile and off the end screen.
+let studioOn = false;
+const studio = createStudio({
+  game: () => game,
+  exit() { studio.close(); toTitle(); },
+  rebuild() { openStudio(); },
+  step() { if (game) { simUpdate(game, input.snapshot(), SIM.dt); renderFrame(SIM.dt); } },
+});
+function openStudio() {
+  if (!assets) { pendingStudio = true; return; }
+  studioOn = true;
+  selectedHero = studio.spec.hero;
+  soak = false;
+  testUI?.close();
+  start();
+  studio.open();
+}
+let pendingStudio = testEnabled() && new URLSearchParams(location.search).has('studio');
 if (testUI) document.getElementById('title-test').hidden = false;
 document.getElementById('title-test')?.addEventListener('click', () => testUI?.open());
 
@@ -447,6 +469,7 @@ Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
   markTown();
   markSelected();
   preview = buildPreview();
+  if (pendingStudio) { pendingStudio = false; openStudio(); }
 }).catch((err) => {
   hud.setLoading(`Failed to load heroes: ${err.message}`);
   console.error(err);
@@ -473,12 +496,13 @@ function start() {
   // and spent skill points the loadout, the clear count whether the boss's drop is certain.
   const me = heroOf(profile, selectedHero);
   game = createGame({
-    hero: selectedHero, seed: (Date.now() % 100000) | 0, dungeon: soak ? SOAK : (TOWNS[selectedTown] || TOWNS.prontera),
+    hero: selectedHero, seed: (Date.now() % 100000) | 0, dungeon: studioOn ? studio.dungeon() : soak ? SOAK : (TOWNS[selectedTown] || TOWNS.prontera),
     tier: pickedTier(), xp: me.xp, gear: me.gear, wear: me.wear, skills: { ...me.skills }, branches: { ...me.branches },
     drop: dropFor(profile, selectedHero, selectedTown),
   });
   if (testTown) { testTown = null; if (testRoom > 0) loadRoom(game, Math.min(testRoom, game.dungeon.rooms.length - 1)); }
-  if (!soak) { profile.last = { hero: selectedHero, town: selectedTown }; saveProfile(profile); }
+  if (studioOn) studio.setup(game);
+  else if (!soak) { profile.last = { hero: selectedHero, town: selectedTown }; saveProfile(profile); }
   if (soak) {
     prewarmRoom(world, SOAK.rooms[0], 0);
     while (prewarmTick(world));
@@ -506,6 +530,7 @@ function start() {
 function toTitle() {
   if (!game) return;
   soak = false;
+  if (studioOn) { studioOn = false; studio.close(); }
   if (heroView) { heroView.dispose(); heroView = null; }
   monsters.clear();
   fx.clear();
@@ -581,7 +606,7 @@ function frame(now) {
     // hit-stop: freeze the sim for a few ms after a solid hit, the belt-scroller crunch
     if (hitstop > 0) hitstop -= dtReal;
     else {
-      acc += dtReal;
+      acc += dtReal * (studioOn ? studio.timeScale : 1);
       let steps = 0;
       const simStart = performance.now();
       while (acc >= SIM.dt && steps < 5) {
@@ -624,7 +649,7 @@ function frame(now) {
     }
   }
 
-  renderFrame(paused ? 0 : dtReal + pendingDt);
+  renderFrame(paused ? 0 : (dtReal + pendingDt) * (studioOn ? studio.timeScale : 1));
   pendingDt = 0;
   const drawStart = performance.now();
   world.renderer.render(world.scene, world.camera);
@@ -774,7 +799,7 @@ function renderFrame(dt) {
   monsters.update(game, dt);        phase.monsters = performance.now() - t; t = performance.now();
   updateScene(world, game, dt);     phase.scene = performance.now() - t; t = performance.now();
   hud.update(game, dt);             phase.hud = performance.now() - t;
-  if (!ended && (game.phase === 'won' || game.phase === 'dead')) {
+  if (!ended && !studioOn && (game.phase === 'won' || game.phase === 'dead')) {
     ended = true;
     // Bank the run the moment it ends, not when the overlay shows: a tab closed during the
     // victory beat still keeps its xp and its clear.

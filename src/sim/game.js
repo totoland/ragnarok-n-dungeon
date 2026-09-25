@@ -220,7 +220,10 @@ function rollPassive(g, e, attackId, killed) {
 // Weapons that cast a hero skill: [the rate on the player, the attack it fires, its tag].
 const SKILL_PROCS = [['magnum', 'magnumBreak', 'autoMagnum'], ['shower', 'arrowShower', 'autoShower']];
 
-const BOLT_R = { x: 2.6, z: 1.6 };
+// Cold Bolt's reach about the hero. Widened from 2.6 x 1.6 when the wedges were made smaller
+// and thrown further out (Toto) - the box has to cover where they are SEEN to land, or a shard
+// falls on a monster that takes nothing.
+const BOLT_R = { x: 3.8, z: 2.0 };
 const FREEZE_SECS = 1.2;
 
 const PROC_FREE = new Set(['autoBlitz', 'autoMeteor', 'autoBolt', 'doubleAttack', 'autoMagnum', 'autoShower']);

@@ -257,7 +257,7 @@ export function createFx(world) {
 
   // Cold Bolt's wedges. One geometry and one material between all of them, like the arrow:
   // a shard per icicle would hand the driver a new program on the frame the spell lands.
-  const icicleGeo = new THREE.ConeGeometry(0.15, 0.85, 5);
+  const icicleGeo = new THREE.ConeGeometry(0.085, 0.48, 5);   // slimmer since 2026-09-25: many small, not a few big
   const icicleMat = new THREE.MeshStandardMaterial({
     color: 0x8fd4ef, roughness: 0.2, metalness: 0.05,
     emissive: 0x1f5e80, emissiveIntensity: 0.7, transparent: true, opacity: 0.88,
@@ -323,11 +323,13 @@ export function createFx(world) {
   // ---- ice shower: the same falling-and-sticking machinery the arrows use, in a ring
   // around the hero rather than a fan in front of him.
   function iceShower(x, z) {
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * Math.PI * 2 + Math.random() * 0.5;
-      const r = 0.6 + Math.random() * 1.9;
+    // Fourteen small wedges thrown out to the edge of the sim's reach (BOLT_R, 3.8 x 2.0),
+    // rather than nine large ones close in.
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + Math.random() * 0.4;
+      const r = 0.8 + Math.random() * 3.0;
       const m = makeIcicle();
-      m.position.set(x + Math.cos(a) * r, 4.6 + Math.random() * 1.6, z + Math.sin(a) * r * 0.55);
+      m.position.set(x + Math.cos(a) * r, 4.6 + Math.random() * 1.6, z + Math.sin(a) * r * 0.5);
       m.rotation.z = (Math.random() - 0.5) * 0.35;
       scene.add(m);
       // Fast enough to be on the ground about when the spell resolves - the sim gives them
@@ -443,11 +445,11 @@ export function createFx(world) {
         // and this is that 0.28 s made visible. Beams read as a thing arriving from nowhere;
         // real shards falling read as a thing that was already on its way.
         iceShower(ev.x, ev.z);
-        ring(ev.x, ev.z, { color: 0x50c0ff, radius: 2.6, life: 0.3, y: 0.04 });
+        ring(ev.x, ev.z, { color: 0x50c0ff, radius: 3.8, life: 0.3, y: 0.04 });
         break;
       case 'coldBolt': {
         // and the ground answers when they land
-        ring(ev.x, ev.z, { color: 0xd8f4ff, radius: 2.4, life: 0.3, y: 0.06 });
+        ring(ev.x, ev.z, { color: 0xd8f4ff, radius: 3.6, life: 0.3, y: 0.06 });
         burst(ev.x, 0.3, ev.z, 10, { color: 0xffffff, speed: 2.4, up: 1.8, life: 0.3, size: 0.16 });
         flashLight.position.set(ev.x, 1.2, ev.z); flashLight.intensity = 13;
         addShake(world, 0.16);
