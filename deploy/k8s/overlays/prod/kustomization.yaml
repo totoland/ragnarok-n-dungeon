@@ -21,4 +21,4 @@ patches:
 # Pinned by `deploy.sh prod` to an immutable commit-sha tag, so a rollback is a one-line revert.
 images:
   - name: ghcr.io/totoland/ragnarok-n-dungeon
-    newTag: sha-3adfeb23c159
+    newTag: sha-75e299fd29b8
