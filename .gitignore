@@ -27,6 +27,13 @@ ios/local.xcconfig
 # re-export does. (Toto's call, option B.)
 assets/blender/dwarf_warrior_game_source.blend
 
-# Mixamo animation downloads for the skinned Knight: ~9 MB each, and they are Mixamo's files
-# rather than ours to republish. Baked into assets/heroes/knight.glb, which IS committed.
-assets/blender/knight_tripo/anims/
+# Mixamo animation downloads: ~9 MB each, and they are Mixamo's files rather than ours to
+# republish. One shared library for every skinned character; what is in it, and who uses what,
+# is in assets/blender/mixamo/README.md, which IS committed - and so are the GLBs they bake into.
+assets/blender/mixamo/*.fbx
+
+# Tripo's rigged source GLBs for the bosses: textured (Moonraya's is 9 MB at 2k) and only
+# needed to re-run tools/tripo_to_skinned.py. The _skinned.blend each converts into, and the
+# GLB the game loads, ARE committed. Kept local like King Orc's sculpt.
+assets/blender/moonraya_tripo/moonraya_rigged.glb
+assets/blender/baphomet_tripo/baphomet_rigged.glb

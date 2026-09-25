@@ -32,7 +32,9 @@ import bpy
 from mathutils import Matrix, Vector
 
 M = "mixamorig:"
-HEIGHT = {"knight": 1.9}          # game units, as the rigid recipes had them
+HEIGHT = {"knight": 1.9, "moonraya": 2.7, "baphomet": 3.0}   # game units, as the rigid recipes had them
+# Where each one's GLB and meta entry go: heroes and monsters are loaded from separate folders.
+OUT_DIR = {"knight": "heroes", "moonraya": "monsters", "baphomet": "monsters"}
 # Every weapon was fitted to the old, chunky Knight; on this slimmer one at the same height the
 # blade reads a size too big. The grip carries the shrink, so a mounted weapon gets it too.
 WEAPON_SCALE = {"knight": 0.8}
@@ -183,7 +185,7 @@ def main():
     for o in bpy.data.objects:
         o.select_set(o is target or o.parent is not None)
     bpy.context.view_layer.objects.active = target
-    out = os.path.join("assets", "heroes", f"{hero}.glb")
+    out = os.path.join("assets", OUT_DIR[hero], f"{hero}.glb")
     bpy.ops.export_scene.gltf(
         filepath=out, export_format="GLB", use_selection=True, export_yup=True,
         export_skins=True, export_animations=True, export_animation_mode="NLA_TRACKS",
@@ -195,11 +197,13 @@ def main():
     def yup(v):
         return [round(v[0] * s, 4), round(v[2] * s, 4), round(-v[1] * s, 4)]
 
-    meta_path = os.path.join("assets", "heroes", "meta.json")
+    meta_path = os.path.join("assets", OUT_DIR[hero], "meta.json")
     meta = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
     meta[hero] = {
         "height": HEIGHT[hero], "front": "+z", "skinned": True,
-        "pivot": {"root": [0, 0, 0], "head": yup(scene["knight_neck"]), "weapon": yup(scene["knight_fist"])},
+        "pivot": {"root": [0, 0, 0],
+                  **({"head": yup(scene["knight_neck"])} if "knight_neck" in scene else {}),
+                  **({"weapon": yup(scene["knight_fist"])} if "knight_fist" in scene else {})},
         # The nodes riding the skeleton, by name - tools/items_doc.mjs reads a baked weapon
         # variant (weapon_katana) off this list.
         "parts": {o.name: {} for o in bpy.data.objects

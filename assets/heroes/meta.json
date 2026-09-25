@@ -58,6 +58,14 @@
       "idle": {
         "dur": 7.833,
         "strike": 4.533
+      },
+      "powerup": {
+        "dur": 2.367,
+        "strike": 0.5
+      },
+      "hurt": {
+        "dur": 0.767,
+        "strike": 0.1
       }
     }
   },

@@ -2,152 +2,94 @@
   "baphomet": {
     "height": 3.0,
     "front": "+z",
+    "skinned": true,
     "pivot": {
       "root": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "torso": [
-        0.0,
-        1.2766,
-        0.0
-      ],
-      "head": [
-        0.0,
-        1.9574,
-        0.0
-      ],
-      "armL": [
-        -0.2128,
-        1.8723,
-        0.0
-      ],
-      "armR": [
-        0.1957,
-        1.8638,
-        0.0
-      ],
-      "weapon": [
-        -0.6809,
-        1.6255,
-        0.0
-      ],
-      "legL": [
-        -0.1532,
-        1.2979,
-        0.0
-      ],
-      "legR": [
-        0.1532,
-        1.2979,
-        0.0
+        0,
+        0,
+        0
       ]
     },
-    "parts": {
-      "torso": {
-        "meshes": 58,
-        "verts": 18690
+    "parts": {},
+    "clips": {
+      "walk": {
+        "dur": 1.167,
+        "strike": 0.033
       },
-      "legL": {
-        "meshes": 31,
-        "verts": 1933
+      "idle": {
+        "dur": 7.833,
+        "strike": 4.533
       },
-      "legR": {
-        "meshes": 31,
-        "verts": 1933
+      "dead": {
+        "dur": 2.367,
+        "strike": 1.6
       },
-      "armL": {
-        "meshes": 12,
-        "verts": 1078
+      "cast": {
+        "dur": 2.7,
+        "strike": 1.133
       },
-      "armR": {
-        "meshes": 13,
-        "verts": 1086
+      "run": {
+        "dur": 0.733,
+        "strike": 0.733
       },
-      "head": {
-        "meshes": 38,
-        "verts": 23734
+      "slash1": {
+        "dur": 1.267,
+        "strike": 0.567
       },
-      "weapon": {
-        "meshes": 26,
-        "verts": 4418
+      "slash3": {
+        "dur": 1.5,
+        "strike": 0.6
+      },
+      "powerup": {
+        "dur": 2.367,
+        "strike": 0.5
+      },
+      "hurt": {
+        "dur": 0.767,
+        "strike": 0.1
       }
     }
   },
   "moonraya": {
     "height": 2.7,
     "front": "+z",
+    "skinned": true,
     "pivot": {
       "root": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "torso": [
-        0.0,
-        1.2295,
-        0.0
-      ],
-      "head": [
-        0.0,
-        1.7839,
-        0.0
-      ],
-      "armL": [
-        -0.1591,
-        1.7261,
-        0.0964
-      ],
-      "armR": [
-        0.1446,
-        1.7116,
-        0.0964
-      ],
-      "weapon": [
-        -0.54,
-        1.4416,
-        0.352
-      ],
-      "legL": [
-        -0.1061,
-        1.2198,
-        0.0
-      ],
-      "legR": [
-        0.1061,
-        1.2198,
-        0.0
+        0,
+        0,
+        0
       ]
     },
-    "parts": {
-      "torso": {
-        "meshes": 49,
-        "verts": 19673
+    "parts": {},
+    "clips": {
+      "walk": {
+        "dur": 1.167,
+        "strike": 0.033
       },
-      "legL": {
-        "meshes": 8,
-        "verts": 1467
+      "idle": {
+        "dur": 7.833,
+        "strike": 1.8
       },
-      "armL": {
-        "meshes": 10,
-        "verts": 3168
+      "dead": {
+        "dur": 2.367,
+        "strike": 1.6
       },
-      "legR": {
-        "meshes": 8,
-        "verts": 1467
+      "cast": {
+        "dur": 2.7,
+        "strike": 1.133
       },
-      "armR": {
-        "meshes": 19,
-        "verts": 4894
+      "run": {
+        "dur": 0.733,
+        "strike": 0.733
       },
-      "head": {
-        "meshes": 50,
-        "verts": 9783
+      "powerup": {
+        "dur": 2.367,
+        "strike": 0.5
       },
-      "weapon": {
-        "meshes": 10,
-        "verts": 1768
+      "hurt": {
+        "dur": 0.767,
+        "strike": 0.1
       }
     }
   },

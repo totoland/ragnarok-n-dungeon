@@ -349,7 +349,7 @@ export function createFx(world) {
           setTimeout(() => { ring(ev.x, ev.z, { color: 0xff7020, radius: 3.2, life: 0.5 }); ring(ev.x, ev.z, { color: 0xffd040, radius: 2.2, life: 0.35, y: 0.1 }); burst(ev.x, 0.6, ev.z, 90, { color: 0xff8020, speed: 7, up: 5, life: 0.7, size: 0.5, gravity: 4 }); burst(ev.x, 0.4, ev.z, 40, { color: 0xffe080, speed: 4, up: 7, life: 0.6, size: 0.35 }); flashLight.position.set(ev.x, 1.5, ev.z); flashLight.intensity = 30; addShake(world, 0.7); }, 280);
         } else if (id === 'quicken') {
           // The cast: a gold ring rushes out and sparks climb the blade. The aura that
-          // follows is drawn every frame below, off the player's buff state.
+          // follows - at his feet, not on his body - is drawn every frame below.
           ring(ev.x, ev.z, { color: 0xffc040, radius: 1.8, life: 0.4 });
           burst(ev.x, 0.9, ev.z, 40, { color: 0xffd060, speed: 1.5, up: 4, life: 0.7, size: 0.32, gravity: -2 });
         } else if (id === 'windWalk') {
@@ -540,7 +540,7 @@ export function createFx(world) {
     }
   }
 
-  let auraAcc = 0, windAcc = 0.4;
+  let auraAcc = 0, windAcc = 0.4, quickAcc = 0.4;
   function update(game, dt) {
     for (const ev of game.events) onEvent(ev, game);
 
@@ -553,10 +553,10 @@ export function createFx(world) {
       while (auraAcc >= 1) {
         auraAcc -= 1;
         const a = Math.random() * Math.PI * 2;
-        if (quick) {   // gold motes climbing the body
-          const r = 0.45 + Math.random() * 0.35;
-          burst(p.x + Math.cos(a) * r, p.y + 0.15 + Math.random() * 0.4, p.z + Math.sin(a) * r * 0.5, 1,
-            { color: 0xffd060, speed: 0.2, up: 1.6, life: 0.7, size: 0.22, spread: 0, gravity: -0.6 });
+        if (quick) {   // gold sparks at the feet, curling out and barely rising - Wind Walk's shape
+          const r = 0.3 + Math.random() * 0.5;
+          burst(p.x + Math.cos(a) * r, p.y + 0.05 + Math.random() * 0.12, p.z + Math.sin(a) * r * 0.55, 1,
+            { color: Math.random() < 0.5 ? 0xffc840 : 0xffe28a, speed: 1.2, up: 0.4, life: 0.6, size: 0.3, spread: 0, gravity: -0.15 });
         }
         if (wind) {    // dust kicked up around the feet, drifting out and barely rising
           const r = 0.3 + Math.random() * 0.5;
@@ -566,7 +566,9 @@ export function createFx(world) {
       }
       // and, while the wind lasts, a faint gust ring rolling out from the feet now and then
       if (wind) { windAcc += dt; if (windAcc >= 0.55) { windAcc = 0; ring(p.x, p.z, { color: 0xdfe6ea, radius: 1.6, life: 0.45, y: 0.03 }); } }
-    } else { auraAcc = 0; windAcc = 0.4; }
+      // and a gold ring pulsing out from under the Knight's feet while Quicken holds
+      if (quick) { quickAcc += dt; if (quickAcc >= 0.5) { quickAcc = 0; ring(p.x, p.z, { color: 0xffc040, radius: 1.4, life: 0.45, y: 0.03 }); } }
+    } else { auraAcc = 0; windAcc = 0.4; quickAcc = 0.4; }
 
     // particles
     for (let i = parts.length - 1; i >= 0; i--) {

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { WARM_X, WARM_Z } from './scene.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { evalClip, walkPose, idlePose, blendTo, applyPose } from './anim.js';
+import { SKIN, prepareSkin, attachSkinRig, driveSkin, layerSkin, attackClipTime, stepLayers, cloneModel } from './skin.js';
 
 const HALF = Math.PI / 2;
 // Scratch colours for the rage tint, made once rather than per material per frame.
@@ -212,14 +213,19 @@ export function setKingOrcModel(scene) { koModel = scene; }
 
 export async function loadMonsterAssets(base = 'assets/monsters/') {
   const loader = new GLTFLoader();
-  const [baph, moon, sand, ds, ner, ko] = await Promise.all([
+  const [baph, moon, sand, ds, ner, ko, meta] = await Promise.all([
     loader.loadAsync(base + 'baphomet.glb'),
     loader.loadAsync(base + 'moonraya.glb'),
     loader.loadAsync(base + 'sandman.glb'),
     loader.loadAsync(base + 'darkSword.glb'),
     loader.loadAsync(base + 'nerakos.glb'),
     loader.loadAsync(base + 'kingOrc.glb'),
+    fetch(base + 'meta.json').then((r) => r.json()).catch(() => ({})),
   ]);
+  // A boss exported with its skeleton (tools/export_skinned_hero.py) says so in meta.json.
+  for (const [key, gltf] of [['baphomet', baph], ['moonraya', moon], ['sandman', sand], ['darkSword', ds], ['nerakos', ner], ['kingOrc', ko]]) {
+    if (meta?.[key]?.skinned) prepareSkin(key, gltf, meta[key]);
+  }
   setBossModel(baph.scene);
   setMoonrayaModel(moon.scene);
   setSandmanModel(sand.scene);
@@ -233,7 +239,7 @@ export async function loadMonsterAssets(base = 'assets/monsters/') {
  *  included, because the view mutates emissive for the hit flash and would otherwise corrupt
  *  the source model on the next retry. */
 function rigFromGlb(model, { scale = 1, darken = 0 } = {}) {
-  const root = model.clone(true);
+  const root = cloneModel(model);
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.material = o.material.clone();
@@ -247,6 +253,7 @@ function rigFromGlb(model, { scale = 1, darken = 0 } = {}) {
     const n = root.getObjectByName(name);
     if (n) rig[name] = n;
   }
+  attachSkinRig(rig, root);
   for (const k of ['root', 'torso', 'head']) if (rig[k]) rig[k].rotation.order = 'YXZ';
   if (scale !== 1) root.scale.setScalar(scale);
   return { root, rig, base: { root: rig.root.position.clone(), torso: rig.torso.position.clone() }, kind: 'humanoid' };
@@ -1362,6 +1369,101 @@ const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   // Morroc's boss. No legs: the pose rig simply leaves out what the sculpt does not have.
   sandman: buildSandmanGlb };
 
+// ------------------------------------------------------------------ skinned bosses
+//
+// Which Mixamo clip a skinned boss plays for each thing it does. A move not listed here - and
+// hurt, being knocked down - stays on the procedural clips below, driven onto the same bones
+// (render/skin.js). An attack's clip runs across its wind-up AND its swing, cut to
+// [strike - pre, strike + post] seconds and warped so the fastest frame lands on the moment
+// the wind-up ends and the hit comes out. `stride` is game units per walk cycle, so the feet
+// keep pace with the sim.
+const SKIN_MOVES = {
+  // Placeholders from the Knight's set until her own arrive - the skeleton is the same.
+  moonraya: {
+    walk: { clip: 'walk', stride: 2.44 }, idle: { clip: 'idle' }, dead: { clip: 'dead' }, hurt: { clip: 'hurt', rate: 1.3 },
+    moves: {
+      // Foxfire: Mixamo "Standing 2H Magic Attack 01" - both arms up over her head and thrown
+      // forward. The throw (1.13 s) lands on the frame the flames leave; the crouch before it
+      // is her wind-up, the step back after it the recovery.
+      cast: { clip: 'cast', pre: 0.9, post: 0.7 },
+      // Moon Dash: Mixamo "Standing Run Forward", which is a run cycle from its first frame.
+      // The crouch before it stays procedural - it is the tell - and the dash itself loops the
+      // run, legs paced to her speed but capped, because 13.5 u/s would be a blur of knees.
+      charge: { clip: 'run', loop: true, stride: 4.4, maxRate: 2.2, windup: false },
+      // Second wind: Mixamo "Sword And Shield Power Up", straight through - the raise and the
+      // held tension are the 1.5 s tell, the release is the heal landing.
+      heal: { clip: 'powerup', linear: true },
+    },
+  },
+  // Baphomet, the ram samurai from Tripo. His katana is part of his mesh, riding his right hand
+  // (tools/tripo_to_skinned.py), so walking and standing keep that arm on its stance - Mixamo's
+  // walk would wave the blade at the floor.
+  baphomet: {
+    walk: { clip: 'walk', stride: 2.66, keep: 'swordArm' }, idle: { clip: 'idle', keep: 'swordArm' }, dead: { clip: 'dead' },
+    hurt: { clip: 'hurt', rate: 1.3 },
+    moves: {
+      attack: { clip: 'slash3', pre: 0.5, post: 0.6 },    // the downward cut
+      // The two-sided slam is the overhead chop; its whole raise is spread over the long
+      // wind-up, which is the tell.
+      slam: { clip: 'slash1', pre: 0.6, post: 0.6 },
+      charge: { clip: 'run', loop: true, stride: 4.85, maxRate: 2.2, windup: false },
+      cast: { clip: 'cast', pre: 0.9, post: 0.7 },        // Hellfire
+      heal: { clip: 'powerup', linear: true },             // second wind, as Moonraya's
+    },
+  },
+};
+// His minions are the same sculpt at 0.58 - the same moves, and a stride to match.
+SKIN_MOVES.baphometling = { ...SKIN_MOVES.baphomet, walk: { ...SKIN_MOVES.baphomet.walk, stride: 2.66 * 0.58 } };
+
+function wantedBossLayer(v, e, dt) {
+  const cfg = SKIN_MOVES[e.type];
+  const S = SKIN[v.built.rig.skinHero];
+  if (!cfg || !S) return null;
+  const has = (c) => c && S.clips[c.clip];
+  if (e.dead) {
+    if (!has(cfg.dead)) return null;
+    v.deadT = (v.deadT ?? 0) + dt;
+    return { name: cfg.dead.clip, key: 'dead', time: Math.min(S.clips[cfg.dead.clip].info.dur, v.deadT) };
+  }
+  if (e.state === 'windup' || e.state === 'attack') {
+    const m = cfg.moves[e.move === 'heal' && !cfg.moves.heal ? 'cast' : e.move];
+    const pat = e.move === 'attack' ? e.def.attack : e.def[e.move];
+    if (!has(m) || !pat) return null;
+    if (m.loop) {
+      // A cycle, not a blow: it plays while the move is under way, from wherever it was.
+      if (e.state === 'windup' && m.windup === false) return null;
+      const info = S.clips[m.clip].info;
+      const speed = Math.abs(pat.speed || e.def.speed);
+      v.loopTime = ((v.loopTime ?? 0) + dt * Math.min(m.maxRate ?? 9, speed / m.stride) * info.dur) % info.dur;
+      return { name: m.clip, key: 'atk:' + e.move, time: v.loopTime };
+    }
+    const total = pat.windup + pat.dur;
+    const u = e.state === 'windup' ? e.stateT / total : (pat.windup + e.stateT) / total;
+    // A move with no single blow in it - a second wind is a slow build and a release - plays
+    // its clip straight through across the wind-up and the move, instead of around a strike.
+    if (m.linear) return { name: m.clip, key: 'atk:' + e.move, time: Math.min(1, u) * S.clips[m.clip].info.dur };
+    return { name: m.clip, key: 'atk:' + e.move, time: attackClipTime(S.clips[m.clip].info, m, Math.min(1, u), pat.windup / total) };
+  }
+  // Struck on the ground: the reaction clip from the moment of the hit. Launched or knocked
+  // down stays procedural - there is no Mixamo clip for being thrown through the air.
+  if (e.state === 'hurt' && e.grounded !== false && !e.launched && has(cfg.hurt)) {
+    v.hurtT = (v.hurtT ?? 0) + dt;
+    return { name: cfg.hurt.clip, key: 'hurt', time: Math.min(S.clips[cfg.hurt.clip].info.dur, v.hurtT * (cfg.hurt.rate ?? 1)) };
+  }
+  v.hurtT = 0;
+  if (e.state === 'hurt' || e.state === 'down') return null;
+  if ((e.moving || e.state === 'enter') && has(cfg.walk)) {
+    const info = S.clips[cfg.walk.clip].info;
+    v.walkTime = ((v.walkTime ?? 0) + dt * (e.def.speed / cfg.walk.stride) * info.dur) % info.dur;
+    return { name: cfg.walk.clip, key: 'walk', time: v.walkTime };
+  }
+  if (has(cfg.idle)) {
+    const info = S.clips[cfg.idle.clip].info;
+    return { name: cfg.idle.clip, key: 'idle', time: (v.t % info.dur) };
+  }
+  return null;
+}
+
 // ------------------------------------------------------------------ clips
 
 const CLIPS = {
@@ -1516,7 +1618,17 @@ export function createMonsterViews(world) {
     // the clip ended. The clip opens at zero and closes on very nearly a whole turn, so
     // dropping the channel on the next frame is very nearly invisible.
     v.cur.ryaw = target.ryaw ?? 0;
+    // A skinned boss's death clip falls down on its own; the procedural one tips the root over.
+    if (rig.skinHero && e.dead && SKIN_MOVES[e.type]?.dead) { v.cur.rx = 0; v.cur.ry = 0; }
     applyPose(rig, base, rest, v.cur, v.yaw);
+    if (rig.skinHero) {
+      // A tail has no clip of its own in any Mixamo set: it sways on its own clock, harder
+      // while the body is moving.
+      if (rig.tail) { const s = e.moving ? 1.6 : 1; rig.tail.rotation.set(0.12 * s * Math.sin(v.t * 2.3), 0.28 * s * Math.sin(v.t * 1.7), 0.08 * Math.sin(v.t * 2.9)); }
+      driveSkin(rig);
+      v.layers = stepLayers(v.layers || [], wantedBossLayer(v, e, dt), dt);
+      layerSkin(rig, v.layers);
+    }
   }
 
   function updateBlob(v, e, dt) {
