@@ -82,7 +82,10 @@ PRESETS = {
         "mount": {
             "glb": "assets/blender/hunter_tripo/classic_hunter_parts.glb", "old_height": 1.75,
             "items": [
-                {"node": "weapon", "anchor": "grip", "bone": "RightHand", "at": "fist"},
+                # Tripo's recurve bow, fitted onto the classic bow's frame by
+                # assets/blender/hunter_tripo/prepare_bow.py.
+                {"node": "weapon", "glb": "assets/blender/hunter_tripo/bow_parts.glb",
+                 "anchor": "grip", "bone": "RightHand", "at": "fist"},
                 # Beside the left shoulder, where the classic Hunter carried it: the bird's pivot
                 # is its body, and its tail and wingtips hang well below its feet, so it is
                 # placed by that pivot, out and a little up, not by its lowest point.
