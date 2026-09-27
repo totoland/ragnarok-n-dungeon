@@ -21,7 +21,15 @@ if [ -f "$KA/Standard_Walk.fbx" ]; then
 else
   echo "[export_heroes] knight: Mixamo clips not on this machine - keeping the committed GLB"
 fi
-"$BLENDER" -b "$SRC/hunter_falcon/hunter_falcon.blend" -P tools/export_heroes.py -- hunter assets/heroes 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
+# The Hunter is skinned too (tools/tripo_to_skinned.py hunter): bow and falcon lifted from the
+# classic Hunter's GLB (assets/blender/hunter_tripo/classic_hunter_parts.glb).
+if [ -f "$KA/Standard_Walk.fbx" ]; then
+  sh tools/export_skinned_hero.sh hunter "$SRC/hunter_tripo/hunter_skinned.blend" \
+    walk=$KA/Standard_Walk.fbx idle=$KA/Unarmed_Idle_Looking_Ver_2.fbx jump=$KA/Jumping_Up.fbx \
+    dead=$KA/Standing_Death_Forward_02.fbx hurt=$KA/Standing_React_Small_From_Front_02.fbx
+else
+  echo "[export_heroes] hunter: Mixamo clips not on this machine - keeping the committed GLB"
+fi
 
 # No `rm meta.json`: every exporter merges its own entry, and the skinned ones may be skipped.
 # Baphomet is skinned too (tools/tripo_to_skinned.py baphomet), on clips from the shared library.

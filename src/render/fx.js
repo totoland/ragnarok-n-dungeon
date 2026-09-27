@@ -542,7 +542,15 @@ export function createFx(world) {
     }
   }
 
-  let auraAcc = 0, windAcc = 0.4, quickAcc = 0.4;
+  let auraAcc = 0, windAcc = 0.4, quickT = 0;
+  const quickRings = [0, 1].map(() => {
+    const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffc040, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.rotation.x = -Math.PI / 2;
+    m.renderOrder = 4;
+    m.visible = false;
+    scene.add(m);
+    return m;
+  });
   function update(game, dt) {
     for (const ev of game.events) onEvent(ev, game);
 
@@ -569,8 +577,22 @@ export function createFx(world) {
       // and, while the wind lasts, a faint gust ring rolling out from the feet now and then
       if (wind) { windAcc += dt; if (windAcc >= 0.55) { windAcc = 0; ring(p.x, p.z, { color: 0xdfe6ea, radius: 1.6, life: 0.45, y: 0.03 }); } }
       // and a gold ring pulsing out from under the Knight's feet while Quicken holds
-      if (quick) { quickAcc += dt; if (quickAcc >= 0.5) { quickAcc = 0; ring(p.x, p.z, { color: 0xffc040, radius: 1.4, life: 0.45, y: 0.03 }); } }
-    } else { auraAcc = 0; windAcc = 0.4; quickAcc = 0.4; }
+    } else { auraAcc = 0; windAcc = 0.4; }
+    // Quicken's aura is a ring that lives under the Knight's feet, not one dropped behind him:
+    // a fired-and-forgotten ring stays where it was spawned, so a walking Knight left a trail
+    // of them. Two bands, following him every frame, breathing out and fading in turn.
+    const showQuick = quick && p.state !== 'dead';
+    for (let i = 0; i < quickRings.length; i++) {
+      const m = quickRings[i];
+      m.visible = showQuick;
+      if (!showQuick) continue;
+      quickT += i ? 0 : dt;
+      const u = (quickT / 1.0 + i * 0.5) % 1;         // 0 → 1 over a second, the pair half a beat apart
+      m.position.set(p.x, p.y + 0.03 + i * 0.002, p.z);
+      m.scale.setScalar(0.75 + 0.75 * u);
+      m.material.opacity = 0.85 * (1 - u) * Math.min(1, u * 6);
+    }
+    if (!showQuick) quickT = 0;
 
     // particles
     for (let i = parts.length - 1; i >= 0; i--) {

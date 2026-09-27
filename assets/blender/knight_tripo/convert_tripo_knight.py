@@ -79,6 +79,15 @@ for key in ("weapon", "weapon_katana"):
             continue
         me = p.data.copy()
         me.transform(Matrix.Translation(-pivot) @ p.matrix_world)   # about the grip, game units
+        # Both blades are held edge-forward. A katana's edge is on the convex side of its curve; the
+        # old Knight's fist carried it bowing out sideways (-X); turned about the blade (which
+        # stands along Z here) by 110 degrees, the bow - and the edge - faces front (-Y).
+        # Measured, not guessed: the bow's direction is the blade's mid-slice off the line
+        # from guard to tip (see the Knight's README if this is ever re-fitted).
+        # The longsword needs the same turn for the same reason: its blade lay flat-on to the
+        # front, edges sideways, where the Under Water Sword (assets/gear) holds edge-forward.
+        # Every item without a model of its own shows this blade, so it is most of the swords.
+        me.transform(Matrix.Rotation(math.radians(110), 4, "Z"))
         meshes.append(me)
     weapons[key] = meshes
 for o in list(scene.objects):
@@ -337,8 +346,12 @@ if SKINNED:
     bpy.data.meshes.remove(old_mesh)
     for im in list(bpy.data.images):
         bpy.data.images.remove(im)
+    # Tripo's textured material goes; the blades' own (steel, gold, the katana's rayskin and
+    # brass) stay. Deleting every material that was not a KN tone left both weapons with empty
+    # slots, and the GLB drew them flat grey - the katana's dark grip and fittings vanished.
+    keep = {m for mm in weapons.values() for me_ in mm for m in me_.materials if m}
     for m in list(bpy.data.materials):
-        if not m.name.startswith("KN •"):
+        if not m.name.startswith("KN •") and m not in keep:
             bpy.data.materials.remove(m)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.mode_set(mode="POSE")

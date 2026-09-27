@@ -173,6 +173,17 @@ const HUNTER = {
     ],
   },
   run: {},
+  // The skinned Hunter (Tripo, tools/tripo_to_skinned.py hunter). The bow arm keeps the
+  // procedural stance above - raised, bow upright - while the rest of him walks and idles on
+  // Mixamo clips; his shots stay procedural until archery clips arrive.
+  skinned: {
+    walk: { clip: 'walk', stride: 1.7, keep: 'swordArm' },
+    idle: { clip: 'idle', keep: 'swordArm' },
+    air: { clip: 'jump' },
+    dead: { clip: 'dead' },
+    hurt: { clip: 'hurt', rate: 1.5 },
+    attacks: {},
+  },
 };
 
 const DEFS = { knight: KNIGHT, hunter: HUNTER };
@@ -333,10 +344,13 @@ export function createHeroView(world, heroKey, assets) {
   for (const k of ['torso', 'head']) if (rig[k]) rig[k].rotation.order = 'YXZ';
   for (const k of ['armL', 'armR']) if (rig[k]) rig[k].rotation.order = def.armOrder;
 
-  // the falcon rides the draw hand; during Blitz Beat it flies free in world space
+  // the falcon rides the draw hand; during Blitz Beat it flies free in world space. On the
+  // skinned Hunter it sits on a `perch` anchor riding his shoulder bone instead - armR there is
+  // a stand-in that is not in the scene, and a bird attached to it would vanish.
   let falconPerch = null;
+  const perchNode = (rig.skinHero && model.getObjectByName('perch')) || rig.armR;
   if (rig.falcon) {
-    if (rig.falcon.parent !== rig.armR) rig.armR.attach(rig.falcon);
+    if (rig.falcon.parent !== perchNode) perchNode.attach(rig.falcon);
     if (!model.userData.perch) model.userData.perch = { pos: rig.falcon.position.clone(), quat: rig.falcon.quaternion.clone() };
     falconPerch = model.userData.perch;
     rig.falcon.position.copy(falconPerch.pos);
@@ -540,12 +554,12 @@ export function createHeroView(world, heroKey, assets) {
       let px, py, pz;
       if (u < 0.4) { const k = u / 0.4; px = falcon.from.x + (tx - falcon.from.x) * k; py = falcon.from.y + 2.2 * Math.sin(k * Math.PI / 2); pz = falcon.from.z + (tz - falcon.from.z) * k; }
       else if (u < 0.6) { const k = (u - 0.4) / 0.2; px = tx; py = ty + 2.2 * (1 - Math.sin(k * Math.PI)); pz = tz; }
-      else { const k = (u - 0.6) / 0.4; const home = rig.armR.getWorldPosition(new THREE.Vector3()); px = tx + (home.x - tx) * k; py = ty + 1.2 + (home.y - ty - 1.2) * k; pz = tz + (home.z - tz) * k; }
+      else { const k = (u - 0.6) / 0.4; const home = perchNode.getWorldPosition(new THREE.Vector3()); px = tx + (home.x - tx) * k; py = ty + 1.2 + (home.y - ty - 1.2) * k; pz = tz + (home.z - tz) * k; }
       f.position.lerp(new THREE.Vector3(px, py, pz), Math.min(1, 16 * dt));
       f.rotation.set(0, view.yaw, 0);
       if (u >= 1) {
         falcon.flying = false;
-        rig.armR.attach(f);
+        perchNode.attach(f);
         f.position.copy(falconPerch.pos);
         f.quaternion.copy(falconPerch.quat);
       }
@@ -562,7 +576,7 @@ export function createHeroView(world, heroKey, assets) {
       f.rotation.set(0, a + Math.PI / 2, 0);            // beak along the direction of travel
       if (u >= 1) {
         falcon.flying = false;
-        rig.armR.attach(f);
+        perchNode.attach(f);
         f.position.copy(falconPerch.pos);
         f.quaternion.copy(falconPerch.quat);
       }
@@ -583,12 +597,12 @@ export function createHeroView(world, heroKey, assets) {
     f.rotation.set(0, view.yaw, 0);
     if (done || u >= 1) {
       falcon.flying = false;
-      rig.armR.attach(f);
+      perchNode.attach(f);
       f.position.copy(falconPerch.pos);
       f.quaternion.copy(falconPerch.quat);
     }
   }
 
-  view.dispose = () => { world.scene.remove(group); if (rig.falcon && falcon.flying) { rig.armR.attach(rig.falcon); } };
+  view.dispose = () => { world.scene.remove(group); if (rig.falcon && falcon.flying) { perchNode.attach(rig.falcon); } };
   return view;
 }

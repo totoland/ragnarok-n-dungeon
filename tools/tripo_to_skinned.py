@@ -64,12 +64,156 @@ PRESETS = {
             "absorb": ("RightHandIndex", "RightHandMiddle", "RightHandRing", "RightHandPinky", "RightHandThumb"),
         },
     },
+    "hunter": {
+        "src": "assets/blender/hunter_tripo/hunter_rigged.glb",
+        "out": "assets/blender/hunter_tripo/hunter_skinned.blend",
+        "prefix": "HN",
+        "clusters": 16,
+        # The quiver rides the back. The auto-rig gave most of it to the right upper arm, so it
+        # would swing out with every draw of the bow.
+        "rebind": [{
+            "to": "Spine2",
+            "pick": lambda c, dom, near: c[1] > 0.055 and c[2] > 0.45 and near["arm"] > 0.045
+                    and dom.startswith(("RightArm", "RightShoulder", "LeftShoulder", "Head", "Neck")),
+        }],
+        # A closed bow hand; the falcon hand stays open, it is a perch.
+        "fist": {"side": "Right", "joints": (70, 90, 70), "thumb": (20, 40, 30)},
+        # The classic Hunter's bow and falcon, lifted out of his GLB about their own pivots.
+        "mount": {
+            "glb": "assets/blender/hunter_tripo/classic_hunter_parts.glb", "old_height": 1.75,
+            "items": [
+                {"node": "weapon", "anchor": "grip", "bone": "RightHand", "at": "fist"},
+                # Beside the left shoulder, where the classic Hunter carried it: the bird's pivot
+                # is its body, and its tail and wingtips hang well below its feet, so it is
+                # placed by that pivot, out and a little up, not by its lowest point.
+                # The falcon is Tripo's, cut into body and wings by
+                # assets/blender/hunter_tripo/prepare_falcon.py.
+                {"node": "falcon", "glb": "assets/blender/hunter_tripo/falcon_parts.glb",
+                 "anchor": "perch", "bone": "LeftShoulder", "at": "shoulder", "offset": (0.09, 0.0, 0.10)},
+            ],
+        },
+        "head_anchor": True,
+    },
 }
+
+
+# ---------------------------------------------------------------- props from an older model
+
+def lift_parts(mount):
+    """Import the old rigid model and keep copies of the named nodes' meshes, each about its
+    own pivot, in its old game units - plus any child nodes (the falcon's wings) with their
+    offsets from it. Everything imported is then deleted but the copies."""
+    out = {}
+    for it in mount["items"]:
+        # An item may come from a file of its own (the Tripo falcon); the rest from `glb`.
+        for o in list(bpy.data.objects):
+            bpy.data.objects.remove(o)
+        bpy.ops.import_scene.gltf(filepath=it.get("glb", mount["glb"]))
+        objs = {o.name: o for o in bpy.data.objects}
+        node = objs[it["node"]]
+        pivot = node.matrix_world.translation.copy()
+        parts = []
+        for o in [node] + [c for c in node.children_recursive]:
+            if o.type != "MESH":
+                continue
+            me = o.data.copy()
+            own = o.matrix_world.translation.copy()
+            # A child keeps its own origin (it is animated about it); its mesh is about that.
+            origin = pivot if o is node else own
+            me.transform(Matrix.Translation(-origin) @ o.matrix_world)
+            parts.append((o.name, me, (own - pivot)))
+        out[it["node"]] = parts
+    for o in list(bpy.data.objects):
+        bpy.data.objects.remove(o)
+    return out
+
+
+def pose_and_mount(preset, arm, body, lifted, top):
+    """Close a hand, make the pose the rest pose, and hang props off bone anchors."""
+    world = arm.matrix_world
+    pb = arm.pose.bones
+    H = lambda n: world @ pb[M + n].head
+
+    def turn_bone(name, axis, angle):
+        bone = pb[M + name]
+        m = world @ bone.matrix
+        r = Matrix.Rotation(angle, 4, Vector(axis).normalized())
+        bone.matrix = world.inverted() @ (Matrix.Translation(m.translation) @ r @ Matrix.Translation(-m.translation) @ m)
+        bpy.context.view_layer.update()
+
+    fs = preset.get("fist")
+    if fs:
+        side = fs["side"]
+        f = (world @ pb[f"{M}{side}Hand"].matrix).to_3x3().col[1].normalized()
+        k = (H(f"{side}HandIndex1") - H(f"{side}HandPinky1")).normalized()
+        palm = (k.cross(f) if side == "Right" else f.cross(k)).normalized()
+        axis = f.cross(palm)
+        for finger in ("Index", "Middle", "Ring", "Pinky"):
+            for j, deg in zip((1, 2, 3), fs["joints"]):
+                turn_bone(f"{side}Hand{finger}{j}", axis, math.radians(deg))
+        for j, deg in zip((1, 2, 3), fs["thumb"]):
+            turn_bone(f"{side}HandThumb{j}", axis, math.radians(deg))
+    fist = sum((H(f"RightHandMiddle{j}") for j in (1, 2, 3, 4)), Vector()) / 4
+    points = {"fist": fist, "shoulder": H("LeftArm")}
+    neck = H("Neck")
+
+    dg = bpy.context.evaluated_depsgraph_get()
+    posed = bpy.data.meshes.new_from_object(body.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg)
+    posed.transform(body.matrix_world)
+    old = body.data
+    body.data = posed
+    body.matrix_world = Matrix.Identity(4)
+    bpy.data.meshes.remove(old)
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode="POSE")
+    bpy.ops.pose.armature_apply(selected=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    scene = bpy.context.scene
+
+    def anchor(name, bone, at):
+        e = bpy.data.objects.new(name, None)
+        scene.collection.objects.link(e)
+        e.parent, e.parent_type, e.parent_bone = arm, "BONE", M + bone
+        for _ in range(3):
+            bpy.context.view_layer.update()
+            e.matrix_world = Matrix.Translation(at)
+        bpy.context.view_layer.update()
+        return e
+
+    mount = preset.get("mount")
+    if mount:
+        k = top / mount["old_height"]                   # old game units -> this file's units
+        for it in mount["items"]:
+            parts = lifted[it["node"]]
+            at = points[it["at"]].copy() + Vector(it.get("offset", (0, 0, 0)))
+            if it.get("sit"):
+                # Lift the prop so its lowest point rests on the spot rather than its pivot.
+                low = min(min((v.co.z + off.z) for v in me.vertices) for _, me, off in parts)
+                at.z -= low * k
+            a = anchor(it["anchor"], it["bone"], at)
+            root_ob = None
+            for i, (name, me, off) in enumerate(parts):
+                ob = bpy.data.objects.new(name, me)
+                scene.collection.objects.link(ob)
+                if i == 0:
+                    ob.parent = a; ob.matrix_parent_inverse = Matrix.Identity(4)
+                    ob.location = (0, 0, 0); ob.scale = (k, k, k)
+                    root_ob = ob
+                else:
+                    ob.parent = root_ob; ob.matrix_parent_inverse = Matrix.Identity(4)
+                    ob.location = off
+            print(f"[tripo] {it['node']} on {it['bone']} ({len(parts)} parts)")
+        scene["knight_fist"] = [round(c, 4) for c in fist]
+    if preset.get("head_anchor"):
+        anchor("head", "Head", neck)
+        scene["knight_neck"] = [round(c, 4) for c in neck]
 
 
 def main():
     preset = PRESETS[sys.argv[sys.argv.index("--") + 1]]
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    lifted = lift_parts(preset["mount"]) if preset.get("mount") else {}
     bpy.ops.import_scene.gltf(filepath=preset["src"])
     for o in list(bpy.data.objects):
         if o.type == "MESH" and not o.vertex_groups:
@@ -125,8 +269,9 @@ def main():
     me.update()
     for im in list(bpy.data.images):
         bpy.data.images.remove(im)
+    keep = {m for parts in lifted.values() for _, pm, _ in parts for m in pm.materials if m}
     for m in list(bpy.data.materials):
-        if not m.name.startswith(preset["prefix"] + " •"):
+        if not m.name.startswith(preset["prefix"] + " •") and m not in keep:
             bpy.data.materials.remove(m)
 
     # ---------------------------------------------------------------- weights
@@ -177,6 +322,17 @@ def main():
             grp.add([i], 1.0, "REPLACE")
         print(f"[tripo] {ap['bone']}: {len(picked)} verts moved off the limbs")
 
+    arms = [f"{s_}{p}" for s_ in ("Left", "Right") for p in ("Arm", "ForeArm", "Hand")]
+    near = {"arm": dist(co, arms), "leg": d_leg}
+    for rb in preset.get("rebind", []):
+        grp = body.vertex_groups[M + rb["to"]]
+        picked = [i for i in range(len(co)) if rb["pick"](co[i], dom[i], {k: v[i] for k, v in near.items()})]
+        for i in picked:
+            for g in list(me.vertices[i].groups):
+                body.vertex_groups[g.group].remove([i])
+            grp.add([i], 1.0, "REPLACE")
+        print(f"[tripo] {rb['to']}: {len(picked)} verts rebound")
+
     rg = preset.get("rigid")
     if rg:
         hand = body.vertex_groups[M + rg["bone"]]
@@ -212,10 +368,12 @@ def main():
         print(f"[tripo] skirt: {n} verts share weight with the hips")
 
     top = float(co[:, 2].max())
+    if preset.get("fist") or preset.get("mount") or preset.get("head_anchor"):
+        pose_and_mount(preset, arm, body, lifted, top)
     scene["model_top"] = round(top, 4)
     scene["knight_top"] = round(top, 4)                 # the key export_skinned_hero.py reads
     bpy.ops.wm.save_as_mainfile(filepath=preset["out"], compress=True)
-    print(f"[tripo] saved {preset['out']} ({len(me.vertices)} verts, top {top:.3f})")
+    print(f"[tripo] saved {preset['out']} ({len(body.data.vertices)} verts, top {top:.3f})")
 
 
 main()

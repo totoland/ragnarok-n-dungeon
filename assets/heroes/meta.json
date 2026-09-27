@@ -72,103 +72,51 @@
   "hunter": {
     "height": 1.75,
     "front": "+z",
+    "skinned": true,
     "pivot": {
       "root": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "torso": [
-        0.0,
-        0.7989,
-        0.0
+        0,
+        0,
+        0
       ],
       "head": [
-        0.0,
-        1.3087,
-        0.0
-      ],
-      "armL": [
-        -0.2739,
-        1.1413,
-        -0.0
-      ],
-      "armR": [
-        0.2815,
-        1.1413,
-        -0.0
+        0.0102,
+        1.4391,
+        0.017
       ],
       "weapon": [
-        -0.5174,
-        1.012,
-        0.1674
-      ],
-      "legL": [
-        -0.1217,
-        0.7989,
-        0.0
-      ],
-      "legR": [
-        0.1293,
-        0.7989,
-        0.0
-      ],
-      "falcon": [
-        0.6467,
-        1.4076,
-        0.0152
-      ],
-      "wingL": [
-        0.563,
-        1.4837,
-        -0.0
-      ],
-      "wingR": [
-        0.7304,
-        1.4837,
-        -0.0
+        -0.2527,
+        0.8836,
+        0.0359
       ]
     },
     "parts": {
-      "legL": {
-        "meshes": 13,
-        "verts": 896
+      "falcon": {},
+      "weapon": {}
+    },
+    "clips": {
+      "walk": {
+        "dur": 1.167,
+        "strike": 0.033
       },
-      "legR": {
-        "meshes": 13,
-        "verts": 896
+      "idle": {
+        "dur": 7.833,
+        "strike": 4.533
       },
-      "torso": {
-        "meshes": 60,
-        "verts": 2774
+      "jump": {
+        "dur": 0.833,
+        "strike": 0.433,
+        "takeoff": 0.533,
+        "apex": 0.767,
+        "land": 0.833
       },
-      "head": {
-        "meshes": 51,
-        "verts": 5918
+      "dead": {
+        "dur": 2.367,
+        "strike": 1.6
       },
-      "armL": {
-        "meshes": 10,
-        "verts": 644
-      },
-      "armR": {
-        "meshes": 10,
-        "verts": 644
-      },
-      "weapon": {
-        "meshes": 15,
-        "verts": 1168
-      },
-      "falcon": {
-        "meshes": 46,
-        "verts": 3156
-      },
-      "wingR": {
-        "meshes": 52,
-        "verts": 3228
-      },
-      "wingL": {
-        "meshes": 52,
-        "verts": 3228
+      "hurt": {
+        "dur": 0.767,
+        "strike": 0.1
       }
     }
   }
