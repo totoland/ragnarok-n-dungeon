@@ -167,11 +167,22 @@ cape |= blue & (cen[:, 1] > 0.07) & (cen[:, 2] < 0.79)
 cape &= ~((cen[:, 1] < -0.06) & (np.abs(cen[:, 0]) < 0.12) & (cen[:, 2] > 0.35))
 
 # Smooth: a face follows the majority of its edge neighbours, a few times over.
-bm = bmesh.new(); bm.from_mesh(me)
-bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0005)   # glTF splits verts at UV seams
-bm.faces.ensure_lookup_table()
-nbr = [[l.index for e in f.edges for l in e.link_faces if l.index != f.index] for f in bm.faces]
-bm.free()
+# glTF splits verts at UV seams, so faces are joined by where their corners are rather than by
+# vertex index. (Welding with remove_doubles did this, but it also deletes any face the weld
+# collapses - the second Tripo Knight has 82 - and the neighbour list then no longer lines up
+# with the faces it is indexed by.)
+vco = np.zeros(len(me.vertices) * 3); me.vertices.foreach_get("co", vco)
+vkey = [tuple(k) for k in np.round(vco.reshape(-1, 3) / 0.0005).astype(np.int64)]
+edge_faces = {}
+for fi, (a, b_, c) in enumerate(fv):
+    for u, w in ((a, b_), (b_, c), (c, a)):
+        ku, kw = vkey[u], vkey[w]
+        if ku != kw:
+            edge_faces.setdefault((ku, kw) if ku < kw else (kw, ku), []).append(fi)
+nbr = [[] for _ in range(nf)]
+for fs in edge_faces.values():
+    for fi in fs:
+        nbr[fi].extend(x for x in fs if x != fi)
 for _ in range(4):
     votes = np.array([np.mean(cape[n]) if n else cape[i] for i, n in enumerate(nbr)])
     cape = np.where(votes > 0.5, True, np.where(votes < 0.5, False, cape))
