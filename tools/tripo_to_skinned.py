@@ -76,20 +76,23 @@ PRESETS = {
             "pick": lambda c, dom, near: c[1] > 0.055 and c[2] > 0.45 and near["arm"] > 0.045
                     and dom.startswith(("RightArm", "RightShoulder", "LeftShoulder", "Head", "Neck")),
         }],
-        # A closed bow hand; the falcon hand stays open, it is a perch.
-        "fist": {"side": "Right", "joints": (70, 90, 70), "thumb": (20, 40, 30)},
+        # The bow stance is the bind pose, as the Knight's sword stance is his: the bow arm
+        # reaches forward and a little down, the fist is rolled knuckles-vertical with the thumb
+        # on top (as a hand holds a bow), and it closes. The game then adds nothing to it -
+        # the rigid Hunter's 90-degree arm roll would turn this hand palm-down.
+        "stance": [("RightArm", (-0.30, -0.80, -0.52)), ("RightForeArm", (-0.12, -1.0, -0.10)),
+                   ("RightHand", (-0.08, -1.0, -0.06))],
+        "fist": {"side": "Right", "joints": (70, 90, 70), "thumb": (20, 40, 30), "roll_up": True},
         # The classic Hunter's bow and falcon, lifted out of his GLB about their own pivots.
         "mount": {
             "glb": "assets/blender/hunter_tripo/classic_hunter_parts.glb", "old_height": 1.75,
             "items": [
                 # Tripo's recurve bow, fitted onto the classic bow's frame by
                 # assets/blender/hunter_tripo/prepare_bow.py.
-                # The bow keeps the classic bow's angle (prepare_bow.py fitted it there) and the
-                # WRIST turns to hold it ("align": "wrist"): the hand is rolled until its knuckle
-                # line runs along the bow and the back of the hand faces the string, and the
-                # bow's grip is set in the closed fist. Toto: the bow was right, the wrist was not.
+                # Held as a bow is held ("align": "hold"): upright, string towards the archer,
+                # its grip in the closed fist.
                 {"node": "weapon", "glb": "assets/blender/hunter_tripo/bow_parts.glb",
-                 "anchor": "grip", "bone": "RightHand", "at": "fist", "align": "wrist"},
+                 "anchor": "grip", "bone": "RightHand", "at": "fist", "align": "hold"},
                 # Beside the left shoulder, where the classic Hunter carried it: the bird's pivot
                 # is its body, and its tail and wingtips hang well below its feet, so it is
                 # placed by that pivot, out and a little up, not by its lowest point.
@@ -165,7 +168,31 @@ def pose_and_mount(preset, arm, body, lifted, top):
         bone.matrix = world.inverted() @ (Matrix.Translation(m.translation) @ r @ Matrix.Translation(-m.translation) @ m)
         bpy.context.view_layer.update()
 
+    def aim(name, direction):
+        """Swing a bone so its length points along `direction` (world), keeping its head."""
+        bone = pb[M + name]
+        m = world @ bone.matrix
+        cur = (m.to_3x3() @ Vector((0, 1, 0))).normalized()
+        q = cur.rotation_difference(Vector(direction).normalized())
+        bone.matrix = world.inverted() @ (Matrix.Translation(m.translation) @ q.to_matrix().to_4x4() @ m.to_3x3().to_4x4())
+        bpy.context.view_layer.update()
+
+    for name, direction in preset.get("stance", []):
+        aim(name, direction)
+
     fs = preset.get("fist")
+    if fs and fs.get("roll_up"):
+        # the Knight's fist_up: roll the hand about its length until the knuckles stand
+        # vertical, index (and so thumb) on top
+        side = fs["side"]
+        f = (world @ pb[f"{M}{side}Hand"].matrix).to_3x3().col[1].normalized()
+        kl = H(f"{side}HandIndex1") - H(f"{side}HandPinky1")
+        kf = (kl - f * kl.dot(f)).normalized()
+        up = Vector((0, 0, 1)); up = (up - f * up.dot(f)).normalized()
+        ang = kf.angle(up)
+        if kf.cross(up).dot(f) < 0:
+            ang = -ang
+        turn_bone(f"{side}Hand", f, ang)
     if fs:
         side = fs["side"]
         f = (world @ pb[f"{M}{side}Hand"].matrix).to_3x3().col[1].normalized()
@@ -184,24 +211,6 @@ def pose_and_mount(preset, arm, body, lifted, top):
         return up, (back - up * back.dot(up)).normalized()
 
     mount = preset.get("mount")
-    for it in (mount or {}).get("items", []):
-        if it.get("align") != "wrist":
-            continue
-        # Turn the wrist onto the prop: its long axis and riser->string side, as it will sit.
-        g, l, d, _ = bow_frame(np.array([list(v.co) for v in lifted[it["node"]][0][1].vertices]))
-        up, back = hand_frame()
-        src = Matrix((up, back, up.cross(back))).transposed()
-        dd = (d - l * d.dot(l)).normalized()
-        dst = Matrix((l, dd, l.cross(dd))).transposed()
-        R = (dst @ src.inverted()).to_4x4()
-        bone = pb[M + it["bone"]]
-        m = world @ bone.matrix
-        head = m.translation.copy()
-        bone.matrix = world.inverted() @ (Matrix.Translation(head) @ R @ Matrix.Translation(-head) @ m)
-        bpy.context.view_layer.update()
-        # and centre the bow's grip on the fist, at its own angle
-        lifted[it["node"]][0][1].transform(Matrix.Translation(-g))
-        print(f"[tripo] wrist turned {math.degrees(R.to_quaternion().angle):.0f} deg onto the {it['node']}")
     fist = sum((H(f"RightHandMiddle{j}") for j in (1, 2, 3, 4)), Vector()) / 4
     points = {"fist": fist, "shoulder": H("LeftArm")}
     neck = H("Neck")
@@ -235,6 +244,14 @@ def pose_and_mount(preset, arm, body, lifted, top):
         for it in mount["items"]:
             parts = lifted[it["node"]]
             at = points[it["at"]].copy() + Vector(it.get("offset", (0, 0, 0)))
+            if it.get("align") == "hold":
+                _, me0, _ = parts[0]
+                g, l, d, _ = bow_frame(np.array([list(v.co) for v in me0.vertices]))
+                dd = (d - l * d.dot(l)).normalized()
+                src = Matrix((l, dd, l.cross(dd))).transposed()
+                up, back = Vector((0, 0, 1)), Vector((0, 1, 0))      # upright; string to the archer (+Y)
+                dst = Matrix((up, back, up.cross(back))).transposed()
+                me0.transform((dst @ src.inverted()).to_4x4() @ Matrix.Translation(-g))
             if it.get("sit"):
                 # Lift the prop so its lowest point rests on the spot rather than its pivot.
                 low = min(min((v.co.z + off.z) for v in me.vertices) for _, me, off in parts)

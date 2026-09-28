@@ -183,28 +183,15 @@ const HUNTER = {
     dead: { clip: 'dead' },
     hurt: { clip: 'hurt', rate: 1.5 },
     attacks: {},
-    // His wrist was turned onto the bow (tools/tripo_to_skinned.py, align: 'wrist'); the bow's
-    // stance twist turns that wrist too, so the fist never lets go of it.
-    weaponToWrist: true,
+    // His bow stance is his bind pose (tools/tripo_to_skinned.py hunter), so the rigid Hunter's
+    // rest - the bow arm raised, rolled 90 degrees and the bow turned in it - is not applied:
+    // on a hand that grips the bow, that roll turned it palm-down.
+    rest: {},
   },
 };
 
 const DEFS = { knight: KNIGHT, hunter: HUNTER };
 
-// A skinned hero whose weapon twist belongs to his wrist (weaponToWrist). The rigid Hunter
-// turned his bow in his hand with wx/wy/wz, which on a hand that grips it would turn the bow
-// out of the fist; so the same turn goes to the hand bone instead - about the grip, expressed
-// in the bone's frame - and the bow, riding the hand, comes with it.
-const QW = new THREE.Quaternion(), QA = new THREE.Quaternion();
-function twistToWrist(rig, weapon) {
-  const grip = weapon.parent;
-  const hand = grip?.parent;
-  if (!hand?.isBone) return;
-  QW.copy(weapon.quaternion);
-  weapon.quaternion.identity();
-  QA.copy(grip.quaternion);
-  hand.quaternion.multiply(QA.clone().multiply(QW).multiply(QA.invert()));
-}
 
 // ------------------------------------------------------------------ loading
 
@@ -296,9 +283,8 @@ export function restPose(model, heroKey) {
   const base = {};
   for (const k of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'cape', 'weapon', 'root']) if (rig[k]) base[k] = rig[k].position.clone();
   if (model.userData.base) for (const k in model.userData.base) if (base[k]) base[k].copy(model.userData.base[k]);
-  applyPose(rig, base, DEFS[heroKey].rest, {}, 0);
+  applyPose(rig, base, (rig.skinHero && DEFS[heroKey].skinned?.rest) || DEFS[heroKey].rest, {}, 0);
   if (rig.skinHero) driveSkin(rig);
-  if (DEFS[heroKey].skinned?.weaponToWrist && rig.skinHero && rig.weapon) twistToWrist(rig, rig.weapon);
   for (const v of Object.values(rig.variants)) { v.rotation.copy(rig.weapon.rotation); v.position.copy(rig.weapon.position); }
 }
 
@@ -480,9 +466,8 @@ export function createHeroView(world, heroKey, assets) {
     // both at once would put him through the floor.
     if (skinCfg?.dead && p.state === 'dead' && SKIN[rig.skinHero].clips[skinCfg.dead.clip]) { for (const k in target) delete target[k]; rate = 12; }
     blendTo(view.cur, target, rate, dt);
-    applyPose(rig, base, def.rest, view.cur, view.yaw);
+    applyPose(rig, base, skinCfg?.rest || def.rest, view.cur, view.yaw);
     if (rig.skinHero) { driveSkin(rig); updateLayers(p, dt); layerSkin(rig, view.layers); }
-    if (skinCfg?.weaponToWrist && rig.weapon) twistToWrist(rig, rig.weapon);
     // The wielded weapon rides the sword's grip: same pose every frame, and only it shows.
     if (shownGear !== (p.gear?.id ?? null)) { shownGear = p.gear?.id ?? null; showWeapon(model, shownGear); }
     // The hat rides the head node and needs no per-frame work, only a swap when it changes.
