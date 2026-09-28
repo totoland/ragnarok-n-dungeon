@@ -84,11 +84,12 @@ PRESETS = {
             "items": [
                 # Tripo's recurve bow, fitted onto the classic bow's frame by
                 # assets/blender/hunter_tripo/prepare_bow.py.
-                # Fitted to the fist itself ("align"): grip in the hollow of the fingers, the
-                # bow along the knuckle line (upper limb on the index side), string towards the
-                # archer - where the hand, not the old bow, says it goes.
+                # The bow keeps the classic bow's angle (prepare_bow.py fitted it there) and the
+                # WRIST turns to hold it ("align": "wrist"): the hand is rolled until its knuckle
+                # line runs along the bow and the back of the hand faces the string, and the
+                # bow's grip is set in the closed fist. Toto: the bow was right, the wrist was not.
                 {"node": "weapon", "glb": "assets/blender/hunter_tripo/bow_parts.glb",
-                 "anchor": "grip", "bone": "RightHand", "at": "fist", "align": "bow"},
+                 "anchor": "grip", "bone": "RightHand", "at": "fist", "align": "wrist"},
                 # Beside the left shoulder, where the classic Hunter carried it: the bird's pivot
                 # is its body, and its tail and wingtips hang well below its feet, so it is
                 # placed by that pivot, out and a little up, not by its lowest point.
@@ -176,13 +177,33 @@ def pose_and_mount(preset, arm, body, lifted, top):
                 turn_bone(f"{side}Hand{finger}{j}", axis, math.radians(deg))
         for j, deg in zip((1, 2, 3), fs["thumb"]):
             turn_bone(f"{side}HandThumb{j}", axis, math.radians(deg))
+    # The closed hand's own frame: the knuckle line, and back along the hand towards the wrist.
+    def hand_frame():
+        up = (H("RightHandIndex1") - H("RightHandPinky1")).normalized()
+        back = (H("RightHand") - H("RightHandMiddle1")).normalized()
+        return up, (back - up * back.dot(up)).normalized()
+
+    mount = preset.get("mount")
+    for it in (mount or {}).get("items", []):
+        if it.get("align") != "wrist":
+            continue
+        # Turn the wrist onto the prop: its long axis and riser->string side, as it will sit.
+        g, l, d, _ = bow_frame(np.array([list(v.co) for v in lifted[it["node"]][0][1].vertices]))
+        up, back = hand_frame()
+        src = Matrix((up, back, up.cross(back))).transposed()
+        dd = (d - l * d.dot(l)).normalized()
+        dst = Matrix((l, dd, l.cross(dd))).transposed()
+        R = (dst @ src.inverted()).to_4x4()
+        bone = pb[M + it["bone"]]
+        m = world @ bone.matrix
+        head = m.translation.copy()
+        bone.matrix = world.inverted() @ (Matrix.Translation(head) @ R @ Matrix.Translation(-head) @ m)
+        bpy.context.view_layer.update()
+        # and centre the bow's grip on the fist, at its own angle
+        lifted[it["node"]][0][1].transform(Matrix.Translation(-g))
+        print(f"[tripo] wrist turned {math.degrees(R.to_quaternion().angle):.0f} deg onto the {it['node']}")
     fist = sum((H(f"RightHandMiddle{j}") for j in (1, 2, 3, 4)), Vector()) / 4
     points = {"fist": fist, "shoulder": H("LeftArm")}
-    # The closed hand's own frame, for a prop that must sit in it rather than where an older
-    # model's prop sat: the knuckle line, and back along the hand towards the wrist.
-    hand_up = (H("RightHandIndex1") - H("RightHandPinky1")).normalized()
-    hand_back = (H("RightHand") - H("RightHandMiddle1")).normalized()
-    hand_back = (hand_back - hand_up * hand_back.dot(hand_up)).normalized()
     neck = H("Neck")
 
     dg = bpy.context.evaluated_depsgraph_get()
@@ -209,18 +230,11 @@ def pose_and_mount(preset, arm, body, lifted, top):
         bpy.context.view_layer.update()
         return e
 
-    mount = preset.get("mount")
     if mount:
         k = top / mount["old_height"]                   # old game units -> this file's units
         for it in mount["items"]:
             parts = lifted[it["node"]]
             at = points[it["at"]].copy() + Vector(it.get("offset", (0, 0, 0)))
-            if it.get("align") == "bow":
-                _, me0, _ = parts[0]
-                g, l, d, sd = bow_frame(np.array([list(v.co) for v in me0.vertices]))
-                src = Matrix((l, d, sd)).transposed()
-                dst = Matrix((hand_up, hand_back, hand_up.cross(hand_back))).transposed()
-                me0.transform((dst @ src.inverted()).to_4x4() @ Matrix.Translation(-g))
             if it.get("sit"):
                 # Lift the prop so its lowest point rests on the spot rather than its pivot.
                 low = min(min((v.co.z + off.z) for v in me.vertices) for _, me, off in parts)

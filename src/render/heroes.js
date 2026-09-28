@@ -183,36 +183,27 @@ const HUNTER = {
     dead: { clip: 'dead' },
     hurt: { clip: 'hurt', rate: 1.5 },
     attacks: {},
-    // The bow is fitted to his closed fist (tools/tripo_to_skinned.py, align: 'bow'), so the
-    // wx/wy/wz turn the rigid Hunter's bow needed in his hand would only twist it out of it.
-    lockWeapon: true,
+    // His wrist was turned onto the bow (tools/tripo_to_skinned.py, align: 'wrist'); the bow's
+    // stance twist turns that wrist too, so the fist never lets go of it.
+    weaponToWrist: true,
   },
 };
 
 const DEFS = { knight: KNIGHT, hunter: HUNTER };
 
-// A skinned hero whose weapon is fitted to his fist (lockWeapon) holds it at whatever angle
-// his hand is at. The bow should stand upright in his stance, so work out once, in the rest
-// pose, the turn about the grip that puts the bow's long axis straight up - the job wz did
-// for the rigid Hunter - and keep it as the weapon's own rotation from then on.
-const UP = new THREE.Vector3(0, 1, 0);
-function weaponUpright(rig, weapon) {
-  let mesh = null;
-  weapon.traverse((o) => { if (!mesh && o.isMesh) mesh = o; });
-  if (!mesh) return new THREE.Quaternion();
-  mesh.geometry.computeBoundingBox();
-  const size = mesh.geometry.boundingBox.getSize(new THREE.Vector3());
-  const axis = size.x >= size.y && size.x >= size.z ? new THREE.Vector3(1, 0, 0)
-    : size.y >= size.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+// A skinned hero whose weapon twist belongs to his wrist (weaponToWrist). The rigid Hunter
+// turned his bow in his hand with wx/wy/wz, which on a hand that grips it would turn the bow
+// out of the fist; so the same turn goes to the hand bone instead - about the grip, expressed
+// in the bone's frame - and the bow, riding the hand, comes with it.
+const QW = new THREE.Quaternion(), QA = new THREE.Quaternion();
+function twistToWrist(rig, weapon) {
+  const grip = weapon.parent;
+  const hand = grip?.parent;
+  if (!hand?.isBone) return;
+  QW.copy(weapon.quaternion);
   weapon.quaternion.identity();
-  rig.root.updateMatrixWorld(true);
-  const wq = weapon.getWorldQuaternion(new THREE.Quaternion());
-  const world = axis.clone().applyQuaternion(wq);
-  if (world.dot(UP) < 0) world.negate();
-  const turn = new THREE.Quaternion().setFromUnitVectors(world, UP);
-  // expressed in the weapon's parent frame: local = P^-1 * turn * P, applied on the left
-  const pq = weapon.parent.getWorldQuaternion(new THREE.Quaternion());
-  return pq.clone().invert().multiply(turn).multiply(pq);
+  QA.copy(grip.quaternion);
+  hand.quaternion.multiply(QA.clone().multiply(QW).multiply(QA.invert()));
 }
 
 // ------------------------------------------------------------------ loading
@@ -307,11 +298,7 @@ export function restPose(model, heroKey) {
   if (model.userData.base) for (const k in model.userData.base) if (base[k]) base[k].copy(model.userData.base[k]);
   applyPose(rig, base, DEFS[heroKey].rest, {}, 0);
   if (rig.skinHero) driveSkin(rig);
-  if (DEFS[heroKey].skinned?.lockWeapon && rig.skinHero && rig.weapon) {
-    // Kept as an array: a clone copies userData through JSON, which a Quaternion would not survive.
-    model.userData.weaponUpright ||= weaponUpright(rig, rig.weapon).toArray();
-    rig.weapon.quaternion.fromArray(model.userData.weaponUpright);
-  }
+  if (DEFS[heroKey].skinned?.weaponToWrist && rig.skinHero && rig.weapon) twistToWrist(rig, rig.weapon);
   for (const v of Object.values(rig.variants)) { v.rotation.copy(rig.weapon.rotation); v.position.copy(rig.weapon.position); }
 }
 
@@ -399,16 +386,6 @@ export function createHeroView(world, heroKey, assets) {
 
   // Which clip, if any, the skinned hero should be playing now, and where in it.
   const skinCfg = rig.skinHero ? def.skinned : null;
-  // The bow's upright turn, measured with the arm on its stance (see weaponUpright).
-  let uprightQ = null;
-  if (skinCfg?.lockWeapon && rig.weapon) {
-    if (!model.userData.weaponUpright) {
-      applyPose(rig, base, def.rest, {}, 0);
-      driveSkin(rig);
-      model.userData.weaponUpright = weaponUpright(rig, rig.weapon).toArray();
-    }
-    uprightQ = new THREE.Quaternion().fromArray(model.userData.weaponUpright);
-  }
   function wantedLayer(p, dt) {
     const S = SKIN[rig.skinHero];
     if (p.state === 'attack' && p.attack) {
@@ -505,7 +482,7 @@ export function createHeroView(world, heroKey, assets) {
     blendTo(view.cur, target, rate, dt);
     applyPose(rig, base, def.rest, view.cur, view.yaw);
     if (rig.skinHero) { driveSkin(rig); updateLayers(p, dt); layerSkin(rig, view.layers); }
-    if (skinCfg?.lockWeapon && rig.weapon) rig.weapon.quaternion.copy(uprightQ);
+    if (skinCfg?.weaponToWrist && rig.weapon) twistToWrist(rig, rig.weapon);
     // The wielded weapon rides the sword's grip: same pose every frame, and only it shows.
     if (shownGear !== (p.gear?.id ?? null)) { shownGear = p.gear?.id ?? null; showWeapon(model, shownGear); }
     // The hat rides the head node and needs no per-frame work, only a swap when it changes.
