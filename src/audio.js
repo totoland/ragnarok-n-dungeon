@@ -1,4 +1,4 @@
-// Tiny WebAudio synth, same shape as the sibling projects: no assets, context created on the
+// Tiny WebAudio synth, same shape as the sibling projects - almost no assets (SAMPLES below), context created on the
 // first user gesture. Consumes the same game.events the effects layer does.
 //
 // Two things every voice has to do, and for a long time none of them did - which was the
@@ -16,13 +16,48 @@
 //    plays a slice of it from a random offset; the gain envelope was already doing the fade.
 const MAX_VOICES = 32;       // past this, a new sound is dropped rather than stacked
 
+// Recorded sounds, for the few moments a synth blip undersells. Fetched and decoded once, the
+// first time the context exists; until one is ready its synth version plays instead, so a slow
+// connection never costs a sound, only its upgrade.
+const SAMPLES = {
+  levelUp: { url: 'assets/sfx/levelup.m4a', vol: 0.7 },
+  critical: { url: 'assets/sfx/critical.m4a', vol: 0.8 },
+};
+
 class Sfx {
-  constructor() { this.ctx = null; this.muted = false; this.lastAt = new Map(); this.noiseBuf = null; this.voices = 0; }
+  constructor() { this.ctx = null; this.muted = false; this.lastAt = new Map(); this.noiseBuf = null; this.voices = 0; this.buffers = {}; }
 
   init() {
     if (this.ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (AC) this.ctx = new AC();
+    if (this.ctx && typeof fetch === 'function') this.loadSamples();
+  }
+
+  loadSamples() {
+    for (const [name, s] of Object.entries(SAMPLES)) {
+      fetch(s.url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+        // the callback form: older WebKit's decodeAudioData returns no promise
+        .then((data) => new Promise((ok, no) => this.ctx.decodeAudioData(data, ok, no)))
+        .then((buf) => { this.buffers[name] = buf; })
+        .catch(() => { /* the synth version stays */ });
+    }
+  }
+
+  // Play a recorded sound; false when it is not loaded yet, so the caller can fall back.
+  sample(name) {
+    const buf = this.buffers[name];
+    if (!buf) return false;
+    if (!this.ctx || this.muted || this.voices >= MAX_VOICES) return true;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    const gain = this.ctx.createGain();
+    gain.gain.value = SAMPLES[name].vol;
+    src.connect(gain).connect(this.ctx.destination);
+    this.voice(src, [src, gain]);
+    src.start();
+    return true;
   }
 
   // One second of white noise, made the first time it is needed and kept.
@@ -106,6 +141,7 @@ class Sfx {
       case 'hit':
         if (ev.target === 'enemy') {
           if (ev.crit) {
+            if (this.sample('critical')) break;
             // Ragnarok's critical: a bright metallic "kshing" - a hard high transient, a pair
             // of detuned partials that ring out, and a thump underneath. Never rate-gated:
             // a critical that goes silent because the combo is busy is the one you notice.
@@ -153,7 +189,7 @@ class Sfx {
       case 'itemDrop': [1318, 1568, 2093].forEach((f, i) => this.tone({ freq: f, type: 'sine', dur: 0.5, vol: 0.05, at: i * 0.09 })); break;
       case 'bossDrop': [1046, 1318, 1568, 2093].forEach((f, i) => this.tone({ freq: f, type: 'sine', dur: 0.9, vol: 0.06, at: 0.4 + i * 0.12 })); break;
       // The RO level-up fanfare in spirit: a fast rising run and a held top note.
-      case 'levelUp': [659, 784, 988, 1318].forEach((f, i) => this.tone({ freq: f, type: 'triangle', dur: 0.14, vol: 0.07, at: i * 0.07 })); this.tone({ freq: 1568, type: 'triangle', dur: 0.7, vol: 0.09, at: 0.3 }); this.tone({ freq: 784, type: 'sine', dur: 0.7, vol: 0.05, at: 0.3 }); break;
+      case 'levelUp': if (this.sample('levelUp')) break; [659, 784, 988, 1318].forEach((f, i) => this.tone({ freq: f, type: 'triangle', dur: 0.14, vol: 0.07, at: i * 0.07 })); this.tone({ freq: 1568, type: 'triangle', dur: 0.7, vol: 0.09, at: 0.3 }); this.tone({ freq: 784, type: 'sine', dur: 0.7, vol: 0.05, at: 0.3 }); break;
       case 'won': [523, 659, 784, 1046, 1318].forEach((f, i) => this.tone({ freq: f, type: 'square', dur: 0.4, vol: 0.07, at: i * 0.12 })); break;
       case 'gameOver': [440, 415, 392, 349].forEach((f, i) => this.tone({ freq: f, type: 'triangle', dur: 0.5, vol: 0.08, at: i * 0.25 })); break;
     }

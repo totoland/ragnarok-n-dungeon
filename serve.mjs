@@ -7,7 +7,7 @@ const root = new URL('.', import.meta.url).pathname;
 const port = Number(process.env.PORT || 8082);
 const types = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon', '.md': 'text/plain; charset=utf-8', '.glb': 'model/gltf-binary', '.svg': 'image/svg+xml',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon', '.md': 'text/plain; charset=utf-8', '.glb': 'model/gltf-binary', '.m4a': 'audio/mp4', '.svg': 'image/svg+xml',
 };
 
 // Dev-only: `PUT /__screenshot/<name>` stores a PNG body under docs/screenshots/ so the game
