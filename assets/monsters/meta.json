@@ -376,5 +376,52 @@
         "verts": 1393
       }
     }
+  },
+  "skelbow": {
+    "height": 1.8,
+    "front": "+z",
+    "skinned": true,
+    "pivot": {
+      "root": [
+        0,
+        0,
+        0
+      ],
+      "head": [
+        0.0036,
+        1.3394,
+        -0.0106
+      ],
+      "weapon": [
+        0.2871,
+        1.1304,
+        0.6041
+      ]
+    },
+    "parts": {
+      "weapon": {}
+    },
+    "clips": {
+      "walk": {
+        "dur": 1.167,
+        "strike": 0.033
+      },
+      "idle": {
+        "dur": 7.833,
+        "strike": 4.533
+      },
+      "dead": {
+        "dur": 2.367,
+        "strike": 1.6
+      },
+      "hurt": {
+        "dur": 0.767,
+        "strike": 0.1
+      },
+      "aim": {
+        "dur": 0.7,
+        "strike": 0.2
+      }
+    }
   }
 }

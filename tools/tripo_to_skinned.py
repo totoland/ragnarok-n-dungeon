@@ -136,6 +136,38 @@ PRESETS = {
             "items": [{"node": "weapon", "anchor": "grip", "bone": "RightHand", "at": "fist"}],
         },
     },
+    "skelbow": {
+        "src": "assets/blender/skelbow_tripo/skelbow_rigged.glb",
+        "out": "assets/blender/skelbow_tripo/skelbow_skinned.blend",
+        "prefix": "SB",
+        "clusters": 12,
+        # The cloak and the quiver on it: the auto-rig gave them, hem to shoulder, to the upper
+        # arms - the right one mostly - so every draw of the bow would fling the cloak out. Off
+        # the arm itself (thin bone, a bracer) and below the hood, it rides a Cape bone.
+        "appendages": [{
+            "bone": "Cape", "parent": "Spine2",
+            "head": (0.0, 0.05, 0.70), "tail": (0.0, 0.10, 0.10),
+            "pick": lambda c, dom, d_leg, lum=1, d_arm=1: c[2] <= 0.72 and d_arm > 0.035
+                    and dom in ("LeftArm", "RightArm", "LeftShoulder", "RightShoulder"),
+        }],
+        # The hood, which the same arms had: it goes with the skull.
+        "rebind": [{
+            "to": "Head",
+            "pick": lambda c, dom, near: c[2] > 0.72 and near["arm"] > 0.035
+                    and dom in ("LeftArm", "RightArm", "LeftShoulder", "RightShoulder"),
+        }],
+        # The Hunter's bow stance and the Hunter's bow: left hand forward, thumb on top.
+        "stance": [("LeftArm", (0.30, -0.80, -0.52)), ("LeftForeArm", (0.12, -1.0, -0.10)),
+                   ("LeftHand", (0.08, -1.0, -0.06))],
+        "fist": {"side": "Left", "joints": (70, 90, 70), "thumb": (20, 40, 30), "roll_up": True},
+        "mount": {
+            "glb": "assets/blender/hunter_tripo/bow_parts.glb", "old_height": 1.8,
+            "items": [{"node": "weapon", "anchor": "grip", "bone": "LeftHand", "at": "fist", "align": "hold"}],
+        },
+        # Skelbow wears the Robin Hood hat over the hood (render/monsters.js); Skel Archer is
+        # the same model bare-headed.
+        "head_anchor": True,
+    },
 }
 
 

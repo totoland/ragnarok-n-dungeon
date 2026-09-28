@@ -52,6 +52,14 @@ if [ -f "$KA/Standard_Walk.fbx" ]; then
 else
   echo "[export_heroes] moonraya: Mixamo clips not on this machine - keeping the committed GLB"
 fi
+# Skelbow is skinned too (tools/tripo_to_skinned.py skelbow), with the Hunter's bow and clips.
+if [ -f "$KA/Standard_Walk.fbx" ]; then
+  sh tools/export_skinned_hero.sh skelbow assets/blender/skelbow_tripo/skelbow_skinned.blend \
+    walk=$KA/Standard_Walk.fbx idle=$KA/Unarmed_Idle_Looking_Ver_2.fbx dead=$KA/Standing_Death_Forward_02.fbx \
+    hurt=$KA/Standing_React_Small_From_Front_02.fbx aim=$KA/Standing_Aim_Recoil.fbx
+else
+  echo "[export_heroes] skelbow: Mixamo clips not on this machine - keeping the committed GLB"
+fi
 "$BLENDER" -b assets/blender/sandman/sandman.blend -P tools/export_heroes.py -- sandman assets/monsters 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
 "$BLENDER" -b assets/blender/dark_sword/dark_sword.blend -P tools/export_heroes.py -- darkSword assets/monsters 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
 # Nerakos is skinned (tools/tripo_to_skinned.py nerakos), holding the Under Water Sword from

@@ -202,6 +202,8 @@ let dsModel = null;
 let nerModel = null;
 let koModel = null;
 let wispModel = null;
+let skelbowModel = null;
+let skelHat = null;          // { model, neckY }: the Robin Hood hat Skelbow wears over his hood
 
 /** Injection seam for the loaded boss model. The render test uses it to supply a stand-in
  *  rig, since GLTFLoader cannot fetch a file in Node. */
@@ -212,10 +214,11 @@ export function setDarkSwordModel(scene) { dsModel = scene; }
 export function setNerakosModel(scene) { nerModel = scene; }
 export function setKingOrcModel(scene) { koModel = scene; }
 export function setWispraModel(scene) { wispModel = scene; }
+export function setSkelbowModel(scene, hat = null) { skelbowModel = scene; skelHat = hat; }
 
 export async function loadMonsterAssets(base = 'assets/monsters/') {
   const loader = new GLTFLoader();
-  const [baph, moon, sand, ds, ner, ko, wisp, meta] = await Promise.all([
+  const [baph, moon, sand, ds, ner, ko, wisp, skb, hat, meta] = await Promise.all([
     loader.loadAsync(base + 'baphomet.glb'),
     loader.loadAsync(base + 'moonraya.glb'),
     loader.loadAsync(base + 'sandman.glb'),
@@ -223,11 +226,13 @@ export async function loadMonsterAssets(base = 'assets/monsters/') {
     loader.loadAsync(base + 'nerakos.glb'),
     loader.loadAsync(base + 'kingOrc.glb'),
     loader.loadAsync(base + 'wispra.glb').catch(() => null),
+    loader.loadAsync(base + 'skelbow.glb').catch(() => null),
+    loader.loadAsync(base + '../gear/robinHat.glb').catch(() => null),
     fetch(base + 'meta.json').then((r) => r.json()).catch(() => ({})),
   ]);
   // A boss exported with its skeleton (tools/export_skinned_hero.py) says so in meta.json.
-  for (const [key, gltf] of [['baphomet', baph], ['moonraya', moon], ['sandman', sand], ['darkSword', ds], ['nerakos', ner], ['kingOrc', ko]]) {
-    if (meta?.[key]?.skinned) prepareSkin(key, gltf, meta[key]);
+  for (const [key, gltf] of [['baphomet', baph], ['moonraya', moon], ['sandman', sand], ['darkSword', ds], ['nerakos', ner], ['kingOrc', ko], ['skelbow', skb]]) {
+    if (gltf && meta?.[key]?.skinned) prepareSkin(key, gltf, meta[key]);
   }
   setBossModel(baph.scene);
   setMoonrayaModel(moon.scene);
@@ -236,6 +241,7 @@ export async function loadMonsterAssets(base = 'assets/monsters/') {
   setNerakosModel(ner.scene);
   setKingOrcModel(ko.scene);
   setWispraModel(wisp?.scene ?? null);
+  setSkelbowModel(skb?.scene ?? null, hat ? { model: hat.scene, neckY: meta?.skelbow?.pivot?.head?.[1] ?? 0 } : null);
   return bossModel;
 }
 
@@ -288,6 +294,24 @@ function buildDarkSwordGlb() {
 function buildNerakosGlb() {
   if (!nerModel) throw new Error('nerakos.glb not loaded - call loadMonsterAssets() first');
   return rigFromGlb(nerModel);
+}
+
+// Tripo's hooded skeleton archer (tools/tripo_to_skinned.py skelbow) is both of the game's
+// skeleton archers: Skel Archer bare-hooded in Prontera, and Skelbow in Phaelan with the
+// Robin Hood hat over the hood - the hat he drops. The hat rides the `head` anchor, whose
+// origin is the neck; its band sits HAT_Y above the floor, over the hood's crown.
+const HAT_Y = 1.72, HAT_SCALE = 1.3;
+function buildSkelArcherGlb(hat) {
+  const built = rigFromGlb(skelbowModel);
+  const anchor = built.root.getObjectByName('head');
+  if (hat && skelHat && anchor) {
+    const node = skelHat.model.clone(true);
+    node.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.castShadow = true; } });
+    node.scale.setScalar(HAT_SCALE);
+    node.position.set(0, HAT_Y - skelHat.neckY, 0);
+    anchor.add(node);
+  }
+  return built;
 }
 
 function buildKingOrcGlb() {
@@ -1332,14 +1356,16 @@ function buildRotgrim() {
 // limb-segmented by tools/export_heroes.py to assets/monsters/moonraya.glb with an entry in
 // meta.json, loaded in loadMonsterAssets(), and this function replaced by the GLB build.
 const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
-  pecoPeco: buildPecoPeco, ant: buildAnt, babyWolf: buildBabyWolf, sandWraith: buildSandWraith, golem: buildGolem, phreeoni: buildPhreeoni, skeleton: () => buildSkeleton(), skelArcher: () => buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: () => buildBaphomet(),
+  pecoPeco: buildPecoPeco, ant: buildAnt, babyWolf: buildBabyWolf, sandWraith: buildSandWraith, golem: buildGolem, phreeoni: buildPhreeoni, skeleton: () => buildSkeleton(), skelArcher: () => skelbowModel ? buildSkelArcherGlb(false) : buildSkeleton({ archer: true }), orcLord: buildOrcLord, baphomet: () => buildBaphomet(),
   // 1.75 of the boss's 3.0 game units, which is skeleton height.
   baphometling: () => buildBaphomet(0.58, 0.3),
   // Phaelan. Skelbow is the archer skeleton's build in the forest's own colours, so the two
   // read as cousins rather than as the same monster twice.
   famiru: buildFamiru, wispra: buildWispra, foxShade: buildFoxShade,
   munari: buildMunari, bonku: buildBonku, sorya: buildSorya,
-  skelbow: () => buildSkeleton({ archer: true, boneColor: 0xcfd6c4, clothColor: 0x3f5b3a }),
+  // Tripo's hooded skeleton archer, skinned (tools/tripo_to_skinned.py skelbow) with the
+  // Hunter's bow; the primitive one is the fallback for when skelbow.glb is not loaded.
+  skelbow: () => skelbowModel ? buildSkelArcherGlb(true) : buildSkeleton({ archer: true, boneColor: 0xcfd6c4, clothColor: 0x3f5b3a }),
   moonraya: buildMoonrayaGlb,
   // Orvane. The tower above, the rift below, and the boss's own shards for his adds.
   flittern: buildFlittern, hushling: buildHushling, stringen: buildStringen,
@@ -1415,7 +1441,16 @@ const SKIN_MOVES = {
       heal: { clip: 'powerup', linear: true },
     },
   },
+  // Skelbow: the Hunter's clips and the Hunter's grip - the bow in the left hand, held on its
+  // stance while he walks, and Mixamo's Standing Aim Recoil for the shot. Its release lands
+  // on the frame the arrow leaves, and the 0.75 s wind-up stretches the draw into the tell.
+  skelbow: {
+    walk: { clip: 'walk', stride: 1.75, keep: 'bowArm' }, idle: { clip: 'idle', keep: 'bowArm' }, dead: { clip: 'dead' },
+    hurt: { clip: 'hurt', rate: 1.5 },
+    moves: { attack: { clip: 'aim', pre: 0.2, post: 0.35 } },
+  },
 };
+SKIN_MOVES.skelArcher = SKIN_MOVES.skelbow;
 // His minions are the same sculpt at 0.58 - the same moves, and a stride to match.
 SKIN_MOVES.baphometling = { ...SKIN_MOVES.baphomet, walk: { ...SKIN_MOVES.baphomet.walk, stride: 2.66 * 0.58 } };
 
@@ -1459,11 +1494,11 @@ function wantedBossLayer(v, e, dt) {
   if ((e.moving || e.state === 'enter') && has(cfg.walk)) {
     const info = S.clips[cfg.walk.clip].info;
     v.walkTime = ((v.walkTime ?? 0) + dt * (e.def.speed / cfg.walk.stride) * info.dur) % info.dur;
-    return { name: cfg.walk.clip, key: 'walk', time: v.walkTime };
+    return { name: cfg.walk.clip, key: 'walk', time: v.walkTime, keep: cfg.walk.keep };
   }
   if (has(cfg.idle)) {
     const info = S.clips[cfg.idle.clip].info;
-    return { name: cfg.idle.clip, key: 'idle', time: (v.t % info.dur) };
+    return { name: cfg.idle.clip, key: 'idle', time: (v.t % info.dur), keep: cfg.idle.keep };
   }
   return null;
 }
