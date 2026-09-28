@@ -19,16 +19,22 @@ const MAX_VOICES = 32;       // past this, a new sound is dropped rather than st
 // Recorded sounds, for the few moments a synth blip undersells. Fetched and decoded once, the
 // first time the context exists; until one is ready its synth version plays instead, so a slow
 // connection never costs a sound, only its upgrade.
+//
+// Each is AAC (.m4a, a few KB) with a PCM .wav beside it. The native app on a Mac ("Designed
+// for iPad") runs a WebKit whose decodeAudioData refuses AAC outright - EncodingError, on a
+// file Safari and Chrome both decode - so a sample that fails to decode tries the next file.
+// PCM needs no codec at all. Browsers never get past the first.
 const SAMPLES = {
-  levelUp: { url: 'assets/sfx/levelup.m4a', vol: 0.7 },
-  critical: { url: 'assets/sfx/critical.m4a', vol: 0.8 },
+  levelUp: { url: 'assets/sfx/levelup', vol: 0.7 },
+  critical: { url: 'assets/sfx/critical', vol: 0.8 },
   // The ordinary hit lands dozens of times a minute: pitched a few percent either way each time
   // so a combo is not one sample on repeat, and a little under the critical so that one stands out.
-  hit: { url: 'assets/sfx/hit.m4a', vol: 0.55, vary: 0.06 },
+  hit: { url: 'assets/sfx/hit', vol: 0.55, vary: 0.06 },
   // The hero being struck. Rarer than his own hits (0.9 s of i-frames after each), so it can be
   // loud; pitched a little either way so two hits in a fight do not match.
-  hurt: { url: 'assets/sfx/hurt.m4a', vol: 0.75, vary: 0.04 },
+  hurt: { url: 'assets/sfx/hurt', vol: 0.75, vary: 0.04 },
 };
+const FORMATS = ['m4a', 'wav'];
 
 class Sfx {
   constructor() { this.ctx = null; this.muted = false; this.lastAt = new Map(); this.noiseBuf = null; this.voices = 0; this.buffers = {}; this.sampleStatus = {}; }
@@ -46,20 +52,30 @@ class Sfx {
   loadSamples() {
     for (const [name, s] of Object.entries(SAMPLES)) {
       this.sampleStatus[name] = 'loading';
-      // Status 0 is a success here. The native app serves its files through Capacitor's
-      // WebViewAssetHandler, which answers an audio extension (.m4a, .mp3, .wav...) with a
-      // bare URLResponse rather than an HTTP one, so fetch sees no status at all: ok is
-      // false, the body is all there. Rejecting on !ok threw every sample away in the app
-      // and it played the synth - the "sounds never changed" on the iPad build.
-      fetch(s.url).then((r) => (r.ok || r.status === 0 ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
-        // the callback form: older WebKit's decodeAudioData returns no promise
-        .then((data) => new Promise((ok, no) => this.ctx.decodeAudioData(data, ok, (e) => no(e || new Error('decode failed')))))
-        .then((buf) => { this.buffers[name] = buf; this.sampleStatus[name] = `ok ${buf.duration.toFixed(2)}s`; })
-        .catch((e) => {
-          this.sampleStatus[name] = `failed: ${e?.message || e}`;
+      const tried = [];
+      const next = (i) => {
+        if (i >= FORMATS.length) {
+          this.sampleStatus[name] = `failed: ${tried.join('; ')}`;
           console.warn(`[sfx] ${s.url}: ${this.sampleStatus[name]} - playing the synth version`);
-        });
+          return;
+        }
+        const url = `${s.url}.${FORMATS[i]}`;
+        this.fetchSample(url)
+          .then((buf) => { this.buffers[name] = buf; this.sampleStatus[name] = `ok ${FORMATS[i]} ${buf.duration.toFixed(2)}s`; })
+          .catch((e) => { tried.push(`${FORMATS[i]} ${e?.name || ''} ${e?.message || e}`.trim()); next(i + 1); });
+      };
+      next(0);
     }
+  }
+
+  fetchSample(url) {
+    // Status 0 is a success here. The native app serves its files through Capacitor's
+    // WebViewAssetHandler, which answers an audio extension (.m4a, .wav, .mp3...) with a bare
+    // URLResponse rather than an HTTP one, so fetch sees no status at all: ok is false, the
+    // body is all there.
+    return fetch(url).then((r) => (r.ok || r.status === 0 ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      // the callback form: older WebKit's decodeAudioData returns no promise
+      .then((data) => new Promise((ok, no) => this.ctx.decodeAudioData(data, ok, (e) => no(e || new Error('decode failed')))));
   }
 
   // Play a recorded sound; false when it is not loaded yet, so the caller can fall back.
