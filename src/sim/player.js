@@ -200,7 +200,7 @@ function runAttack(g, p, dt) {
       g.spawnProjectile({
         owner: 'player', kind: s.kind, x: p.x + p.facing * 0.6, z: p.z, y: p.y + s.y,
         vx: s.speed * p.facing, vy: s.vy || 0, dmg: s.dmg * skillDmg(p, p.attack), knock: s.knock, stun: s.stun,
-        life: s.life, pierce: !!s.pierce, facing: p.facing,
+        life: s.life, pierce: !!s.pierce, facing: p.facing, skill: p.def.skills.includes(p.attack),
       });
     });
   }
@@ -219,7 +219,7 @@ function runAttack(g, p, dt) {
 export function landHit(g, p, e, hit, dir) {
   const mult = hit.dmg * skillDmg(p, p.attack) * elementMult(p, e);
   const { dmg, crit } = rollDamage(p.atk, mult, g.rng, p.crit, p.critDmg);
-  const killed = applyHit(e, dmg, hit.knock, hit.stun, dir, e.mass);
+  const killed = applyHit(e, dmg, hit.knock, hit.stun, dir, e.mass, p.def.skills.includes(p.attack));
   e.facing = -dir || e.facing;
   g.onEnemyHit(e, dmg, crit, killed, p.attack);
 }

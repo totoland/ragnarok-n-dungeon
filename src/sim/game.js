@@ -117,7 +117,7 @@ function updateProjectiles(g, dt) {
         if (e.dead || pr.hitIds.includes(e.id) || !boxHits(pr, pr.facing, box, e)) continue;
         pr.hitIds.push(e.id);
         const { dmg, crit } = rollDamage(p.atk, pr.dmg * elementMult(p, e), g.rng, p.crit, p.critDmg);
-        const killed = applyHit(e, dmg, pr.knock, pr.stun, pr.facing, e.mass);
+        const killed = applyHit(e, dmg, pr.knock, pr.stun, pr.facing, e.mass, !!pr.skill);
         e.facing = -pr.facing;
         onEnemyHit(g, e, dmg, crit, killed, pr.kind);
         if (!pr.pierce) { pr.dead = true; break; }
@@ -339,7 +339,7 @@ function resolvePending(g, dt) {
     const hit = p.def.passive.hit;
     const { dmg, crit } = rollDamage(p.atk, hit.dmg, g.rng, p.crit, p.critDmg);
     const dir = Math.sign(e.x - p.x) || p.facing;
-    const killed = applyHit(e, dmg, hit.knock, hit.stun, dir, e.mass);
+    const killed = applyHit(e, dmg, hit.knock, hit.stun, dir, e.mass, false);
     onEnemyHit(g, e, dmg, crit, killed, 'autoBlitz');
   }
 }

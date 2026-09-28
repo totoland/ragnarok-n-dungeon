@@ -60,6 +60,20 @@ test('applyHit launches on upward knockback and scales knockback by mass', () =>
   assert.equal(light.hp, 0);
 });
 
+test('a boss is shoved by skills only, never by the basic combo', () => {
+  const boss = () => ({ hp: 900, vx: 0, vy: 0, hitstun: 0, flash: 0 });
+  const basic = boss();
+  applyHit(basic, 10, [7, 2.5], 0.5, 1, 4.5, false);
+  assert.equal(basic.vx, 0, 'slash3 lands on it without moving it');
+  assert.equal(basic.hp, 890);
+  const skill = boss();
+  applyHit(skill, 10, [11, 4], 0.9, 1, 4.5, true);
+  assert.ok(skill.vx > 0, 'Bowling Bash still sends it back');
+  const minion = { hp: 50, vx: 0, vy: 0, hitstun: 0, flash: 0 };
+  applyHit(minion, 10, [2.5, 0], 0.34, 1, 1, false);
+  assert.ok(minion.vx > 0, 'a minion is still knocked by the combo');
+});
+
 // This is the boss that disappeared when you hit it. A hit with no knockback passes 0 where
 // a [x, y] pair goes; indexing that gave undefined, undefined * dir * k gave NaN, and NaN
 // went into vx and then into x, where it stayed. The monster kept its health, kept its place

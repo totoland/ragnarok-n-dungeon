@@ -34,7 +34,12 @@ export function rollDamage(atk, mult, rng, crit = 0.08, critDmg = 1.6) {
 // counted by the wave and still drawn - drawn nowhere. That was the boss that disappeared
 // the moment you hit it, and why it only ever happened to a hero carrying Orvane's gear:
 // Auto Meteor and Double Attack are the only two things in the game that pass 0 here.
-export function applyHit(target, dmg, knock, stun, dir, mass = 1) {
+//
+// `skill` says whether the blow is a skill (Bowling Bash, Magnum Break - or a weapon casting
+// one). A boss is only ever shoved by those: the basic combo, a plain arrow and the falcon
+// land on it without moving it an inch, so a boss stands its ground against being chipped at
+// and a skill is what still sends it back.
+export function applyHit(target, dmg, knock, stun, dir, mass = 1, skill = true) {
   // Armour: a share of the damage that never lands. It is a PERCENTAGE and not a flat
   // subtraction on purpose - a flat one is brutal against a level-1 hero swinging for 12
   // and worth nothing against one swinging for 89, and this game's ATK moves by 7x across
@@ -46,7 +51,7 @@ export function applyHit(target, dmg, knock, stun, dir, mass = 1) {
   if (dmg > 0) dmg = Math.max(1, Math.round(dmg * (1 - (target.armor || 0))));
   target.hp = Math.max(0, target.hp - dmg);
   const k = 1 / Math.max(0.35, mass);
-  if (knock) target.vx = knock[0] * dir * k;
+  if (knock && (mass < 3 || skill)) target.vx = knock[0] * dir * k;
   // Hyper armour. A boss used to keep 45 % of the stun, which reads as a flinch and is
   // enough to cut a wind-up - so the Sandman, who is hit constantly because he is enormous
   // and slow, almost never got an attack out at all. A boss now takes the hit without
