@@ -267,7 +267,7 @@ test("Hunter's Auto Blitz sends the falcon after a share of arrow hits, and the 
     g.events.length = 0;
     e.hp = 1e9; e.x = 4.5; e.z = 0; e.vx = 0; e.dead = false;
     e.state = 'chase'; e.hitstun = 0; e.launched = false; e.y = 0; e.vy = 0; e.grounded = true;
-    p.x = 1.5; p.z = 0; p.vx = 0; p.facing = 1;                  // shoot3 backsteps into the wall otherwise
+    p.x = 1.5; p.z = 0; p.vx = 0; p.facing = 1;                  // held in place for every loop
   }
   // A proc in the last 0.3s of the loop has not landed yet; let the falcon finish its trip.
   for (let i = 0; i < 20; i++) {

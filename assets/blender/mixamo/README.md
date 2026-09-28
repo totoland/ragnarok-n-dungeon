@@ -40,6 +40,7 @@ lines up with the moment a hit lands (render/skin.js `attackClipTime`).
 | `Standing_2H_Magic_Attack_01.fbx` | Crouch, both arms over the head, throw forward | 2.70 s | 1.13 s | Moonraya `cast` (Foxfire), Baphomet `cast` (Hellfire) |
 | `Standing_Run_Forward.fbx` | A run cycle from the first frame (~4 m/s), loops | 0.77 s | — | Moonraya `run` (Moon Dash, looped), Baphomet `run` (charge) |
 | `Standing_React_Small_From_Front_02.fbx` | Struck from the front: flinch back a step and recover | 0.77 s | — | Knight, Hunter, Moonraya, Baphomet `hurt` (played ~1.3-1.5x, from the moment of the hit) |
+| `Standing_Aim_Recoil.fbx` | Archer side-on, bow in the LEFT hand, draw to the cheek, release, lower | 0.70 s | 0.20 s (release) | Hunter `aim` (shoot1-3; bow moved to his left hand for it) |
 | `Sword_And_Shield_Power_Up.fbx` | Sword up to the sky, down, chest out and tense, relax | 2.37 s | 0.50 s | Knight `powerup` (Quicken, the raise only), Moonraya + Baphomet `powerup` (second-wind heal, played straight through) |
 
 ## Good fits for what is still missing
@@ -53,4 +54,4 @@ lines up with the moment a hit lands (render/skin.js `attackClipTime`).
 
 Still wanted from Mixamo: a female walk and idle for Moonraya, a knock-down /
 get-up, Moonraya's melee and Spirit Bell, and the Knight's dash, air slash, Magnum Break and
-Bowling Bash, and archery for the Hunter ("Standing Draw Arrow", "Standing Aim Recoil").
+Bowling Bash, and more archery for the Hunter (air shot, Arrow Shower aiming up).

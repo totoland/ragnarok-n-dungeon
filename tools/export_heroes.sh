@@ -26,7 +26,8 @@ fi
 if [ -f "$KA/Standard_Walk.fbx" ]; then
   sh tools/export_skinned_hero.sh hunter "$SRC/hunter_tripo/hunter_skinned.blend" \
     walk=$KA/Standard_Walk.fbx idle=$KA/Unarmed_Idle_Looking_Ver_2.fbx jump=$KA/Jumping_Up.fbx \
-    dead=$KA/Standing_Death_Forward_02.fbx hurt=$KA/Standing_React_Small_From_Front_02.fbx
+    dead=$KA/Standing_Death_Forward_02.fbx hurt=$KA/Standing_React_Small_From_Front_02.fbx \
+    aim=$KA/Standing_Aim_Recoil.fbx
 else
   echo "[export_heroes] hunter: Mixamo clips not on this machine - keeping the committed GLB"
 fi

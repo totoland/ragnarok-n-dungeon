@@ -129,11 +129,11 @@ const HUNTER = {
       [0.7, { aRx: 0.9, aRy: 0.3, tx: 0.05, aLx: 0.1 }],
       [1, {}],
     ],
-    shootHeavy: [ // kneel + long draw
+    shootHeavy: [ // a braced long draw: feet set, a small sink into the knees, a deeper pull
       [0, { aRx: 0.9 }],
-      [0.25, { aRx: 0.35, aRy: 0.5, tx: -0.1, tyaw: 0.2, aLx: 0.2, ry: -0.3, lLx: 0.9, lRx: -1.1, lLz: 0.2, hx: -0.1 }],
-      [0.36, { aRx: 1.35, aRy: 0.2, tx: 0.2, tyaw: -0.05, aLx: 0.3, ry: -0.3, lLx: 0.9, lRx: -1.1, lLz: 0.2, hx: 0.05 }],
-      [0.8, { aRx: 1.0, tx: 0.1, aLx: 0.15, ry: -0.25, lLx: 0.8, lRx: -1.0, lLz: 0.2 }],
+      [0.25, { aRx: 0.3, aRy: 0.55, tx: -0.06, tyaw: 0.22, aLx: 0.2, ty: -0.05, lLx: 0.22, lRx: -0.18, hx: -0.08 }],
+      [0.36, { aRx: 1.35, aRy: 0.2, tx: 0.12, tyaw: -0.05, aLx: 0.28, ty: -0.05, lLx: 0.22, lRx: -0.18, hx: 0.04 }],
+      [0.8, { aRx: 1.0, tx: 0.06, aLx: 0.15, ty: -0.03, lLx: 0.15, lRx: -0.12 }],
       [1, {}],
     ],
     airShot: [
@@ -177,12 +177,17 @@ const HUNTER = {
   // procedural stance above - raised, bow upright - while the rest of him walks and idles on
   // Mixamo clips; his shots stay procedural until archery clips arrive.
   skinned: {
-    walk: { clip: 'walk', stride: 1.7, keep: 'swordArm' },
-    idle: { clip: 'idle', keep: 'swordArm' },
+    walk: { clip: 'walk', stride: 1.7, keep: 'bowArm' },
+    idle: { clip: 'idle', keep: 'bowArm' },
     air: { clip: 'jump' },
     dead: { clip: 'dead' },
     hurt: { clip: 'hurt', rate: 1.5 },
-    attacks: {},
+    // Mixamo "Standing Aim Recoil": the bow arm out at the target, the right hand at the cheek,
+    // the release (0.20 s) landing on the frame the arrow leaves. The heavy shot draws it out.
+    attacks: {
+      shoot: { clip: 'aim', pre: 0.2, post: 0.35 },
+      shootHeavy: { clip: 'aim', pre: 0.2, post: 0.5 },
+    },
     // His bow stance is his bind pose (tools/tripo_to_skinned.py hunter), so the rigid Hunter's
     // rest - the bow arm raised, rolled 90 degrees and the bow turned in it - is not applied:
     // on a hand that grips the bow, that roll turned it palm-down.
@@ -380,7 +385,8 @@ export function createHeroView(world, heroKey, assets) {
       const C = cfg && S.clips[cfg.clip];
       if (!C) return null;
       const u = Math.min(1, p.attackT / atk.dur);
-      const hitU = (atk.hits?.[0]?.at ?? atk.dur / 2) / atk.dur;
+      // the moment it lands: a blow's hit, or a shot's arrow leaving the string
+      const hitU = (atk.hits?.[0]?.at ?? atk.spawns?.[0]?.at ?? atk.dur / 2) / atk.dur;
       return { name: cfg.clip, key: 'atk:' + p.attack, time: attackClipTime(C.info, cfg, u, hitU) };
     }
     if (p.state === 'walk' && skinCfg.walk && S.clips[skinCfg.walk.clip]) {

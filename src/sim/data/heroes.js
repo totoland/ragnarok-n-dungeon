@@ -82,8 +82,9 @@ export const HEROES = {
         spawns: [{ at: 0.1, kind: 'arrow', speed: 17, dmg: 1.0, life: 0.9, y: 1.15, knock: [2, 0], stun: 0.25 }],
       },
       shoot3: {
+        // No backstep: the heavy shot used to hop the Hunter 0.26 back as he loosed, which on
+        // the skinned model read as recoil-flinching rather than a braced shot (Toto).
         dur: 0.5, cancelAt: 0.42, next: null, anim: 'shootHeavy',
-        move: { from: 0.0, until: 0.15, speed: -3.5 },
         spawns: [{ at: 0.16, kind: 'arrow', speed: 20, dmg: 1.7, life: 1.0, y: 1.1, knock: [6, 2], stun: 0.45, pierce: true }],
       },
       airShot: {

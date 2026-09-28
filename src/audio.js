@@ -25,6 +25,9 @@ const SAMPLES = {
   // The ordinary hit lands dozens of times a minute: pitched a few percent either way each time
   // so a combo is not one sample on repeat, and a little under the critical so that one stands out.
   hit: { url: 'assets/sfx/hit.m4a', vol: 0.55, vary: 0.06 },
+  // The hero being struck. Rarer than his own hits (0.9 s of i-frames after each), so it can be
+  // loud; pitched a little either way so two hits in a fight do not match.
+  hurt: { url: 'assets/sfx/hurt.m4a', vol: 0.75, vary: 0.04 },
 };
 
 class Sfx {
@@ -162,6 +165,7 @@ class Sfx {
           this.noise({ dur: 0.09, vol: 0.1, freq: 1100, q: 0.7 });
           this.tone({ freq: 380, to: 90, type: 'square', dur: 0.09, vol: 0.07 });
         } else {
+          if (this.sample('hurt')) break;
           this.tone({ freq: 240, to: 70, type: 'sawtooth', dur: 0.25, vol: 0.14 });
           this.noise({ dur: 0.2, vol: 0.1, freq: 400, q: 0.5 });
         }

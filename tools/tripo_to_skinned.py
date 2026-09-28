@@ -80,9 +80,12 @@ PRESETS = {
         # reaches forward and a little down, the fist is rolled knuckles-vertical with the thumb
         # on top (as a hand holds a bow), and it closes. The game then adds nothing to it -
         # the rigid Hunter's 90-degree arm roll would turn this hand palm-down.
-        "stance": [("RightArm", (-0.30, -0.80, -0.52)), ("RightForeArm", (-0.12, -1.0, -0.10)),
-                   ("RightHand", (-0.08, -1.0, -0.06))],
-        "fist": {"side": "Right", "joints": (70, 90, 70), "thumb": (20, 40, 30), "roll_up": True},
+        # The LEFT hand holds the bow, as every Mixamo archery clip is authored (Standing Aim
+        # Recoil and the rest); the right draws. render/skin.js mirrors the Hunter's arm
+        # channels so the procedural "bow arm" (aL) still drives the arm with the bow in it.
+        "stance": [("LeftArm", (0.30, -0.80, -0.52)), ("LeftForeArm", (0.12, -1.0, -0.10)),
+                   ("LeftHand", (0.08, -1.0, -0.06))],
+        "fist": {"side": "Left", "joints": (70, 90, 70), "thumb": (20, 40, 30), "roll_up": True},
         # The classic Hunter's bow and falcon, lifted out of his GLB about their own pivots.
         "mount": {
             "glb": "assets/blender/hunter_tripo/classic_hunter_parts.glb", "old_height": 1.75,
@@ -92,14 +95,15 @@ PRESETS = {
                 # Held as a bow is held ("align": "hold"): upright, string towards the archer,
                 # its grip in the closed fist.
                 {"node": "weapon", "glb": "assets/blender/hunter_tripo/bow_parts.glb",
-                 "anchor": "grip", "bone": "RightHand", "at": "fist", "align": "hold"},
+                 "anchor": "grip", "bone": "LeftHand", "at": "fist", "align": "hold"},
                 # Beside the left shoulder, where the classic Hunter carried it: the bird's pivot
                 # is its body, and its tail and wingtips hang well below its feet, so it is
                 # placed by that pivot, out and a little up, not by its lowest point.
                 # The falcon is Tripo's, cut into body and wings by
                 # assets/blender/hunter_tripo/prepare_falcon.py.
                 {"node": "falcon", "glb": "assets/blender/hunter_tripo/falcon_parts.glb",
-                 "anchor": "perch", "bone": "LeftShoulder", "at": "shoulder", "offset": (0.09, 0.0, 0.10)},
+                 # on the right shoulder: the left arm is out front with the bow
+                 "anchor": "perch", "bone": "RightShoulder", "at": "shoulderR", "offset": (-0.09, 0.0, 0.10)},
             ],
         },
         "head_anchor": True,
@@ -211,8 +215,9 @@ def pose_and_mount(preset, arm, body, lifted, top):
         return up, (back - up * back.dot(up)).normalized()
 
     mount = preset.get("mount")
-    fist = sum((H(f"RightHandMiddle{j}") for j in (1, 2, 3, 4)), Vector()) / 4
-    points = {"fist": fist, "shoulder": H("LeftArm")}
+    fside = (fs or {}).get("side", "Right")
+    fist = sum((H(f"{fside}HandMiddle{j}") for j in (1, 2, 3, 4)), Vector()) / 4
+    points = {"fist": fist, "shoulder": H("LeftArm"), "shoulderR": H("RightArm")}
     neck = H("Neck")
 
     dg = bpy.context.evaluated_depsgraph_get()

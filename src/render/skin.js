@@ -12,11 +12,16 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 // a weight that fades in and out, so a move with no clip of its own is never left without a
 // pose.
 const MIXAMO = (n) => 'mixamorig' + n;      // GLTFLoader strips the ':' from mixamorig:Hips
+// Per model, which bone each arm channel drives when it is not the default. The Hunter holds
+// his bow in his LEFT hand (the side every Mixamo archery clip uses), and the procedural
+// clips' bow arm is aL - so for him aL drives LeftArm and aR the drawing RightArm.
+const DRIVE_FOR = { hunter: { armL: 'LeftArm', armR: 'RightArm' } };
 export const DRIVE = { torso: 'Spine', head: 'Neck', armL: 'RightArm', armR: 'LeftArm', legL: 'RightUpLeg', legR: 'LeftUpLeg', cape: 'Cape', tail: 'Tail' };
 // Bone sets a clip layer leaves alone. The walk swings both arms; the Knight's sword arm
 // stays on its stance so the blade is carried upright rather than waved at the floor.
 const KEEP = {
   swordArm: (name) => /^mixamorigRight(Shoulder|Arm|ForeArm|Hand)/.test(name),
+  bowArm: (name) => /^mixamorigLeft(Shoulder|Arm|ForeArm|Hand)/.test(name),
 };
 export const SKIN = {};
 
@@ -31,7 +36,7 @@ export function prepareSkin(heroKey, gltf, meta) {
   // cheap enough to always draw, and so is a boss.
   root.traverse((o) => { if (o.isSkinnedMesh) o.frustumCulled = false; });
   const drive = [];
-  for (const [key, bone] of Object.entries(DRIVE)) {
+  for (const [key, bone] of Object.entries({ ...DRIVE, ...(DRIVE_FOR[heroKey] || {}) })) {
     const b = root.getObjectByName(MIXAMO(bone));
     if (!b) continue;
     const P0 = b.parent.getWorldQuaternion(new THREE.Quaternion());
