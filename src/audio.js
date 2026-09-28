@@ -46,7 +46,12 @@ class Sfx {
   loadSamples() {
     for (const [name, s] of Object.entries(SAMPLES)) {
       this.sampleStatus[name] = 'loading';
-      fetch(s.url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      // Status 0 is a success here. The native app serves its files through Capacitor's
+      // WebViewAssetHandler, which answers an audio extension (.m4a, .mp3, .wav...) with a
+      // bare URLResponse rather than an HTTP one, so fetch sees no status at all: ok is
+      // false, the body is all there. Rejecting on !ok threw every sample away in the app
+      // and it played the synth - the "sounds never changed" on the iPad build.
+      fetch(s.url).then((r) => (r.ok || r.status === 0 ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
         // the callback form: older WebKit's decodeAudioData returns no promise
         .then((data) => new Promise((ok, no) => this.ctx.decodeAudioData(data, ok, (e) => no(e || new Error('decode failed')))))
         .then((buf) => { this.buffers[name] = buf; this.sampleStatus[name] = `ok ${buf.duration.toFixed(2)}s`; })
