@@ -201,6 +201,7 @@ let sandModel = null;
 let dsModel = null;
 let nerModel = null;
 let koModel = null;
+let wispModel = null;
 
 /** Injection seam for the loaded boss model. The render test uses it to supply a stand-in
  *  rig, since GLTFLoader cannot fetch a file in Node. */
@@ -210,16 +211,18 @@ export function setSandmanModel(scene) { sandModel = scene; }
 export function setDarkSwordModel(scene) { dsModel = scene; }
 export function setNerakosModel(scene) { nerModel = scene; }
 export function setKingOrcModel(scene) { koModel = scene; }
+export function setWispraModel(scene) { wispModel = scene; }
 
 export async function loadMonsterAssets(base = 'assets/monsters/') {
   const loader = new GLTFLoader();
-  const [baph, moon, sand, ds, ner, ko, meta] = await Promise.all([
+  const [baph, moon, sand, ds, ner, ko, wisp, meta] = await Promise.all([
     loader.loadAsync(base + 'baphomet.glb'),
     loader.loadAsync(base + 'moonraya.glb'),
     loader.loadAsync(base + 'sandman.glb'),
     loader.loadAsync(base + 'darkSword.glb'),
     loader.loadAsync(base + 'nerakos.glb'),
     loader.loadAsync(base + 'kingOrc.glb'),
+    loader.loadAsync(base + 'wispra.glb').catch(() => null),
     fetch(base + 'meta.json').then((r) => r.json()).catch(() => ({})),
   ]);
   // A boss exported with its skeleton (tools/export_skinned_hero.py) says so in meta.json.
@@ -232,6 +235,7 @@ export async function loadMonsterAssets(base = 'assets/monsters/') {
   setDarkSwordModel(ds.scene);
   setNerakosModel(ner.scene);
   setKingOrcModel(ko.scene);
+  setWispraModel(wisp?.scene ?? null);
   return bossModel;
 }
 
@@ -635,9 +639,26 @@ function buildFamiru() {
   return { root, body, ears: wings, kind: 'blob' };
 }
 
-// Wispra: a drifting white shade, wide at the shoulders and trailing away to nothing. A blob
-// again, because it has no legs to walk on and the squash reads as a drift.
+// Wispra: Tripo's torn-sheet ghost (assets/blender/wispra_tripo/prepare_wispra.py). A blob,
+// because it has no legs to walk on and the squash reads as a drift; the wisp of a tail under
+// its hem is its own node, swayed in updateBlob. The primitive shade below is the fallback for
+// when wispra.glb is not loaded - the render test, which cannot fetch a file.
 function buildWispra() {
+  if (!wispModel) return buildWispraPrimitive();
+  const root = new THREE.Group();
+  const body = node(0, 0.8, 0, root);
+  const model = wispModel.clone(true);
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    o.material = o.material.clone();
+    o.castShadow = true;
+  });
+  body.add(model);
+  return { root, body, tail: model.getObjectByName('tail'), kind: 'blob' };
+}
+
+// The first Wispra, from primitives: a white shade, wide at the shoulders and trailing away.
+function buildWispraPrimitive() {
   const root = new THREE.Group();
   const body = node(0, 0.8, 0, root);
   const pale = mat(0xe8f0f4, { roughness: 1, emissive: 0x8fb6c8, emissiveIntensity: 0.25, transparent: true, opacity: 0.92 });
@@ -1648,6 +1669,8 @@ export function createMonsterViews(world) {
     body.scale.set(v.cur.sxz, v.cur.sy, v.cur.sxz);
     body.position.y = def.hurtbox.h * 0.5 * v.cur.sy + v.cur.lift;
     body.rotation.set(v.cur.lean, v.yaw, 0);
+    // A tail trails the drift: it swings behind whichever way the body leans, and waves.
+    if (v.built.tail) v.built.tail.rotation.set(-0.5 * v.cur.lean + 0.12 * Math.sin(v.t * 2.2), 0, 0.22 * Math.sin(v.t * 3.1));
     if (v.built.ears) for (const ear of v.built.ears) ear.rotation.x = -0.3 * (v.cur.lift / Math.max(0.01, hop.height)) - 0.1 * Math.sin(v.t * 4);
   }
 
