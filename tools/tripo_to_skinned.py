@@ -84,8 +84,11 @@ PRESETS = {
             "items": [
                 # Tripo's recurve bow, fitted onto the classic bow's frame by
                 # assets/blender/hunter_tripo/prepare_bow.py.
+                # Fitted to the fist itself ("align"): grip in the hollow of the fingers, the
+                # bow along the knuckle line (upper limb on the index side), string towards the
+                # archer - where the hand, not the old bow, says it goes.
                 {"node": "weapon", "glb": "assets/blender/hunter_tripo/bow_parts.glb",
-                 "anchor": "grip", "bone": "RightHand", "at": "fist"},
+                 "anchor": "grip", "bone": "RightHand", "at": "fist", "align": "bow"},
                 # Beside the left shoulder, where the classic Hunter carried it: the bird's pivot
                 # is its body, and its tail and wingtips hang well below its feet, so it is
                 # placed by that pivot, out and a little up, not by its lowest point.
@@ -131,6 +134,23 @@ def lift_parts(mount):
     return out
 
 
+def bow_frame(co):
+    """A bow's grip (middle of the riser), long axis (upper limb +), riser->string axis, side."""
+    mid = co.mean(0)
+    vt = np.linalg.svd(co - mid, full_matrices=False)[2]
+    length, depth = vt[0], vt[1]
+    if length[2] < 0:
+        length = -length
+    d = (co - mid) @ depth
+    if (d.max() + d.min()) / 2 < d.mean():        # point from the mass (riser) to the string
+        depth = -depth; d = -d
+    t = (co - mid) @ length
+    riser = co[np.abs(t) < 0.12 * (t.max() - t.min())]
+    rd = (riser - mid) @ depth
+    grip = riser[rd < np.percentile(rd, 50)].mean(0)
+    return Vector(grip), Vector(length), Vector(depth), Vector(np.cross(length, depth))
+
+
 def pose_and_mount(preset, arm, body, lifted, top):
     """Close a hand, make the pose the rest pose, and hang props off bone anchors."""
     world = arm.matrix_world
@@ -158,6 +178,11 @@ def pose_and_mount(preset, arm, body, lifted, top):
             turn_bone(f"{side}HandThumb{j}", axis, math.radians(deg))
     fist = sum((H(f"RightHandMiddle{j}") for j in (1, 2, 3, 4)), Vector()) / 4
     points = {"fist": fist, "shoulder": H("LeftArm")}
+    # The closed hand's own frame, for a prop that must sit in it rather than where an older
+    # model's prop sat: the knuckle line, and back along the hand towards the wrist.
+    hand_up = (H("RightHandIndex1") - H("RightHandPinky1")).normalized()
+    hand_back = (H("RightHand") - H("RightHandMiddle1")).normalized()
+    hand_back = (hand_back - hand_up * hand_back.dot(hand_up)).normalized()
     neck = H("Neck")
 
     dg = bpy.context.evaluated_depsgraph_get()
@@ -190,6 +215,12 @@ def pose_and_mount(preset, arm, body, lifted, top):
         for it in mount["items"]:
             parts = lifted[it["node"]]
             at = points[it["at"]].copy() + Vector(it.get("offset", (0, 0, 0)))
+            if it.get("align") == "bow":
+                _, me0, _ = parts[0]
+                g, l, d, sd = bow_frame(np.array([list(v.co) for v in me0.vertices]))
+                src = Matrix((l, d, sd)).transposed()
+                dst = Matrix((hand_up, hand_back, hand_up.cross(hand_back))).transposed()
+                me0.transform((dst @ src.inverted()).to_4x4() @ Matrix.Translation(-g))
             if it.get("sit"):
                 # Lift the prop so its lowest point rests on the spot rather than its pivot.
                 low = min(min((v.co.z + off.z) for v in me.vertices) for _, me, off in parts)

@@ -254,8 +254,10 @@ function rollGearProcs(g, e, attackId, killed) {
   if (p.meteor && g.rng.chance(p.meteor)) {
     // It falls, so it lands a moment later and on wherever the target is by then - which is
     // the point of a meteor, and why it goes through the same queue the falcon does.
-    g.pending.push({ kind: 'autoMeteor', target: e.id, t: 0.55, x: e.x, z: e.z });
-    pushEvent(g, { type: 'autoMeteor', target: e.id, x: e.x, z: e.z, y: e.y });
+    // A rain of fire around the HERO, over the same ground as Cold Bolt (BOLT_R) - Toto had it
+    // match the ice rather than fall on the one thing that was hit.
+    g.pending.push({ kind: 'autoMeteor', target: e.id, t: 0.55, x: p.x, z: p.z });
+    pushEvent(g, { type: 'autoMeteor', target: e.id, x: p.x, z: p.z, y: p.y });
   }
   // The weapon casting one of the hero's own skills, without his hands or his SP. Unlike
   // every other proc it is not a spell of its own: it borrows the skill's hit box, damage
@@ -315,7 +317,7 @@ function resolvePending(g, dt) {
       const ice = job.kind === 'autoBolt';
       const dmg = Math.max(1, Math.round(p.atk * 0.1));
       pushEvent(g, { type: ice ? 'coldBolt' : 'meteor', x: job.x, z: job.z, y: 0, dmg });
-      const rx = ice ? BOLT_R.x : 1.6, rz = ice ? BOLT_R.z : 1.1;
+      const rx = BOLT_R.x, rz = BOLT_R.z;      // fire and ice cover the same ring now
       for (const e of g.enemies) {
         if (e.dead || Math.abs(e.x - job.x) > rx || Math.abs(e.z - job.z) > rz) continue;
         const dead = applyHit(e, dmg, 0, 0, Math.sign(e.x - job.x) || 1, e.mass);

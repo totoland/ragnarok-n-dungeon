@@ -338,6 +338,49 @@ export function createFx(world) {
     }
   }
 
+  // ---- fire shower: Auto Meteor. Glowing balls falling on the same ring as the ice, each
+  // trailing sparks and bursting in fire where it lands. One shared geometry and material.
+  const fireballGeo = new THREE.SphereGeometry(0.16, 10, 8);
+  const fireballMat = new THREE.MeshBasicMaterial({ color: 0xfff0b0 });                 // white-hot core
+  const fireHaloMat = new THREE.MeshBasicMaterial({ color: 0xff5a18, transparent: true, opacity: 0.55,
+    blending: THREE.AdditiveBlending, depthWrite: false });                               // and the fire round it
+  const fireballs = [];
+  function fireShower(x, z) {
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + Math.random() * 0.5;
+      const r = 0.8 + Math.random() * 3.0;
+      const m = new THREE.Mesh(fireballGeo, fireballMat);
+      const halo = new THREE.Mesh(fireballGeo, fireHaloMat);
+      halo.scale.setScalar(2.1);
+      m.add(halo);
+      const tx = x + Math.cos(a) * r, tz = z + Math.sin(a) * r * 0.5;
+      // They fall on a slant, like stars, from up and behind their landing spot.
+      m.position.set(tx - 1.6, 6.5 + Math.random() * 1.5, tz - 0.4);
+      m.scale.setScalar(0.8 + Math.random() * 0.6);
+      scene.add(m);
+      const t = 0.55 + (Math.random() - 0.5) * 0.12;       // land about when the sim resolves
+      fireballs.push({ m, t, left: t, tx, tz, sx: m.position.x, sy: m.position.y, sz: m.position.z, trail: 0 });
+    }
+  }
+  function updateFireballs(dt) {
+    for (let i = fireballs.length - 1; i >= 0; i--) {
+      const f = fireballs[i];
+      f.left -= dt;
+      const u = Math.min(1, 1 - f.left / f.t);
+      const e = u * u;                                      // accelerating, like a fall
+      f.m.position.set(f.sx + (f.tx - f.sx) * e, f.sy * (1 - e) + 0.15 * e, f.sz + (f.tz - f.sz) * e);
+      f.trail += dt;
+      if (f.trail > 0.025) { f.trail = 0; burst(f.m.position.x, f.m.position.y, f.m.position.z, 1, { color: Math.random() < 0.5 ? 0xff6a1a : 0xffc060, speed: 0.4, up: 0.6, life: 0.35, size: 0.26, spread: 0, gravity: -1 }); }
+      if (u >= 1) {
+        scene.remove(f.m);
+        fireballs.splice(i, 1);
+        ring(f.tx, f.tz, { color: 0xffb060, radius: 0.9, life: 0.3, y: 0.06 });
+        burst(f.tx, 0.25, f.tz, 12, { color: 0xff5a18, speed: 3, up: 2.6, life: 0.4, size: 0.28, gravity: 5 });
+        burst(f.tx, 0.2, f.tz, 5, { color: 0xffe08a, speed: 1.6, up: 1.8, life: 0.3, size: 0.18 });
+      }
+    }
+  }
+
   const skillColor = { slash1: 0xd8ecff, slash2: 0xd8ecff, slash3: 0xfff0b0, airSlash: 0xd8ecff, bash: 0xffd070, bowlingBash: 0xffa040, arrow: 0xd0f0ff, doubleStrafe: 0xa0e0ff, blitzBeat: 0xffe0a0, arrowShower: 0xa0e0ff, magnumBreak: 0xff8030 };
 
   function onEvent(ev, game) {
@@ -438,7 +481,10 @@ export function createFx(world) {
         burst(ev.x, ev.y, ev.z, 10, { color: 0x9fe4ff, speed: 1.6, up: 1.2, life: 0.35, size: 0.22, gravity: 2 });
         break;
       case 'autoMeteor':
-        ring(ev.x, ev.z, { color: 0xb070ff, radius: 1.5, life: 0.5, y: 0.04 });
+        // Fireballs out of the sky around the hero, over Cold Bolt's ground; the call is the
+        // ring, and the balls leave now so they land when the sim resolves the hit (0.55 s).
+        fireShower(ev.x, ev.z);
+        ring(ev.x, ev.z, { color: 0xff7a2a, radius: 3.8, life: 0.5, y: 0.04 });
         break;
       case 'autoBolt':
         // The wedges leave on the call, not on the landing: the sim holds the damage 0.28 s
@@ -485,8 +531,10 @@ export function createFx(world) {
         ring(ev.x, ev.z, { color: 0xff4a1a, radius: 1.5, life: (ev.at ?? 0.6) + 0.1, y: 0.04 });
         break;
       case 'meteor': {
-        // Two meteors share this: the hero's own Auto Meteor, violet, and the King Orc's,
-        // which is fire and falls on the hero rather than for him.
+        // Two meteors share this. The hero's Auto Meteor lands as a shower (fireShower, each
+        // ball bursting where it strikes), so here it only needs the one flash and shake;
+        // the King Orc's is a single stone on the hero and keeps the full burst.
+        if (!ev.fire) { flashLight.position.set(ev.x, 1.2, ev.z); flashLight.intensity = 16; addShake(world, 0.25); break; }
         const hot = !!ev.fire;
         beam(ev.x, ev.z, { color: hot ? 0xff7a2a : 0xc48aff, life: 0.5 });
         ring(ev.x, ev.z, { color: hot ? 0xffb060 : 0xe0b0ff, radius: 2.0, life: 0.35, y: 0.06 });
@@ -594,6 +642,8 @@ export function createFx(world) {
     }
     if (!showQuick) quickT = 0;
 
+    updateFireballs(dt);
+
     // particles
     for (let i = parts.length - 1; i >= 0; i--) {
       const p = parts[i];
@@ -692,6 +742,8 @@ export function createFx(world) {
   }
 
   function clear() {
+    for (const f of fireballs) scene.remove(f.m);
+    fireballs.length = 0;
     parts.length = 0;
     for (const n of numbers) for (const sp of n.sps) freeNumber(sp);
     numbers.length = 0;
