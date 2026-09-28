@@ -31,7 +31,7 @@ const SAMPLES = {
 };
 
 class Sfx {
-  constructor() { this.ctx = null; this.muted = false; this.lastAt = new Map(); this.noiseBuf = null; this.voices = 0; this.buffers = {}; }
+  constructor() { this.ctx = null; this.muted = false; this.lastAt = new Map(); this.noiseBuf = null; this.voices = 0; this.buffers = {}; this.sampleStatus = {}; }
 
   init() {
     if (this.ctx) return;
@@ -40,13 +40,20 @@ class Sfx {
     if (this.ctx && typeof fetch === 'function') this.loadSamples();
   }
 
+  // A sample that fails keeps its synth version, which sounds like nothing went wrong - so
+  // the reason is kept in sampleStatus (window.__dro.sfx) and warned, or a missing file in
+  // the app bundle is indistinguishable from a sound that was never changed.
   loadSamples() {
     for (const [name, s] of Object.entries(SAMPLES)) {
-      fetch(s.url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+      this.sampleStatus[name] = 'loading';
+      fetch(s.url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
         // the callback form: older WebKit's decodeAudioData returns no promise
-        .then((data) => new Promise((ok, no) => this.ctx.decodeAudioData(data, ok, no)))
-        .then((buf) => { this.buffers[name] = buf; })
-        .catch(() => { /* the synth version stays */ });
+        .then((data) => new Promise((ok, no) => this.ctx.decodeAudioData(data, ok, (e) => no(e || new Error('decode failed')))))
+        .then((buf) => { this.buffers[name] = buf; this.sampleStatus[name] = `ok ${buf.duration.toFixed(2)}s`; })
+        .catch((e) => {
+          this.sampleStatus[name] = `failed: ${e?.message || e}`;
+          console.warn(`[sfx] ${s.url}: ${this.sampleStatus[name]} - playing the synth version`);
+        });
     }
   }
 

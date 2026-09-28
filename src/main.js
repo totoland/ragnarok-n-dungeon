@@ -832,7 +832,7 @@ window.__dro = {
   shot,
   get game() { return game; },
   get heroView() { return heroView; },
-  world, fx, monsters, input, telemetry,
+  world, fx, monsters, input, telemetry, sfx,
   tick(n = 1) { for (let i = 0; i < n; i++) simUpdate(game, input.snapshot(), SIM.dt); },
   play(n = 1) { for (let i = 0; i < n; i++) { simUpdate(game, input.snapshot(), SIM.dt); renderFrame(SIM.dt); } },
   start, hero(key) { selectedHero = key; start(); },
