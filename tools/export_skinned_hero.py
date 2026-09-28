@@ -32,9 +32,9 @@ import bpy
 from mathutils import Matrix, Vector
 
 M = "mixamorig:"
-HEIGHT = {"knight": 1.9, "hunter": 1.75, "moonraya": 2.7, "baphomet": 3.0, "nerakos": 3.3, "skelbow": 1.8}   # game units, as the rigid recipes had them
+HEIGHT = {"knight": 1.9, "hunter": 1.75, "moonraya": 2.7, "baphomet": 3.0, "nerakos": 3.3, "skelbow": 1.8, "sorya": 1.75, "munari": 1.6}   # game units, as the rigid recipes had them
 # Where each one's GLB and meta entry go: heroes and monsters are loaded from separate folders.
-OUT_DIR = {"knight": "heroes", "hunter": "heroes", "moonraya": "monsters", "baphomet": "monsters", "nerakos": "monsters", "skelbow": "monsters"}
+OUT_DIR = {"knight": "heroes", "hunter": "heroes", "moonraya": "monsters", "baphomet": "monsters", "nerakos": "monsters", "skelbow": "monsters", "sorya": "monsters", "munari": "monsters"}
 # Every weapon was fitted to the old, chunky Knight; on this slimmer one at the same height the
 # blade reads a size too big. The grip carries the shrink, so a mounted weapon gets it too.
 WEAPON_SCALE = {"knight": 0.8, "nerakos": 1.35}   # Nerakos: the Knight's sword, at a boss's size

@@ -39,7 +39,12 @@ assets/blender/moonraya_tripo/moonraya_rigged.glb
 assets/blender/baphomet_tripo/baphomet_rigged.glb
 assets/blender/nerakos_tripo/nerakos_rigged.glb
 assets/blender/skelbow_tripo/skelbow_rigged.glb
+assets/blender/sorya_tripo/sorya_rigged.glb
+assets/blender/munari_tripo/munari_rigged.glb
 assets/blender/hunter_tripo/hunter_rigged.glb
 assets/blender/hunter_tripo/falcon_tripo.glb
 assets/blender/wispra_tripo/wispra_tripo.glb
 assets/blender/hunter_tripo/bow_tripo.glb
+
+# Local backup of the first Tripo Knight (source, blends, game GLB) - also tagged knight-v1 in git
+assets/blender/knight_tripo/backup_v1/

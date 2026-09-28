@@ -168,6 +168,46 @@ PRESETS = {
         # the same model bare-headed.
         "head_anchor": True,
     },
+    "sorya": {
+        "src": "assets/blender/sorya_tripo/sorya_rigged.glb",
+        "out": "assets/blender/sorya_tripo/sorya_skinned.blend",
+        "prefix": "SY",
+        "clusters": 14,
+        # The sleeves hang to mid-thigh, and their white tips went to the thigh they hang
+        # beside - they would kick with every step. White (the sleeve, not the red hakama)
+        # and below the hands, they go back to the forearm on their own side.
+        # Its lining is a shadowed grey the colour test misses, so the pick grows from the white
+        # across the sleeve's own edges - through anything not red, which is where the sleeve
+        # meets the hakama and the growing has to stop.
+        "rebind": [
+            {"to": side + "ForeArm",
+             "pick": (lambda sgn: lambda c, dom, near: dom.endswith(("UpLeg", "Leg")) and near["lum"] > 0.5
+                      and c[2] > 0.2 and c[0] * sgn > 0.08)(sgn),
+             "grow": (lambda sgn: lambda c, dom, near: dom.endswith(("UpLeg", "Leg", "Hips"))
+                      and near["red"] < 0.12 and c[2] > 0.2 and c[0] * sgn > 0.06)(sgn)}
+            for side, sgn in (("Left", 1), ("Right", -1))
+        ],
+        # The hakama is one long skirt over legs that nearly touch: shared with the hips so a
+        # stride does not split it down the middle.
+        "skirt": {"below": 0.5, "start": 0.03, "full": 0.10, "max": 0.7},
+        # What is left of the sleeve hems carries a forearm AND a thigh; split them by colour.
+        "unmix": {"red_max": 0.12},
+    },
+    "munari": {
+        "src": "assets/blender/munari_tripo/munari_rigged.glb",
+        "out": "assets/blender/munari_tripo/munari_skinned.blend",
+        "prefix": "MU",
+        "clusters": 14,
+        # The apron that hangs from the belt in front of the thighs came out split between
+        # them, so it would tear down the middle with each step: it rides the hips.
+        "rebind": [{
+            "to": "Hips",
+            "pick": lambda c, dom, near: c[1] < -0.085 and abs(c[0]) < 0.1 and 0.1 < c[2] < 0.4
+                    and dom.endswith(("UpLeg", "Leg")),
+        }],
+        # The tunic's side flaps over the thighs: shared with the hips like a skirt.
+        "skirt": {"below": 0.36, "start": 0.04, "full": 0.10, "max": 0.5},
+    },
 }
 
 
@@ -428,6 +468,14 @@ def main():
         for vi in p.vertices:
             lum[vi] += face_lum[f]; cnt[vi] += 1
     lum /= np.maximum(cnt, 1)
+    # And how red: red minus the larger of green and blue, the same way. A white sleeve and its
+    # grey lining read near 0; a red hakama well above it.
+    red = np.zeros(len(me.vertices))
+    face_red = colour[:, 0] - np.maximum(colour[:, 1], colour[:, 2])
+    for f, p in enumerate(me.polygons):
+        for vi in p.vertices:
+            red[vi] += face_red[f]
+    red /= np.maximum(cnt, 1)
     legs = [f"{s}{p}" for s in ("Left", "Right") for p in ("UpLeg", "Leg", "Foot")]
     d_leg = dist(co, legs)
     gname = {g.index: g.name.replace(M, "") for g in body.vertex_groups}
@@ -455,10 +503,32 @@ def main():
             grp.add([i], 1.0, "REPLACE")
         print(f"[tripo] {ap['bone']}: {len(picked)} verts moved off the limbs")
 
-    near = {"arm": dist(co, arms), "leg": d_leg}
+    near = {"arm": dist(co, arms), "leg": d_leg, "lum": lum, "red": red}
     for rb in preset.get("rebind", []):
         grp = body.vertex_groups[M + rb["to"]]
         picked = [i for i in range(len(co)) if rb["pick"](co[i], dom[i], {k: v[i] for k, v in near.items()})]
+        if rb.get("grow"):
+            # Flood out from what the pick caught, across the mesh's edges, into neighbours
+            # the `grow` test allows: the part of a piece of cloth the pick could not see (a
+            # sleeve's shadowed lining) comes along with the part it could. Welded by position,
+            # since glTF splits the mesh at every UV seam.
+            key = {}
+            for i, c in enumerate(np.round(co / 0.0005).astype(np.int64)):
+                key.setdefault(tuple(c), []).append(i)
+            twin = {i: grp_ for grp_ in key.values() for i in grp_}
+            adj = [set() for _ in range(len(co))]
+            for e in me.edges:
+                a, b = e.vertices
+                adj[a].add(b); adj[b].add(a)
+            seen = set(picked)
+            stack = list(picked)
+            while stack:
+                i = stack.pop()
+                for j in list(adj[i]) + twin[i]:
+                    if j not in seen and rb["grow"](co[j], dom[j], {k: v[j] for k, v in near.items()}):
+                        seen.add(j); stack.append(j)
+            print(f"[tripo] {rb['to']}: grew {len(picked)} -> {len(seen)}")
+            picked = sorted(seen)
         for i in picked:
             for g in list(me.vertices[i].groups):
                 body.vertex_groups[g.group].remove([i])
@@ -483,14 +553,59 @@ def main():
             hand.add([i], 1.0, "REPLACE")
         print(f"[tripo] {rg['bone']}: {len(picked)} verts of the weapon and the grip held rigid")
 
+    um = preset.get("unmix")
+    if um:
+        # Cloth that hangs where an arm meets a leg - a sleeve over a thigh - comes out of the
+        # auto-rig on both, and tears the moment they part. The colour says which it is: not
+        # red is sleeve and goes to the arm alone; red is the skirt and goes to the leg alone.
+        gname.update({g.index: g.name.replace(M, "") for g in body.vertex_groups})
+        is_arm = lambda n: n.startswith(("LeftForeArm", "RightForeArm", "LeftHand", "RightHand"))
+        is_leg = lambda n: n.endswith(("UpLeg", "Leg")) or n == "Hips"
+        n_arm = n_leg = 0
+        for i, v in enumerate(me.vertices):
+            gs = [(g.group, gname[g.group], g.weight) for g in v.groups]
+            aw = sum(w for _, n, w in gs if is_arm(n)); lw = sum(w for _, n, w in gs if is_leg(n))
+            if aw < 0.02 or lw < 0.02:
+                continue
+            keep = is_arm if red[i] < um["red_max"] else is_leg
+            total = sum(w for _, n, w in gs if keep(n))
+            for gi, n, w in gs:
+                if keep(n):
+                    body.vertex_groups[gi].add([i], w / total, "REPLACE")
+                else:
+                    body.vertex_groups[gi].remove([i])
+            if keep is is_arm: n_arm += 1
+            else: n_leg += 1
+        print(f"[tripo] unmix: {n_arm} verts to the arm alone, {n_leg} to the leg alone")
+        # Where the two were fused into one surface, a face now spans an arm vertex and a leg
+        # vertex, and would stretch into a sheet the moment the arm lifts. Cut them: the sleeve
+        # lies over the skirt there, so the seam is under cloth either way.
+        owner = []
+        for v in me.vertices:
+            g = max(v.groups, key=lambda g: g.weight, default=None)
+            n = gname[g.group] if g else ""
+            owner.append("arm" if is_arm(n) else "leg" if is_leg(n) else "")
+        bridges = [p.index for p in me.polygons if {"arm", "leg"} <= {owner[vi] for vi in p.vertices}]
+        bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+        bmesh.ops.delete(bm, geom=[bm.faces[i] for i in bridges], context="FACES_ONLY")
+        bm.to_mesh(me); bm.free(); me.update()
+        print(f"[tripo] unmix: {len(bridges)} faces joining sleeve to skirt cut")
+
     sk = preset.get("skirt")
     if sk:
         hips = body.vertex_groups[M + "Hips"]
+        # Who owns each vertex NOW - after the appendage and rebind rules, which `dom` predates:
+        # a sleeve moved back to its forearm must not then be handed to the hips as skirt.
+        gname.update({g.index: g.name.replace(M, "") for g in body.vertex_groups})
+        now = [gname[max(v.groups, key=lambda g: g.weight).group] if v.groups else "" for v in me.vertices]
+        # Distance to the legs down to the toes: the toes reach past the foot bone, and read as
+        # "far from the leg" they were shared with the hips and dragged behind every step.
+        d_skirt = dist(co, legs + [f"{s_}ToeBase" for s_ in ("Left", "Right") if f"{s_}ToeBase" in bones])
         n = 0
         for i, v in enumerate(me.vertices):
-            if co[i][2] > sk["below"] or not dom[i].endswith(("UpLeg", "Leg", "Foot")):
+            if co[i][2] > sk["below"] or not now[i].endswith(("UpLeg", "Leg")):
                 continue
-            share = min(sk["max"], max(0.0, (d_leg[i] - sk["start"]) / (sk["full"] - sk["start"])) * sk["max"])
+            share = min(sk["max"], max(0.0, (d_skirt[i] - sk["start"]) / (sk["full"] - sk["start"])) * sk["max"])
             if share <= 0:
                 continue
             for g in v.groups:

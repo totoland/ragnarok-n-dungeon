@@ -203,6 +203,8 @@ let nerModel = null;
 let koModel = null;
 let wispModel = null;
 let skelbowModel = null;
+let soryaModel = null;
+let munariModel = null;
 let skelHat = null;          // { model, neckY }: the Robin Hood hat Skelbow wears over his hood
 
 /** Injection seam for the loaded boss model. The render test uses it to supply a stand-in
@@ -214,11 +216,13 @@ export function setDarkSwordModel(scene) { dsModel = scene; }
 export function setNerakosModel(scene) { nerModel = scene; }
 export function setKingOrcModel(scene) { koModel = scene; }
 export function setWispraModel(scene) { wispModel = scene; }
+export function setSoryaModel(scene) { soryaModel = scene; }
+export function setMunariModel(scene) { munariModel = scene; }
 export function setSkelbowModel(scene, hat = null) { skelbowModel = scene; skelHat = hat; }
 
 export async function loadMonsterAssets(base = 'assets/monsters/') {
   const loader = new GLTFLoader();
-  const [baph, moon, sand, ds, ner, ko, wisp, skb, hat, meta] = await Promise.all([
+  const [baph, moon, sand, ds, ner, ko, wisp, skb, hat, sor, mun, meta] = await Promise.all([
     loader.loadAsync(base + 'baphomet.glb'),
     loader.loadAsync(base + 'moonraya.glb'),
     loader.loadAsync(base + 'sandman.glb'),
@@ -228,10 +232,12 @@ export async function loadMonsterAssets(base = 'assets/monsters/') {
     loader.loadAsync(base + 'wispra.glb').catch(() => null),
     loader.loadAsync(base + 'skelbow.glb').catch(() => null),
     loader.loadAsync(base + '../gear/robinHat.glb').catch(() => null),
+    loader.loadAsync(base + 'sorya.glb').catch(() => null),
+    loader.loadAsync(base + 'munari.glb').catch(() => null),
     fetch(base + 'meta.json').then((r) => r.json()).catch(() => ({})),
   ]);
   // A boss exported with its skeleton (tools/export_skinned_hero.py) says so in meta.json.
-  for (const [key, gltf] of [['baphomet', baph], ['moonraya', moon], ['sandman', sand], ['darkSword', ds], ['nerakos', ner], ['kingOrc', ko], ['skelbow', skb]]) {
+  for (const [key, gltf] of [['baphomet', baph], ['moonraya', moon], ['sandman', sand], ['darkSword', ds], ['nerakos', ner], ['kingOrc', ko], ['skelbow', skb], ['sorya', sor], ['munari', mun]]) {
     if (gltf && meta?.[key]?.skinned) prepareSkin(key, gltf, meta[key]);
   }
   setBossModel(baph.scene);
@@ -241,6 +247,8 @@ export async function loadMonsterAssets(base = 'assets/monsters/') {
   setNerakosModel(ner.scene);
   setKingOrcModel(ko.scene);
   setWispraModel(wisp?.scene ?? null);
+  setSoryaModel(sor?.scene ?? null);
+  setMunariModel(mun?.scene ?? null);
   setSkelbowModel(skb?.scene ?? null, hat ? { model: hat.scene, neckY: meta?.skelbow?.pivot?.head?.[1] ?? 0 } : null);
   return bossModel;
 }
@@ -294,6 +302,20 @@ function buildDarkSwordGlb() {
 function buildNerakosGlb() {
   if (!nerModel) throw new Error('nerakos.glb not loaded - call loadMonsterAssets() first');
   return rigFromGlb(nerModel);
+}
+
+// Bonku: Munari's sculpt, a size up (its hurtbox is 1.7 to her 1.6), and red where she is
+// blue. Each material is already a per-spawn clone (rigFromGlb), so the recolour is local: any
+// colour whose blue leads its red swaps the two, which turns navy into oxblood and leaves the
+// gold, the skin and the black where they were.
+function buildBonkuGlb() {
+  const built = rigFromGlb(munariModel, { scale: 1.7 / 1.6 });
+  built.root.traverse((o) => {
+    if (!o.isMesh) return;
+    const c = o.material.color;
+    if (c.b > c.r + 0.03 && c.b >= c.g) { const r = c.r; c.r = c.b; c.b = r; }
+  });
+  return built;
 }
 
 // Tripo's hooded skeleton archer (tools/tripo_to_skinned.py skelbow) is both of the game's
@@ -1362,7 +1384,13 @@ const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   // Phaelan. Skelbow is the archer skeleton's build in the forest's own colours, so the two
   // read as cousins rather than as the same monster twice.
   famiru: buildFamiru, wispra: buildWispra, foxShade: buildFoxShade,
-  munari: buildMunari, bonku: buildBonku, sorya: buildSorya,
+  // Munari and Bonku are one Tripo jiangshi (tools/tripo_to_skinned.py munari): Bonku is the
+  // same sculpt a size up with its blue turned red. The primitive ones are the fallback.
+  munari: () => munariModel ? rigFromGlb(munariModel) : buildMunari(),
+  bonku: () => munariModel ? buildBonkuGlb() : buildBonku(),
+  // Sorya is Tripo's shrine maiden, skinned (tools/tripo_to_skinned.py sorya); the primitive one
+  // is the fallback for when sorya.glb is not loaded.
+  sorya: () => soryaModel ? rigFromGlb(soryaModel) : buildSorya(),
   // Tripo's hooded skeleton archer, skinned (tools/tripo_to_skinned.py skelbow) with the
   // Hunter's bow; the primitive one is the fallback for when skelbow.glb is not loaded.
   skelbow: () => skelbowModel ? buildSkelArcherGlb(true) : buildSkeleton({ archer: true, boneColor: 0xcfd6c4, clothColor: 0x3f5b3a }),
@@ -1451,6 +1479,22 @@ const SKIN_MOVES = {
   },
 };
 SKIN_MOVES.skelArcher = SKIN_MOVES.skelbow;
+// Munari walks and claws with the Knight's second cut, empty-handed.
+SKIN_MOVES.munari = {
+  walk: { clip: 'walk', stride: 1.1 }, idle: { clip: 'idle' }, dead: { clip: 'dead' },
+  hurt: { clip: 'hurt', rate: 1.4 },
+  moves: { attack: { clip: 'slash2', pre: 0.4, post: 0.45 } },
+};
+// Bonku hops, as a jiangshi does: its gait is Mixamo's jump, from just before takeoff to the
+// landing, once per hop of the sim (e.hopT), with the body lifted along the arc (updateHumanoid).
+SKIN_MOVES.bonku = { ...SKIN_MOVES.munari, walk: { clip: 'jump', hop: true } };
+// Sorya fights empty-handed: her blow is Mixamo's two-handed magic thrust, both palms driven
+// out - the same clip as Moonraya's Foxfire, which is the right family for Moonraya's town.
+SKIN_MOVES.sorya = {
+  walk: { clip: 'walk', stride: 1.6 }, idle: { clip: 'idle' }, dead: { clip: 'dead' },
+  hurt: { clip: 'hurt', rate: 1.4 },
+  moves: { attack: { clip: 'cast', pre: 0.9, post: 0.6 } },
+};
 // His minions are the same sculpt at 0.58 - the same moves, and a stride to match.
 SKIN_MOVES.baphometling = { ...SKIN_MOVES.baphomet, walk: { ...SKIN_MOVES.baphomet.walk, stride: 2.66 * 0.58 } };
 
@@ -1491,6 +1535,11 @@ function wantedBossLayer(v, e, dt) {
   }
   v.hurtT = 0;
   if (e.state === 'hurt' || e.state === 'down') return null;
+  if ((e.moving || e.state === 'enter') && has(cfg.walk) && cfg.walk.hop) {
+    const info = S.clips[cfg.walk.clip].info;
+    const from = Math.max(0, (info.takeoff ?? info.dur * 0.6) - 0.15), to = info.land ?? info.dur;
+    return { name: cfg.walk.clip, key: 'walk', time: from + (e.hopT % 1) * (to - from) };
+  }
   if ((e.moving || e.state === 'enter') && has(cfg.walk)) {
     const info = S.clips[cfg.walk.clip].info;
     v.walkTime = ((v.walkTime ?? 0) + dt * (e.def.speed / cfg.walk.stride) * info.dur) % info.dur;
@@ -1662,6 +1711,11 @@ export function createMonsterViews(world) {
       // A tail has no clip of its own in any Mixamo set: it sways on its own clock, harder
       // while the body is moving.
       if (rig.tail) { const s = e.moving ? 1.6 : 1; rig.tail.rotation.set(0.12 * s * Math.sin(v.t * 2.3), 0.28 * s * Math.sin(v.t * 1.7), 0.08 * Math.sin(v.t * 2.9)); }
+      // A hopper's arc: the jump clip bends the knees, the lift is the sim's hop height.
+      const hopCfg = SKIN_MOVES[e.type]?.walk;
+      if (hopCfg?.hop && e.def.hop && (e.moving || e.state === 'enter') && !e.dead && e.state !== 'hurt') {
+        rig.root.position.y += e.def.hop.height * 0.6 * Math.max(0, Math.sin(Math.PI * (e.hopT % 1)));
+      }
       driveSkin(rig);
       v.layers = stepLayers(v.layers || [], wantedBossLayer(v, e, dt), dt);
       layerSkin(rig, v.layers);

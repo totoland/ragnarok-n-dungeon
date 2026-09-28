@@ -423,5 +423,85 @@
         "strike": 0.2
       }
     }
+  },
+  "sorya": {
+    "height": 1.75,
+    "front": "+z",
+    "skinned": true,
+    "pivot": {
+      "root": [
+        0,
+        0,
+        0
+      ]
+    },
+    "parts": {},
+    "clips": {
+      "walk": {
+        "dur": 1.167,
+        "strike": 0.033
+      },
+      "idle": {
+        "dur": 7.833,
+        "strike": 1.8
+      },
+      "dead": {
+        "dur": 2.367,
+        "strike": 1.6
+      },
+      "hurt": {
+        "dur": 0.767,
+        "strike": 0.067
+      },
+      "cast": {
+        "dur": 2.7,
+        "strike": 1.133
+      }
+    }
+  },
+  "munari": {
+    "height": 1.6,
+    "front": "+z",
+    "skinned": true,
+    "pivot": {
+      "root": [
+        0,
+        0,
+        0
+      ]
+    },
+    "parts": {},
+    "clips": {
+      "walk": {
+        "dur": 1.167,
+        "strike": 0.033
+      },
+      "idle": {
+        "dur": 7.833,
+        "strike": 1.8
+      },
+      "dead": {
+        "dur": 2.367,
+        "strike": 1.6
+      },
+      "hurt": {
+        "dur": 0.767,
+        "strike": 0.1
+      },
+      "slash2": {
+        "dur": 3.533,
+        "strike": 0.7,
+        "takeoff": 1.767,
+        "apex": 2.1,
+        "land": 2.367
+      },
+      "jump": {
+        "dur": 0.833,
+        "strike": 0.433,
+        "takeoff": 0.533,
+        "apex": 0.767,
+        "land": 0.833
+      }
+    }
   }
 }
