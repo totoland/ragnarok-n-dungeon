@@ -38,7 +38,7 @@ PRESETS = {
         "appendages": [{
             "bone": "Tail", "parent": "Hips",
             "head": (0.0, 0.07, 0.47), "tail": (0.02, 0.22, 0.30),
-            "pick": lambda c, dom, d_leg, lum=1: dom.endswith("UpLeg") and c[1] > 0.06 and d_leg > 0.06,
+            "pick": lambda c, dom, d_leg, lum=1, d_arm=1: dom.endswith("UpLeg") and c[1] > 0.06 and d_leg > 0.06,
         }],
         "skirt": {"below": 0.52, "start": 0.035, "full": 0.12, "max": 0.65},
     },
@@ -52,7 +52,7 @@ PRESETS = {
             "bone": "Tail", "parent": "Hips",
             "head": (0.0, 0.10, 0.44), "tail": (0.03, 0.30, 0.14),
             # White fur only: the hakama's back panel hangs in the same place and is dark.
-            "pick": lambda c, dom, d_leg, lum=1: dom.endswith(("UpLeg", "Leg")) and c[1] > 0.09 and d_leg > 0.06 and lum > 0.62,
+            "pick": lambda c, dom, d_leg, lum=1, d_arm=1: dom.endswith(("UpLeg", "Leg")) and c[1] > 0.09 and d_leg > 0.06 and lum > 0.62,
         }],
         # The katana is part of the mesh. Its blade came out skinned to the hand, but the hilt
         # went to the fingers and the forearm, so it would bend the moment a clip curled them.
@@ -107,6 +107,34 @@ PRESETS = {
             ],
         },
         "head_anchor": True,
+    },
+    "nerakos": {
+        "src": "assets/blender/nerakos_tripo/nerakos_rigged.glb",
+        "out": "assets/blender/nerakos_tripo/nerakos_skinned.blend",
+        "prefix": "NK",
+        "clusters": 18,
+        # The cape. The auto-rig skinned it, shoulders to hem, to the two upper arms - as it did
+        # the Knight's - so it would fly out with every swing. It gets a bone of its own off the
+        # upper back. Below the elbows anything the upper arms own is cape (the sleeve ends
+        # above that); higher up, only what lies clear of the arm itself.
+        "appendages": [{
+            "bone": "Cape", "parent": "Spine2",
+            "head": (0.0, 0.05, 0.62), "tail": (0.0, 0.16, 0.12),
+            "pick": lambda c, dom, d_leg, lum=1, d_arm=1: dom in ("LeftArm", "RightArm") and (c[2] < 0.5 or d_arm > 0.05),
+        }],
+        # The Knight's sword stance and fist (convert_tripo_knight.py), so the sword sits in
+        # the hand exactly as the Knight holds it and his clips land it where they land his.
+        "stance": [("RightArm", (-0.28, -0.12, -1.0)), ("RightForeArm", (-0.08, -1.0, -0.30)),
+                   ("RightHand", (-0.05, -1.0, -0.25)),
+                   ("LeftArm", (0.26, -0.02, -1.0)), ("LeftForeArm", (0.16, -0.30, -1.0)),
+                   ("LeftHand", (0.10, -0.30, -1.0))],
+        "fist": {"side": "Right", "joints": (75, 95, 70), "thumb": (20, 45, 40), "roll_up": True},
+        # The Under Water Sword - the one he drops for the Knight - from assets/gear, about its
+        # grip in game units. export_skinned_hero.py sizes it up with the grip (WEAPON_SCALE).
+        "mount": {
+            "glb": "assets/gear/underWaterSword.glb", "old_height": 3.3,
+            "items": [{"node": "weapon", "anchor": "grip", "bone": "RightHand", "at": "fist"}],
+        },
     },
 }
 
@@ -376,6 +404,9 @@ def main():
         g = max(v.groups, key=lambda g: g.weight, default=None)
         dom.append(gname[g.group] if g else "")
 
+    arms = [f"{s_}{p}" for s_ in ("Left", "Right") for p in ("Arm", "ForeArm", "Hand")]
+    # fingers too: a fingertip left on a limb while the rest of the hand moves is a spike
+    d_arm = dist(co, arms + [n for n in bones if n.startswith(("LeftHand", "RightHand")) and n not in arms])
     for ap in preset.get("appendages", []):
         bpy.context.view_layer.objects.active = arm
         bpy.ops.object.mode_set(mode="EDIT")
@@ -385,14 +416,13 @@ def main():
         eb.parent = arm.data.edit_bones[M + ap["parent"]]
         bpy.ops.object.mode_set(mode="OBJECT")
         grp = body.vertex_groups.new(name=M + ap["bone"])
-        picked = [i for i in range(len(co)) if ap["pick"](co[i], dom[i], d_leg[i], lum[i])]
+        picked = [i for i in range(len(co)) if ap["pick"](co[i], dom[i], d_leg[i], lum[i], d_arm[i])]
         for i in picked:
             for g in list(me.vertices[i].groups):
                 body.vertex_groups[g.group].remove([i])
             grp.add([i], 1.0, "REPLACE")
         print(f"[tripo] {ap['bone']}: {len(picked)} verts moved off the limbs")
 
-    arms = [f"{s_}{p}" for s_ in ("Left", "Right") for p in ("Arm", "ForeArm", "Hand")]
     near = {"arm": dist(co, arms), "leg": d_leg}
     for rb in preset.get("rebind", []):
         grp = body.vertex_groups[M + rb["to"]]

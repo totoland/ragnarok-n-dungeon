@@ -54,7 +54,17 @@ else
 fi
 "$BLENDER" -b assets/blender/sandman/sandman.blend -P tools/export_heroes.py -- sandman assets/monsters 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
 "$BLENDER" -b assets/blender/dark_sword/dark_sword.blend -P tools/export_heroes.py -- darkSword assets/monsters 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
-"$BLENDER" -b assets/blender/nerakos/abyssal_trident.blend -P tools/export_heroes.py -- nerakos assets/monsters 2>&1 | grep -E "^\[export_heroes\]|^    |Error"
+# Nerakos is skinned (tools/tripo_to_skinned.py nerakos), holding the Under Water Sword from
+# assets/gear. The old legless sculpt (assets/blender/nerakos/abyssal_trident.blend) is retired.
+if [ -f "$KA/Standard_Walk.fbx" ]; then
+  sh tools/export_skinned_hero.sh nerakos assets/blender/nerakos_tripo/nerakos_skinned.blend \
+    walk=$KA/Standard_Walk.fbx idle=$KA/Unarmed_Idle_Looking_Ver_2.fbx dead=$KA/Standing_Death_Forward_02.fbx \
+    cast=$KA/Standing_2H_Magic_Attack_01.fbx run=$KA/Standing_Run_Forward.fbx \
+    slash1=$KA/Great_Sword_Slash_1.fbx slash2=$KA/Sword_And_Shield_Slash_2.fbx slash3=$KA/Sword_And_Shield_Slash_3.fbx \
+    powerup=$KA/Sword_And_Shield_Power_Up.fbx hurt=$KA/Standing_React_Small_From_Front_02.fbx
+else
+  echo "[export_heroes] nerakos: Mixamo clips not on this machine - keeping the committed GLB"
+fi
 
 # Worn gear: its own directory, so a hat is fetched alongside the heroes rather than baked
 # into both of them.

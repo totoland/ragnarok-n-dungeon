@@ -511,11 +511,11 @@ export const MONSTERS = {
     name: 'Nerakos', ai: 'boss', boss: true,
     hp: 3950, atk: 30, speed: 2.2, mass: 5.8,
     hurtbox: { r: 1.2, h: 3.0 },
-    // Trident thrust: long, and it comes with the reach of the haft.
+    // The Under Water Sword's forward cut: a long blade on a big man, so a long reach.
     attack: { range: 2.8, windup: 0.5, dur: 0.34, cd: 1.7, box: { x0: 0.0, x1: 3.2, y0: -0.3, y1: 2.9 }, knock: [7, 2] },
-    // He does not run; he surges, and the tentacles carry him.
+    // The surge: he runs the lane down, sword first.
     charge: { windup: 0.6, dur: 0.55, speed: 13.0, cd: 8.5, box: { x0: -0.6, x1: 2.4, y0: -0.4, y1: 2.9 }, knock: [9, 3] },
-    // Temple sweep: six tentacles, both sides at once, the widest thing in the game.
+    // Temple sweep: the big two-handed swing, both sides at once, the widest thing in the game.
     slam: { windup: 1.0, dur: 0.5, cd: 7.5, box: { x0: -4.0, x1: 4.0, y0: -0.5, y1: 3.2, both: true }, knock: [6, 8], depth: 1.8 },
     // The drowned bell: three rings of water down the lanes.
     cast: { windup: 0.8, dur: 0.5, cd: 6.5, shot: { kind: 'tide', count: 3, speed: 8.5, life: 2.6, y: 1.4, lane: 1.5, dmg: 0.9 }, knock: [4, 1] },

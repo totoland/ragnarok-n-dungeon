@@ -37,6 +37,7 @@ assets/blender/mixamo/*.fbx
 # GLB the game loads, ARE committed. Kept local like King Orc's sculpt.
 assets/blender/moonraya_tripo/moonraya_rigged.glb
 assets/blender/baphomet_tripo/baphomet_rigged.glb
+assets/blender/nerakos_tripo/nerakos_rigged.glb
 assets/blender/hunter_tripo/hunter_rigged.glb
 assets/blender/hunter_tripo/falcon_tripo.glb
 assets/blender/hunter_tripo/bow_tripo.glb

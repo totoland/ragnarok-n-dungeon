@@ -237,51 +237,67 @@
     }
   },
   "nerakos": {
-    "height": 3.5,
+    "height": 3.3,
     "front": "+z",
+    "skinned": true,
     "pivot": {
       "root": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "torso": [
-        0.0,
-        1.1179,
-        -0.0203
-      ],
-      "head": [
-        0.0,
-        2.6016,
-        0.0081
+        0,
+        0,
+        0
       ],
       "weapon": [
-        -0.7317,
-        2.2154,
-        0.1463
-      ],
-      "tentacles": [
-        0.0,
-        1.4634,
-        -0.2033
+        -0.4005,
+        1.5955,
+        0.7772
       ]
     },
     "parts": {
-      "torso": {
-        "meshes": 238,
-        "verts": 34094
+      "weapon": {}
+    },
+    "clips": {
+      "walk": {
+        "dur": 1.167,
+        "strike": 0.033
       },
-      "head": {
-        "meshes": 76,
-        "verts": 9944
+      "idle": {
+        "dur": 7.833,
+        "strike": 4.533
       },
-      "tentacles": {
-        "meshes": 132,
-        "verts": 10819
+      "dead": {
+        "dur": 2.367,
+        "strike": 1.6
       },
-      "weapon": {
-        "meshes": 27,
-        "verts": 6642
+      "cast": {
+        "dur": 2.7,
+        "strike": 1.133
+      },
+      "run": {
+        "dur": 0.733,
+        "strike": 0.733
+      },
+      "slash1": {
+        "dur": 1.267,
+        "strike": 0.567
+      },
+      "slash2": {
+        "dur": 3.533,
+        "strike": 0.7,
+        "takeoff": 1.767,
+        "apex": 2.1,
+        "land": 2.367
+      },
+      "slash3": {
+        "dur": 1.5,
+        "strike": 0.6
+      },
+      "powerup": {
+        "dur": 2.367,
+        "strike": 0.5
+      },
+      "hurt": {
+        "dur": 0.767,
+        "strike": 0.067
       }
     }
   },

@@ -249,7 +249,7 @@ function rigFromGlb(model, { scale = 1, darken = 0 } = {}) {
     if (darken) o.material.color.multiplyScalar(1 - darken);
   });
   const rig = { root };
-  for (const name of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'weapon', 'shards', 'tentacles']) {
+  for (const name of ['torso', 'head', 'armL', 'armR', 'legL', 'legR', 'weapon', 'shards']) {
     const n = root.getObjectByName(name);
     if (n) rig[name] = n;
   }
@@ -302,39 +302,6 @@ const REST = {};
 // Baphomet's scythe is parented to armL, so those clips swung an empty arm and the attack
 // read as no animation at all. These drive the arm that actually holds the weapon.
 export const CLIPS_BY_TYPE = {
-  // Nerakos. Every other boss is posed through his arms; this one has none, so the motion
-  // is the trunk, the head, and the trident turning about the fist that never lets go of it.
-  // The numbers are small on purpose: his torso pivot is the waist of a figure whose legs
-  // are welded to it, so a lean is the whole body tipping and 0.2 is already a long way.
-  nerakos: {
-    // The thrust. He drops his weight onto the leading side and drives the fork out; the
-    // trident turns about the grip, which is exactly what a hand holding a haft does.
-    windup: [[0, {}], [1, { tx: -0.16, tyaw: 0.24, ty: 0.06, hx: -0.14, wx: -0.30, wz: 0.10 }]],
-    attack: [
-      [0, { tx: -0.16, tyaw: 0.24, ty: 0.06, hx: -0.14, wx: -0.30, wz: 0.10 }],
-      [0.35, { tx: 0.20, tyaw: -0.14, ty: -0.05, hx: 0.16, wx: 0.55, wz: -0.06 }],
-      [1, { tx: 0.15, tyaw: -0.10, ty: -0.03, hx: 0.12, wx: 0.46, wz: -0.04 }],
-    ],
-    // The temple sweep is the tentacles, which are driven in update() - here the body only
-    // has to look like it is throwing them: gather down and low, then rise through it.
-    slamWindup: [[0, {}], [1, { tx: -0.20, ty: -0.22, hx: -0.26, wx: -0.16 }]],
-    slam: [
-      [0, { tx: -0.20, ty: -0.22, hx: -0.26, wx: -0.16 }],
-      [0.4, { tx: 0.10, ty: 0.20, hx: 0.22, wx: 0.12, tz: 0.06 }],
-      [1, { tx: 0.06, ty: 0.12, hx: 0.16, wx: 0.08 }],
-    ],
-    // The drowned bell. He lifts the haft and shakes it, and the bell chained under the fork
-    // does the rest - so the tell is a raised trident and a head thrown back, not a swing.
-    castWindup: [[0, {}], [1, { ty: 0.16, hx: -0.34, wx: -0.22, wz: 0.16 }]],
-    cast: [
-      [0, { ty: 0.16, hx: -0.34, wx: -0.22, wz: 0.16 }],
-      [0.3, { ty: 0.20, hx: -0.20, wx: -0.10, wz: -0.14 }],
-      [0.6, { ty: 0.18, hx: -0.24, wx: -0.18, wz: 0.12 }],
-      [1, { ty: 0.10, hx: -0.12, wx: -0.12, wz: -0.04 }],
-    ],
-    chargeWindup: [[0, {}], [1, { tx: -0.22, ty: -0.10, hx: -0.16, wx: -0.24 }]],
-    charge: [[0, { tx: 0.26, hx: 0.12, wx: 0.30 }], [1, { tx: 0.30, hx: 0.14, wx: 0.34 }]],
-  },
   baphomet: {
     // Mixamo "Standing Melee Attack Downward", frames 7:33, gain legs=0.6,hy=0.25,tz=0.4,tyaw=0.55.
     // The scythe goes up over the shoulder while the torso winds the other way, then the
@@ -1358,8 +1325,8 @@ const BUILDERS = { poring: () => buildPoring(), lunatic: buildLunatic,
   grinlit: buildGrinlit, velmara: buildVelmara, nyxmare: buildNyxmare,
   shardling: buildShardling,
   darkSword: buildDarkSwordGlb,
-  // Bairune. Nerakos is the fifth sculpt: one continuous body, so no arms and no legs in
-  // his rig - the six dorsal tentacles are the limb that moves.
+  // Bairune. Nerakos is skinned (tools/tripo_to_skinned.py nerakos): Tripo's octopus captain,
+  // the Under Water Sword in his right hand.
   craboon: buildCraboon, hydrella: buildHydrella, jellune: buildJellune,
   marinox: buildMarinox, shellora: buildShellora, nerakos: buildNerakosGlb,
   // Varkhol. The roster is primitives; King Orc is the sixth sculpt, and the first to arrive
@@ -1409,6 +1376,22 @@ const SKIN_MOVES = {
       charge: { clip: 'run', loop: true, stride: 4.85, maxRate: 2.2, windup: false },
       cast: { clip: 'cast', pre: 0.9, post: 0.7 },        // Hellfire
       heal: { clip: 'powerup', linear: true },             // second wind, as Moonraya's
+    },
+  },
+  // Nerakos, Tripo's octopus captain. The Under Water Sword - the one he drops - rides his right
+  // fist on the Knight's grip (tools/tripo_to_skinned.py), so he walks and stands with the
+  // sword arm held, as Baphomet does.
+  nerakos: {
+    walk: { clip: 'walk', stride: 2.9, keep: 'swordArm' }, idle: { clip: 'idle', keep: 'swordArm' }, dead: { clip: 'dead' },
+    hurt: { clip: 'hurt', rate: 1.3 },
+    moves: {
+      attack: { clip: 'slash2', pre: 0.4, post: 0.45 },   // the forward cut
+      // The temple sweep hits both sides at once: the big two-handed swing, raised across
+      // the whole long wind-up.
+      slam: { clip: 'slash1', pre: 0.6, post: 0.6 },
+      charge: { clip: 'run', loop: true, stride: 5.3, maxRate: 2.2, windup: false },
+      cast: { clip: 'cast', pre: 0.9, post: 0.7 },        // the drowned bell
+      heal: { clip: 'powerup', linear: true },
     },
   },
 };
@@ -1531,9 +1514,7 @@ export function createMonsterViews(world) {
     }
     // The build comes off a shelf, so anything the last owner left on it is reset here: a
     // boss that died raging would otherwise hand the next one his flung-out shards.
-    for (const limb of ['shards', 'tentacles']) {
-      if (built.rig?.[limb]) { built.rig[limb].scale.setScalar(1); built.rig[limb].rotation.set(0, 0, 0); }
-    }
+    if (built.rig?.shards) { built.rig.shards.scale.setScalar(1); built.rig.shards.rotation.set(0, 0, 0); }
     group.scale.setScalar(1);
     const v = { id: e.id, type: e.type, group, built, materials, cur: {}, scratch: {}, walkPhase: 0, yaw: e.facing * HALF, t: Math.random() * 10, dead: false, rageT: 0, shardSpin: 0 };
     views.set(e.id, v);
@@ -1741,24 +1722,6 @@ export function createMonsterViews(world) {
           sh.rotation.z = Math.sin(v.t * 0.7) * 0.1;
           const out = 1 + (rage ? (rage.shards - 1) * v.rageT : 0);
           sh.scale.setScalar(out);
-        }
-
-        // Nerakos' six dorsal tentacles are a limb of their own, and the only one he has -
-        // his body is a single mesh, so there is no arm to swing and no leg to step. They
-        // drift with the water while he stands, draw back through a windup and surge on the
-        // strike, which is where the weight of every one of his moves has to come from.
-        // applyPose never touches this node, so it is driven here rather than keyed: a clip
-        // would be overwritten by the next frame's pose.
-        if (v.built.rig?.tentacles) {
-          const tn = v.built.rig.tentacles;
-          const drive = e.dead ? -0.7 : e.state === 'windup' ? -1 : e.state === 'attack' ? 1.7 : 0;
-          v.tent = (v.tent ?? 0) + (drive - (v.tent ?? 0)) * Math.min(1, 9 * dt);
-          tn.rotation.x = Math.sin(v.t * 1.3) * 0.07 + v.tent * 0.20;
-          tn.rotation.y = Math.sin(v.t * 0.7) * 0.06 + v.tent * 0.08;
-          tn.rotation.z = Math.sin(v.t * 0.9 + 1.2) * 0.05;
-          // and they lengthen with the second phase, which is where his `rage.shards` goes:
-          // the same number the Dark Sword throws his obsidian out by.
-          tn.scale.setScalar(1 + (rage ? (rage.shards - 1) * v.rageT : 0));
         }
 
         // hit flash, and the dead sink into the floor and fade
