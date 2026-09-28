@@ -22,6 +22,9 @@ const MAX_VOICES = 32;       // past this, a new sound is dropped rather than st
 const SAMPLES = {
   levelUp: { url: 'assets/sfx/levelup.m4a', vol: 0.7 },
   critical: { url: 'assets/sfx/critical.m4a', vol: 0.8 },
+  // The ordinary hit lands dozens of times a minute: pitched a few percent either way each time
+  // so a combo is not one sample on repeat, and a little under the critical so that one stands out.
+  hit: { url: 'assets/sfx/hit.m4a', vol: 0.55, vary: 0.06 },
 };
 
 class Sfx {
@@ -52,6 +55,8 @@ class Sfx {
     if (this.ctx.state === 'suspended') this.ctx.resume();
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
+    const vary = SAMPLES[name].vary;
+    if (vary) src.playbackRate.value = 1 + (Math.random() * 2 - 1) * vary;
     const gain = this.ctx.createGain();
     gain.gain.value = SAMPLES[name].vol;
     src.connect(gain).connect(this.ctx.destination);
@@ -153,6 +158,7 @@ class Sfx {
             break;
           }
           if (!this.gate('hit', 0.03)) break;
+          if (this.sample('hit')) break;
           this.noise({ dur: 0.09, vol: 0.1, freq: 1100, q: 0.7 });
           this.tone({ freq: 380, to: 90, type: 'square', dur: 0.09, vol: 0.07 });
         } else {
