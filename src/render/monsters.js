@@ -258,6 +258,10 @@ export async function loadMonsterAssets(base = 'assets/monsters/') {
  *  the source model on the next retry. */
 function rigFromGlb(model, { scale = 1, darken = 0 } = {}) {
   const root = cloneModel(model);
+  // The clone shares the loaded model's geometry (only the skeleton and the materials are its
+  // own), so freeing this copy must leave the geometry alone: disposing it drops the source's
+  // buffers from the GPU, and the next spawn of the type uploads the whole mesh again.
+  root.userData.sharedGeometry = true;
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.material = o.material.clone();
@@ -1578,6 +1582,10 @@ const CLIPS = {
 
 // ------------------------------------------------------------------ manager
 
+// Skinned monsters further than this from the hero, sideways, re-pose at half rate.
+const FAR_X = 6;
+let skinFrame = 0, heroX = 0;
+
 export function createMonsterViews(world) {
   const views = new Map();
   // Views built ahead of their spawn. A monster is a few dozen primitives, and building
@@ -1645,8 +1653,9 @@ export function createMonsterViews(world) {
   }
 
   function destroy(built) {
+    const shared = built.root.userData.sharedGeometry;
     built.root.traverse((o) => {
-      if (o.geometry) o.geometry.dispose();
+      if (o.geometry && !shared) o.geometry.dispose();
       if (o.isMesh) { const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.dispose(); }
     });
   }
@@ -1716,9 +1725,15 @@ export function createMonsterViews(world) {
       if (hopCfg?.hop && e.def.hop && (e.moving || e.state === 'enter') && !e.dead && e.state !== 'hurt') {
         rig.root.position.y += e.def.hop.height * 0.6 * Math.max(0, Math.sin(Math.PI * (e.hopT % 1)));
       }
-      driveSkin(rig);
       v.layers = stepLayers(v.layers || [], wantedBossLayer(v, e, dt), dt);
-      layerSkin(rig, v.layers);
+      // Half rate out at the edges. A pack of skinned minions is most of what a busy room
+      // costs, and the ones well to the side of the hero are small, often half off-screen and
+      // not the thing anyone is watching - so they re-pose on every other frame, alternating
+      // by id so the work is split rather than bunched. A boss, and anything winding up or
+      // swinging, always gets every frame: that is the pose the player reads.
+      const acting = e.state === 'windup' || e.state === 'attack';
+      const halfRate = !e.boss && !acting && Math.abs(e.x - heroX) > FAR_X && ((skinFrame + e.id) & 1);
+      if (!halfRate) { driveSkin(rig); layerSkin(rig, v.layers); }
     }
   }
 
@@ -1798,9 +1813,23 @@ export function createMonsterViews(world) {
       // Spread along the play line rather than parked off the map: inside the camera and
       // inside the shadow box, so the depth pass compiles their shaders too.
       const built = Object.keys(BUILDERS).map((type, i) => { const b = BUILDERS[type](); b.root.position.set(WARM_X + (i % 7) * 1.2 - 3, 0, WARM_Z); world.scene.add(b.root); return b.root; });
-      return () => { for (const r of built) { world.scene.remove(r); r.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); } };
+      // And each GLB model once more as it looks dying: the death fade turns its materials
+      // transparent, and transparent is a shader of its own - so the first Skel Archer to die
+      // compiled three programs in a 140 ms frame. The primitives' materials are shared and
+      // must not be touched; a GLB copy's are its own.
+      for (const [i, type] of Object.keys(BUILDERS).entries()) {
+        const b = BUILDERS[type]();
+        if (!b.root.userData.sharedGeometry) { b.root.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); continue; }
+        b.root.traverse((o) => { if (o.isMesh) for (const m of (Array.isArray(o.material) ? o.material : [o.material])) { m.transparent = true; m.opacity = 0.9; } });
+        b.root.position.set(WARM_X + (i % 7) * 1.2 - 3, 0, WARM_Z - 1.2);
+        world.scene.add(b.root);
+        built.push(b.root);
+      }
+      return () => { for (const r of built) { world.scene.remove(r); if (!r.userData.sharedGeometry) r.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); } };
     },
     update(game, dt) {
+      skinFrame++;
+      heroX = game.player?.x ?? 0;
       const seen = new Set();
       for (const e of game.enemies) {
         seen.add(e.id);
@@ -1883,6 +1912,11 @@ export function createMonsterViews(world) {
       if (freed > 1) note(`${freed} monsters shelved ${Math.round(performance.now() - t0)}ms (${views.size} left)`);
     },
     // The end of a run: nothing is coming back, so let it all go, shelf included.
-    clear() { for (const v of [...views.values()]) { world.scene.remove(v.group); destroy(v.built); views.delete(v.id); } dropPool(); },
+    clear() { this.clearViews(); dropPool(); },
+    // A room change: the old room's monsters go, the shelf stays. It holds the next room's
+    // monsters, built one a frame during the walk to the exit - and clear() used to throw
+    // them away on the way in, so every room's first wave was built cold after all, all of
+    // it in the frame the wave arrived.
+    clearViews() { for (const v of [...views.values()]) { world.scene.remove(v.group); destroy(v.built); views.delete(v.id); } },
   };
 }

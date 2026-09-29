@@ -14,7 +14,7 @@ import { createSettingsUI } from './render/settings-ui.js';
 import { createTestUI, testEnabled, setTestEnabled } from './render/test-ui.js';
 import { createStudio } from './render/studio.js';
 import { createMenuNav } from './render/menu-nav.js';
-import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom, prewarmTick, warmProps, WARM_X, WARM_Z } from './render/scene.js';
+import { createScene, buildRoom, disposeRoom, updateScene, prewarmRoom, prewarmTown, prewarmTick, warmProps, WARM_X, WARM_Z } from './render/scene.js';
 import { loadHeroAssets, createHeroView, showWeapon, restPose, cloneHero } from './render/heroes.js';
 import { auraTick, stripAura } from './render/aura.js';
 import { createTelemetry } from './telemetry.js';
@@ -277,7 +277,9 @@ const townBlurb = new Map(townButtons.map((b) => [b.dataset.town, b.querySelecto
 // town anyone tried to test before clearing the one ahead of it.
 function markTown({ force = false } = {}) {
   if (!force && !isUnlocked(profile, selectedTown)) selectedTown = 'prontera';
-  if (assets) { prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0); monsters.prebuild(TOWNS[selectedTown].rooms[0], MONSTERS); }
+  // The first room now (it is what start() draws first), the rest of the town's rooms over the
+  // title's idle frames - the title loop ticks the queue - so a run never paints one.
+  if (assets) { prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0); while (prewarmTick(world)); prewarmTown(world, TOWNS[selectedTown].rooms); monsters.prebuild(TOWNS[selectedTown].rooms[0], MONSTERS); }
   for (const b of townButtons) b.classList.toggle('selected', b.dataset.town === selectedTown);
   refreshTitle();
 }
@@ -440,25 +442,34 @@ function disposePreview() {
 // Compile every shader the run can need while the title is still up - each monster, each
 // effect, both heroes with a refined blade - so the first boss, the first skill and the
 // first drop do not each cost a 60-100 ms frame on Safari, which compiles lazily and slowly.
-function warmUp() {
+let warming = false;   // the title loop skips its draw while warmUp's shaders compile
+async function warmUp() {
   const t0 = performance.now();
+  warming = true;
   const heroes = ['knight', 'hunter'].map((k, i) => { const m = cloneHero(assets[k]); stripAura(m); m.position.set(WARM_X + i * 1.5 - 1, 0, WARM_Z); world.scene.add(m); auraTick(m, { id: 'katana', plus: 9 }, 0); return m; });
   const undoMonsters = monsters.warm();
   const undoProps = warmProps(world);
   fx.warm();
-  try { world.renderer.compile(world.scene, world.camera); } catch (err) { console.warn('warm-up compile failed', err); }
+  // compileAsync hands the programs to the driver and waits for them off the main thread
+  // (KHR_parallel_shader_compile) instead of blocking on each link in turn - which, with
+  // every monster and effect in the scene at once, was the 260-430 ms frame each session
+  // opened with. Nothing is drawn meanwhile: a draw would use a program still compiling and
+  // block on it after all. Where the extension is missing this is the old compile, no worse.
+  try { await world.renderer.compileAsync(world.scene, world.camera); } catch (err) { console.warn('warm-up compile failed', err); }
   world.renderer.render(world.scene, world.camera);   // uploads the textures the compile did not
   for (const m of heroes) world.scene.remove(m);
   undoMonsters();
   undoProps();
   fx.clear();
+  warming = false;
   world.warmMs = Math.round(performance.now() - t0);
 }
 
-Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(([a]) => {
+Promise.all([loadHeroAssets(), loadMonsterAssets()]).then(async ([a]) => {
   assets = a;
   characterUI.setAssets(a);
-  warmUp();
+  hud.setLoading('Preparing…');
+  await warmUp();
   prewarmRoom(world, TOWNS[selectedTown].rooms[0], 0);
   while (prewarmTick(world));   // the first room is drawn next; spreading it over frames it does not have would only defer the cost into them
   monsters.prebuild(TOWNS[selectedTown].rooms[0], MONSTERS);
@@ -503,12 +514,6 @@ function start() {
   if (testTown) { testTown = null; if (testRoom > 0) loadRoom(game, Math.min(testRoom, game.dungeon.rooms.length - 1)); }
   if (studioOn) studio.setup(game);
   else if (!soak) { profile.last = { hero: selectedHero, town: selectedTown }; saveProfile(profile); }
-  if (soak) {
-    prewarmRoom(world, SOAK.rooms[0], 0);
-    while (prewarmTick(world));
-    monsters.prebuild(SOAK.rooms[0], MONSTERS);
-    while (monsters.tick());
-  }
   progress = null;
   heroView = createHeroView(world, selectedHero, assets);
   hud.bindHero(game.player);
@@ -522,7 +527,21 @@ function start() {
   prewarmed = -1;
   acc = 0;
   hitstop = 0;
+  // Whatever of the town's room textures the title did not get to, painted now: a soak run's
+  // dungeon is every room in the game, and a player who taps straight away leaves some. The
+  // tap is the one moment a wait reads as loading rather than as a stutter.
+  prewarmTown(world, game.dungeon.rooms);
+  while (prewarmTick(world));
   syncRoom();
+  // Everything the first frame of the run draws, made in the click that started it rather
+  // than in that frame: the first room's monsters off the shelf (the title's prebuild was
+  // for whichever town was highlighted, and start() cleared it), and every shader the scene
+  // now holds. The title is still what is on screen while this runs, so it costs a beat
+  // after the tap instead of a hitch in the first second of play - the 100-250 ms frame
+  // every run used to open with on the tablet.
+  monsters.prebuild(game.room, MONSTERS);
+  while (monsters.tick());
+  try { world.renderer.compile(world.scene, world.camera); } catch (err) { console.warn('run compile failed', err); }
   markSelected();
 }
 
@@ -555,7 +574,7 @@ function syncRoom() {
   if (game.roomIndex !== roomBuilt) {
     buildRoom(world, game.room, game.roomIndex);
     roomBuilt = game.roomIndex;
-    monsters.clear();
+    monsters.clearViews();   // not clear(): the shelf holds this room's prebuilt monsters
     fx.clear();
   }
 }
@@ -592,7 +611,7 @@ function frame(now) {
   // arrive as the first frame of input.
   if (!game || paused) input.snapshot();
 
-  if (!game) { touch.setPlaying(false); if (preview) updatePreview(dtReal); monsters.tick(); prewarmTick(world); world.renderer.render(world.scene, world.camera); return; }
+  if (!game) { touch.setPlaying(false); if (warming) return; if (preview) updatePreview(dtReal); monsters.tick(); prewarmTick(world); world.renderer.render(world.scene, world.camera); return; }
 
   const frameStart = performance.now();
   for (const k in phase) phase[k] = 0;
@@ -780,17 +799,26 @@ function renderFrame(dt) {
   } else heldSince = 0;
   const preStart = performance.now();
   syncRoom();
-  // The walk to the exit is the quiet moment to draw the next room's textures.
-  const next = game.roomIndex + 1;
-  if (game.phase === 'cleared' && next < game.dungeon.rooms.length && prewarmed !== next) {
+  // Get the next room ready while this one finishes: its textures painted and uploaded and
+  // its monsters built, one of each a frame. That used to wait for the room to clear and
+  // spend the walk to the exit on it, which is right for a person and never happens in a
+  // soak run (it goes straight on) - so the soak opened every room by building its whole
+  // first wave in one frame. The last wave is a better start: it is on the field, nothing
+  // else will be taken off the shelf - unless a boss still has adds to call, and those come
+  // off the same shelf, so a boss room waits for them.
+  const rooms = game.dungeon.rooms;
+  const next = game.dungeon.soak ? (game.roomIndex + 1) % rooms.length : game.roomIndex + 1;
+  const lastWave = game.phase === 'fight' && game.waveIndex >= 0 && game.waveIndex === game.room.waves.length - 1 && game.spawnQueue.length === 0
+    && !game.enemies.some((e) => !e.dead && e.def.adds && !e.addsDone);
+  const readying = game.phase === 'cleared' || lastWave;
+  if (readying && next < rooms.length && next !== game.roomIndex && prewarmed !== next) {
     prewarmed = next;
-    prewarmRoom(world, game.dungeon.rooms[next], next);
-    monsters.prebuild(game.dungeon.rooms[next], MONSTERS);
-    mark(`prewarm room ${game.dungeon.rooms[next].name}`);
+    prewarmRoom(world, rooms[next], next);
+    monsters.prebuild(rooms[next], MONSTERS);
+    mark(`prewarm room ${rooms[next].name}`);
   }
-  // The walk out is the budget: one monster view and one room texture per frame, not all of
-  // either in the frame that noticed.
-  if (game.phase === 'cleared') { monsters.tick(); prewarmTick(world); }
+  // One monster view and one room texture per frame, not all of either in the frame that noticed.
+  if (readying) { monsters.tick(); prewarmTick(world); }
   for (const ev of game.events) { const f = MARKED[ev.type]; const label = f && f(ev); if (label) mark(label); sfx.handle(ev); }
   phase.pre = performance.now() - preStart;   // room sync, the next room's textures, the event drain
   let t = performance.now();

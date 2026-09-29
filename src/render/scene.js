@@ -243,17 +243,24 @@ function cachedTex(key, make) {
   return t;
 }
 function roomTextures(theme, themeKey, index) {
-  const ground = cachedTex(`ground:${themeKey}:${index}`, () => (theme.ground === 'grass'
-    ? grassFloor(theme.floor, theme.grout, index + 3)
-    : theme.ground === 'sand'
-      ? sandFloor(theme.floor, theme.grout, index + 3)
-      : stoneFloor(theme.floor, theme.grout, index + 3)));
+  const get = roomTextureMakers(theme, themeKey, index);
+  return { ground: get.ground(), bg: get.bg(), wall: get.wall() };
+}
+// The same three, each behind its own call, so a caller can make them one at a time.
+function roomTextureMakers(theme, themeKey, index) {
   const sky = (t) => { t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t; };
-  const bg = theme.bg
+  const bg = () => (theme.bg
     ? cachedTex(`bg:${theme.bg}`, () => { const t = new THREE.TextureLoader().load(theme.bg, () => { if (t.userData.warm) t.userData.warm.initTexture(t); }); return sky(t); })
-    : theme.bgMake ? cachedTex(`sky:${themeKey}:${index}`, () => sky(theme.bgMake(index))) : null;
-  const wall = bg ? null : cachedTex(`wall:${themeKey}:${index}`, () => brickWall(theme.wall, theme.mortar, index + 7));
-  return { ground, bg, wall };
+    : theme.bgMake ? cachedTex(`sky:${themeKey}:${index}`, () => sky(theme.bgMake(index))) : null);
+  return {
+    ground: () => cachedTex(`ground:${themeKey}:${index}`, () => (theme.ground === 'grass'
+      ? grassFloor(theme.floor, theme.grout, index + 3)
+      : theme.ground === 'sand'
+        ? sandFloor(theme.floor, theme.grout, index + 3)
+        : stoneFloor(theme.floor, theme.grout, index + 3))),
+    bg,
+    wall: () => (theme.bg || theme.bgMake ? null : cachedTex(`wall:${themeKey}:${index}`, () => brickWall(theme.wall, theme.mortar, index + 7))),
+  };
 }
 
 // Draw and upload a room's textures now, so building it later costs geometry alone.
@@ -264,20 +271,34 @@ function roomTextures(theme, themeKey, index) {
 let warmQueue = [];
 export function prewarmRoom(world, roomDef, index) {
   const theme = THEMES[roomDef.theme] || THEMES.sewer;
-  const { ground, bg, wall } = roomTextures(theme, roomDef.theme, index);
-  warmQueue = [];
-  for (const t of [ground, bg, wall]) {
-    if (!t) continue;
-    t.userData.warm = world.renderer;
-    warmQueue.push(t);
-  }
+  const make = roomTextureMakers(theme, roomDef.theme, index);
+  // Painting is the expensive half, not the upload: a procedural floor is a canvas filled
+  // stone by stone, and all three in the frame the room was cleared was a 50-80 ms frame on
+  // the tablet. So the queue holds the makers, and each tick paints and uploads one.
+  warmQueue = [make.ground, make.bg, make.wall];
 }
 
-// Upload one queued texture. Returns true while there is more to do.
+// Every room of a town, queued the same way: called from the title screen, whose idle frames
+// paint them one at a time while the player is still choosing, so that nothing a run's rooms
+// draw is painted during the run at all. The textures are cached for the session.
+export function prewarmTown(world, rooms) {
+  warmQueue = [];
+  rooms.forEach((roomDef, index) => {
+    const theme = THEMES[roomDef.theme] || THEMES.sewer;
+    const make = roomTextureMakers(theme, roomDef.theme, index);
+    warmQueue.push(make.ground, make.bg, make.wall);
+  });
+}
+
+// Paint and upload one queued texture. Returns true while there is more to do.
 export function prewarmTick(world) {
-  const t = warmQueue.shift();
-  if (!t) return false;
-  if (t.image && (t.image.width || t.image.complete)) { try { world.renderer.initTexture(t); } catch { /* not uploadable yet */ } }
+  const make = warmQueue.shift();
+  if (!make) return false;
+  const t = make();
+  if (t) {
+    t.userData.warm = world.renderer;
+    if (t.image && (t.image.width || t.image.complete)) { try { world.renderer.initTexture(t); } catch { /* not uploadable yet */ } }
+  }
   return warmQueue.length > 0;
 }
 
@@ -294,6 +315,13 @@ export function prewarmTick(world) {
  * One tiny mesh per *configuration* rather than per theme: what the compiler cares about is
  * the combination of features, and a dozen themes share a handful of those between them.
  */
+// A 1x1 sRGB texture, standing in for a room's painted maps while their shaders compile.
+function warmMap() {
+  const t = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.needsUpdate = true;
+  return t;
+}
 export function warmProps(world) {
   const geo = new THREE.BoxGeometry(0.01, 0.01, 0.01);
   const mats = [
@@ -305,6 +333,11 @@ export function warmProps(world) {
     // The two that were not warmed at all, and the reason this function exists.
     new THREE.MeshStandardMaterial({ color: 0xffd76a, emissive: 0xffd76a, emissiveIntensity: 1.5, roughness: 0.4, toneMapped: false }),
     new THREE.MeshBasicMaterial({ map: null, toneMapped: false }),
+    // And with a map: every room's floor and walls are a standard material with a painted
+    // texture, every backdrop a basic one, and a map is its own shader. Neither was warmed,
+    // so the first frame of every run compiled both - the "+2prog" in each run's first frame.
+    new THREE.MeshStandardMaterial({ map: warmMap(), roughness: 0.92, metalness: 0.02 }),
+    new THREE.MeshBasicMaterial({ map: warmMap() }),
   ];
   const meshes = mats.map((m, i) => {
     const mesh = new THREE.Mesh(geo, m);
